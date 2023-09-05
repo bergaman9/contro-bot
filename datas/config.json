@@ -1,0 +1,18 @@
+{
+    "guilds": {
+        "505520771603496971": {
+            "welcome_channel_id": "1130660857181900931",
+            "description": "Merhaba {mention}, {server} sunucusuna hoş geldin! Seninle birlikte {member_count} üye olduk. <#1025084971842543696> kanalından kayıt olabilirsin.",
+            "color": "0xfe25ff",
+            "fill": "#fe25ff",
+            "background_url": "https://static.vecteezy.com/system/resources/previews/006/241/323/original/retro-style-80s-sci-fi-background-futuristic-with-laser-grid-landscape-digital-cyber-surface-style-of-the-1980s-free-photo.jpg"
+        },
+        "1022821492565749771": {
+            "welcome_channel_id": "1031567058971938906",
+            "description": "Merhaba {mention} aramıza hoş geldin! <#1022821720882692106> kanalından bilgi alabilirsin.",
+            "color": "0xFF0000",
+            "fill": "#ffffff",
+            "background_url": "https://i.ibb.co/54JzFdT/welcome-copy.png"
+        }
+    }
+}
