@@ -11,7 +11,7 @@ pymongo==4.5.0
 python-dotenv==1.0.0
 rawg==1.2.0
 requests==2.27.1
-spotipy==2.22.0
+spotipy==2.22.1
 tmdbsimple==2.9.1
 translate==3.6.1
 wavelink==2.6.2
