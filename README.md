@@ -1,4 +1,4 @@
-# Contro Bot
+## Contro Bot
 
 This is a Discord bot that I made for my own server. It's a work in progress, but it's functional. It's written in Python using the [discord.py](https://discordpy.readthedocs.io/en/stable/index.html) library.
 
