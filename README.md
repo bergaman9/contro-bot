@@ -1,32 +1,15 @@
-## Contro Bot
+# Contro Bot
 
 This is a Discord bot that I made for my own server. It's a work in progress, but it's functional. It's written in Python using the [discord.py](https://discordpy.readthedocs.io/en/stable/index.html) library.
-
-### Features
-
-![contro bot features](https://i.imgur.com/yVG7wtx.jpeg)
-
-- **Welcome Images**: When a new user joins the server, the bot will send a welcome image to the channel specified in the config file.
-- **Music**: Play music from YouTube and Spotify in voice channels.
-- **Moderation**: Kick, ban, and mute users.
-- **Fun**: Play games and get random facts, jokes, and memes.
-- **Reaction Roles**: Assign roles to users by reacting to a button, dropdown, or reaction.
-- **Registration System**: Users can register for the server by reacting to a button.
-- **Utility**: Get information about the server, users, and roles.
-- **Logging**: Log messages, moderation actions, and more to a channel.
-- **Partner System**: Users can partner their server with the bot by reacting to a button.
-- **Invite Tracker**: Track invites and give rewards to users who invite people to the server.
-- **Config**: Configure the bot using a config file.
-- **Game Stats**: Get stats for games like Fortnite, Minecraft, and more.
-- **Moderation System**: Automatically delete messages that contain certain words.
-- **Giveaways**: Create giveaways that users can enter by reacting to a button.
-
 
 ---
 
 ### Features and Commands
 
 ---
+
+![contro bot features](https://i.imgur.com/yVG7wtx.jpeg)
+
 
 #### 🎉 **Giveaways**
 - `/giveaway_create`: Start a new giveaway on the server.
