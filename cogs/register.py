@@ -4,14 +4,18 @@ from discord.ext import commands
 from utils import create_embed, initialize_mongodb, find_guild_in_register_collection, check_if_ctx_or_interaction
 
 class RegisterModal(discord.ui.Modal, title='Kayıt Ol'):
-    name = discord.ui.TextInput(label='İsim')
-    age = discord.ui.TextInput(label='Yaş', style=discord.TextStyle.short, max_length=2)
-    username = discord.ui.TextInput(label='Kullanıcı Adı', required=False)
-class RegisterView(discord.ui.View):
-    def __init__(self):
+    def __init__(self, include_username):
         super().__init__(timeout=None)
-        self.value = None
+        self.add_item(discord.ui.TextInput(label='İsim'))
+        self.add_item(discord.ui.TextInput(label='Yaş', style=discord.TextStyle.short, max_length=2))
+        if include_username:
+            self.add_item(discord.ui.TextInput(label='Kullanıcı Adı', required=False))
+
+class RegisterView(discord.ui.View):
+    def __init__(self, include_username):
+        super().__init__(timeout=None)
         self.add_item(discord.ui.Button(label="Kayıt Ol", style=discord.ButtonStyle.green, custom_id="register_button"))
+        self.include_username = include_username
 class Register(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -26,8 +30,12 @@ class Register(commands.Cog):
         modal_embed = guild_config["modal_embed"]
         channel_id = guild_config["channel_id"]
         channel = self.bot.get_channel(channel_id)
+        include_username = guild_config.get("include_username")
         if modal_embed:
-            await channel.send(embed=create_embed(description=f"{member.mention} kayıt olmak için aşağıdaki butona basabilirsin.", color=discord.Color.green()), view=RegisterView())
+            if include_username:
+                await channel.send(embed=create_embed(description=f"{member.mention} kayıt olmak için aşağıdaki butona basabilirsin.", color=discord.Color.green()), view=RegisterView(include_username=True))
+            else:
+                await channel.send(embed=create_embed(description=f"{member.mention} kayıt olmak için aşağıdaki butona basabilirsin.", color=discord.Color.green()), view=RegisterView(include_username=False))
 
     @commands.hybrid_command(name="kayıt", description="Kayıt olmak için kullanılır.", aliases=["register"])
     async def kayıt(self, ctx, name, age, username=None):
@@ -51,8 +59,12 @@ class Register(commands.Cog):
                 await interaction.response.send_message(embed=create_embed(description="Yaşınızı sayı olarak giriniz.", color=discord.Color.red()), ephemeral=True)
 
         if interaction.data.get("custom_id") == "register_button":
-            await interaction.response.send_modal(RegisterModal())
-
+            guild_config = self.mongo_db['register'].find_one({"guild_id": interaction.guild.id})
+            include_username = guild_config.get("username_edit")
+            if include_username:
+                await interaction.response.send_modal(RegisterModal(include_username=True))
+            else:
+                await interaction.response.send_modal(RegisterModal(include_username=False))
     async def register_handler(self, ctx_or_interaction, member, name, age, username=None):
         guild, send, channel = await check_if_ctx_or_interaction(ctx_or_interaction)
 
