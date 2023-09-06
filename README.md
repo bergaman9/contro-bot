@@ -10,7 +10,7 @@ This is a Discord bot that I made for my own server. It's a work in progress, bu
 
 ![contro bot features](https://i.imgur.com/yVG7wtx.jpeg)
 
-##### Prefix `>` or `/`
+#### Prefix `>` or `/`
 
 #### 🎉 **Giveaways**
 - `/giveaway_create`: Start a new giveaway on the server.

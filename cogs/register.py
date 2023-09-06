@@ -251,8 +251,8 @@ class Register(commands.Cog):
         else:
             await ctx.send(embed=create_embed("Bunu yapmaya iznin yok.", discord.Colour.red()))
 
-    @commands.hybrid_command(name="kayıt_channel", description="Shows the registration channel.")
-    async def kayıt_channel(self, ctx):
+    @commands.hybrid_command(name="kayıt_channel_show", description="Shows the registration channel.")
+    async def kayıt_channel_show(self, ctx):
         if ctx.message.author.guild_permissions.manage_guild:
             record = self.mongo_db['register'].find_one({"guild_id": ctx.guild.id})
             if record is not None:
