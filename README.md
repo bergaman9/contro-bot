@@ -85,7 +85,7 @@ This is a Discord bot that I made for my own server. It's a work in progress, bu
 #### 📝 **Register Commands**
 - `/kayıt`: Register by using this command.
 - `/kayıt_setup`: Set up the registration channel and roles.
-- `/kayıt_channel`: Show the registration channel.
+- `/kayıt_channel_show`: Show the registration channel.
 - `/kayıt_channel_set`: Set the registration channel.
 - `/kayıt_channel_remove`: Remove the registration channel.
 - `/kayıt_settings`: Show the registration settings.

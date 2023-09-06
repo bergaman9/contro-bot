@@ -2,7 +2,9 @@ import os
 import discord
 from discord.ext import commands
 
+from datetime import datetime, timedelta
 import datetime, time
+
 import asyncio
 import wavelink
 from wavelink.ext import spotify
@@ -25,10 +27,6 @@ class Bot(commands.Bot):
         intents.members = True
 
         super().__init__(command_prefix=">", intents=intents, help_command=None)
-
-    async def on_ready(self) -> None:
-        print(f'Logged in {self.user} | {self.user.id}')
-
     async def setup_hook(self) -> None:
         # Wavelink 2.0 has made connecting Nodes easier... Simply create each Node
         # and pass it to NodePool.connect with the client/bot.
@@ -48,6 +46,7 @@ bot = Bot()
 
 @bot.event
 async def on_ready():
+    bot.startTime = time.time()
     await bot.change_presence(status=discord.Status.online, activity=discord.Activity(type=discord.ActivityType.watching, name=f'{len(bot.guilds)} server'))
     await bot.tree.sync()
     count = len(bot.guilds)
@@ -94,7 +93,7 @@ async def on_member_update(before, after):
 
 @bot.command()
 async def uptime(ctx):
-    uptime = str(datetime.timedelta(seconds=int(round(time.time() - startTime))))
+    uptime = str(timedelta(seconds=int(round(time.time() - bot.startTime))))
     embed = discord.Embed(title="Uptime", description=uptime, color=ctx.author.color)
     await ctx.send(embed=embed)
 

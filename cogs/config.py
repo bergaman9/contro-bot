@@ -3,6 +3,9 @@ from discord.ext import commands
 from discord import app_commands
 import psutil
 
+from datetime import datetime, timedelta
+import datetime
+
 import asyncio
 
 
@@ -81,9 +84,13 @@ class Config(commands.Cog):
         embed.add_field(name='CPU Usage', value=f'{cpu_percent}%', inline=True)
         embed.add_field(name='RAM Usage', value=f'{ram_percent}%', inline=True)
         embed.add_field(name='Hosting Region', value='🇪🇺 Europe', inline=True)
-        embed.add_field(name='Active Servers', value=len(self.bot.guilds), inline=True)
-        embed.add_field(name='Active Users', value=len(self.bot.users), inline=True)
-
+        embed.add_field(name='Hosting Provider', value='🐳 DigitalOcean', inline=True)
+        embed.add_field(name='Uptime', value=str(timedelta(seconds=int(round(time.time() - self.bot.startTime)))),
+                        inline=True)
+        embed.add_field(name='Active Servers', value=f'{len(self.bot.guilds)}', inline=True)
+        embed.add_field(name='Active Users', value=f'{len(self.bot.users)}', inline=True)
+        embed.add_field(name='Active Commands', value=f'{len(self.bot.commands)}', inline=True)
+        embed.set_thumbnail(url=self.bot.user.avatar.url)
         await ctx.send(embed=embed)
 
     @commands.hybrid_command(name="support", description="Shows the support server.")

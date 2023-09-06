@@ -1,4 +1,5 @@
 import discord
+from discord import app_commands
 from discord.ext import commands
 
 from utils import create_embed, initialize_mongodb, find_guild_in_register_collection, check_if_ctx_or_interaction
@@ -16,6 +17,7 @@ class RegisterView(discord.ui.View):
         super().__init__(timeout=None)
         self.add_item(discord.ui.Button(label="Kayıt Ol", style=discord.ButtonStyle.green, custom_id="register_button"))
         self.include_username = include_username
+
 class Register(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -38,8 +40,181 @@ class Register(commands.Cog):
                 await channel.send(embed=create_embed(description=f"{member.mention} kayıt olmak için aşağıdaki butona basabilirsin.", color=discord.Color.green()), view=RegisterView(include_username=False))
 
     @commands.hybrid_command(name="kayıt", description="Kayıt olmak için kullanılır.", aliases=["register"])
+    @app_commands.describe(name="İsminizi girin.", age="Yaşınızı girin.", username="Kullanıcı adınızı girin.")
     async def kayıt(self, ctx, name, age, username=None):
         await self.register_handler(ctx, ctx.author, name, age, username)
+
+    @commands.hybrid_command(name="kayıt_setup", description="Kayıt kanalını ve rollerini ayarlar.")
+    @app_commands.describe(channel="Kayıt kanalı ayarlayın.", description="Kayıt kanalı için açıklama girin.", nickname_edit="Nickname düzenlemeyi ayarlayın.", username_edit="Username düzenlemeyi ayarlayın.", age_roles="Yaş rollerini etiketleyerek seçin.", given_roles="Verilecek rolleri etiketleyerek seçin.", taken_roles="Alınacak rolleri etiketleyerek seçin.", modal_embed="Modal embed ayarlayın.")
+    async def kayıt_setup(self, ctx, channel: discord.TextChannel, description=None, nickname_edit: bool = False,
+                          username_edit: bool = False, age_roles: bool = True, given_roles: str = None,
+                          taken_roles: str = None, modal_embed: bool = False):
+        if ctx.message.author.guild_permissions.manage_guild:
+            record = self.mongo_db['register'].find_one({"guild_id": ctx.guild.id})
+            if record is None:
+                # If the record doesn't exist, insert a new record with the given parameters
+                self.mongo_db['register'].insert_one({
+                    "guild_id": ctx.guild.id,
+                    "channel_id": channel.id,
+                    "nickname_edit": nickname_edit,
+                    "username_edit": username_edit,
+                    "age_roles": age_roles,
+                    "modal_embed": modal_embed,
+                    "description": description
+                })
+                await ctx.send(embed=create_embed(
+                    f"Kayıt kanalı {channel.mention} olarak ayarlandı. \n**Düzenleme özellikleri:** \n*Nickname Edit:* {nickname_edit}, *Username Edit:* {username_edit}, *Age Roles:* {age_roles}",
+                    discord.Colour.green()))
+            else:
+                # If the record already exists, update the existing record with the given parameters
+                self.mongo_db['register'].update_one(
+                    {"guild_id": ctx.guild.id},
+                    {"$set": {
+                        "channel_id": channel.id,
+                        "nickname_edit": nickname_edit,
+                        "username_edit": username_edit,
+                        "age_roles": age_roles,
+                        "modal_embed": modal_embed,
+                        "description": description
+                    }}
+                )
+                await ctx.send(embed=create_embed(
+                    f"Kayıt kanalı {channel.mention} olarak güncellendi. \n**Düzenleme özellikleri:** \n*Nickname Edit:* {nickname_edit}, *Username Edit:* {username_edit}, *Age Roles:* {age_roles}",
+                    discord.Colour.green()))
+
+            # Create 18+, 18- and Unregistered roles if they don't exist
+            if age_roles:
+                roles_to_create = [("18+", discord.Colour(0x9bacc5)), ("18-", discord.Colour(0xcc7e36)),
+                                   ("Kayıtsız Üye", discord.Colour(0x86b4a4))]
+
+                for role_name, role_color in roles_to_create:
+                    existing_role = discord.utils.get(ctx.guild.roles, name=role_name)
+                    if existing_role is None:
+                        await ctx.guild.create_role(name=role_name, colour=role_color)
+                        await ctx.send(embed=create_embed(f"Rol '{role_name}' oluşturuldu.", discord.Colour.green()))
+                    else:
+                        await ctx.send(embed=create_embed(f"Rol '{role_name}' zaten var. Yeni bir rol oluşturulmadı.",
+                                                          discord.Colour.orange()))
+
+            # Process given_roles and taken_roles if provided
+            if given_roles:
+                given_roles = [role.strip() for role in given_roles.split(',')]
+                self.mongo_db['register'].update_one({"guild_id": ctx.guild.id}, {"$set": {"given_roles": given_roles}})
+                await ctx.send(
+                    embed=create_embed(f"Roles to be given after registration: {', '.join(given_roles)}",
+                                       discord.Colour.green()))
+
+            if taken_roles:
+                taken_roles = [role.strip() for role in taken_roles.split(',')]
+                self.mongo_db['register'].update_one({"guild_id": ctx.guild.id}, {"$set": {"taken_roles": taken_roles}})
+                await ctx.send(
+                    embed=create_embed(f"Roles to be taken after registration: {', '.join(taken_roles)}",
+                                       discord.Colour.green()))
+        else:
+            await ctx.send(embed=create_embed("Bunu yapmaya iznin yok.", discord.Colour.red()))
+
+    @commands.hybrid_command(name="kayıt_channel_show", description="Shows the registration channel.")
+    async def kayıt_channel_show(self, ctx):
+        if ctx.message.author.guild_permissions.manage_guild:
+            record = self.mongo_db['register'].find_one({"guild_id": ctx.guild.id})
+            if record is not None:
+                channel_id = record.get("channel_id")
+                nickname_edit = record.get("nickname_edit", True)
+                username_edit = record.get("username_edit", True)
+
+                embed = discord.Embed(title="Kayıt Kanalı ve Ayarları", color=discord.Colour.blurple())
+                embed.add_field(name="Kayıt Kanalı", value=f"<#{int(channel_id)}>", inline=False)
+                embed.add_field(name="Nickname Düzenleme", value="Aktif" if nickname_edit else "Pasif", inline=False)
+                embed.add_field(name="Username Düzenleme", value="Aktif" if username_edit else "Pasif", inline=False)
+
+                await ctx.send(embed=embed)
+            else:
+                await ctx.send(embed=create_embed("Kayıt kanalı ayarlanmadı.", discord.Colour.red()))
+        else:
+            await ctx.send(embed=create_embed("Bunu yapmaya iznin yok.", discord.Colour.red()))
+
+    @commands.hybrid_command(name="kayıt_channel_set", description="Sets the age role registration channel.")
+    @app_commands.describe(channel="Kayıt kanalı etiketleyin.")
+    async def kayıt_channel_set(self, ctx, channel: discord.TextChannel):
+        if ctx.message.author.guild_permissions.manage_guild:
+            record = self.mongo_db['register'].find_one({"guild_id": ctx.guild.id})
+            if record is None:
+                self.mongo_db['register'].insert_one({"guild_id": ctx.guild.id, "channel_id": channel.id})
+            else:
+                self.mongo_db['register'].update_one({"guild_id": ctx.guild.id}, {"$set": {"channel_id": channel.id}})
+            await ctx.send(
+                embed=create_embed(f"Kayıt kanalı {channel.mention} olarak ayarlandı.", discord.Colour.green()))
+        else:
+            await ctx.send(embed=create_embed("Bunu yapmaya iznin yok.", discord.Colour.red()))
+
+    @commands.hybrid_command(name="kayıt_channel_remove", description="Removes the age role registration channel.")
+    @app_commands.describe(channel="Kayıt kanalını etiketleyin. Bilmiyorsanız /kayıt_channel_show ile öğrenebilirsiniz.")
+    async def kayıt_channel_remove(self, ctx, channel: discord.TextChannel):
+        if ctx.message.author.guild_permissions.manage_guild:
+            record = self.mongo_db['register'].find_one({"guild_id": ctx.guild.id})
+            if record is None:
+                await ctx.send(embed=create_embed("Kayıt kanalı ayarlanmadı.", discord.Colour.red()))
+            else:
+                self.mongo_db['register'].delete_one({"guild_id": ctx.guild.id})
+                await ctx.send(embed=create_embed("Kayıt kanalı kaldırıldı.", discord.Colour.green()))
+        else:
+            await ctx.send(embed=create_embed("Bunu yapmaya iznin yok.", discord.Colour.red()))
+
+    @commands.hybrid_command(name="kayıt_settings", description="Changes registration settings.")
+    async def kayıt_settings(self, ctx, nickname: bool = None, username: bool = None, given_roles: str = None,
+                             taken_roles: str = None, age_roles: bool = None, modal_embed: bool = None):
+        if ctx.message.author.guild_permissions.manage_guild:
+            record = self.mongo_db['register'].find_one({"guild_id": ctx.guild.id})
+            if record is None:
+                self.mongo_db['register'].insert_one(
+                    {"guild_id": ctx.guild.id, "channel_id": ctx.channel.id, "nickname_edit": True,
+                     "username_edit": True})
+                await ctx.send(embed=create_embed("Kayıt kanalı ayarlanmadı. Önce kayıt kanalını ayarlayın.",
+                                                  discord.Colour.red()))
+                return
+
+            if nickname is not None:
+                self.mongo_db['register'].update_one({"guild_id": ctx.guild.id}, {"$set": {"nickname_edit": nickname}})
+                await ctx.send(
+                    embed=create_embed(f"Nickname edit feature is turned {'on' if nickname else 'off'}.",
+                                       discord.Colour.green()))
+
+            if username is not None:
+                self.mongo_db['register'].update_one({"guild_id": ctx.guild.id}, {"$set": {"username_edit": username}})
+                await ctx.send(
+                    embed=create_embed(f"Username edit feature is turned {'on' if username else 'off'}.",
+                                       discord.Colour.green()))
+
+            if given_roles is not None:
+                given_roles = [role.strip() for role in given_roles.split(',')]
+                self.mongo_db['register'].update_one({"guild_id": ctx.guild.id}, {"$set": {"given_roles": given_roles}})
+                await ctx.send(
+                    embed=create_embed(f"Roles to be given after registration: {', '.join(given_roles)}",
+                                       discord.Colour.green()))
+
+            if taken_roles is not None:
+                taken_roles = [role.strip() for role in taken_roles.split(',')]
+                self.mongo_db['register'].update_one({"guild_id": ctx.guild.id}, {"$set": {"taken_roles": taken_roles}})
+                await ctx.send(
+                    embed=create_embed(f"Roles to be taken after registration: {', '.join(taken_roles)}",
+                                       discord.Colour.green()))
+
+            if age_roles is not None:
+                self.mongo_db['register'].update_one({"guild_id": ctx.guild.id},
+                                                     {"$set": {"age_roles": age_roles}})
+                await ctx.send(
+                    embed=create_embed(f"Age-based roles feature is turned {'on' if age_roles else 'off'}.",
+                                       discord.Colour.green()))
+
+            if modal_embed is not None:
+                self.mongo_db['register'].update_one({"guild_id": ctx.guild.id},
+                                                     {"$set": {"modal_embed": modal_embed}})
+                await ctx.send(
+                    embed=create_embed(f"Modal embed feature is turned {'on' if modal_embed else 'off'}.",
+                                       discord.Colour.green()))
+
+        else:
+            await ctx.send(embed=create_embed("Bunu yapmaya iznin yok.", discord.Colour.red()))
 
     @commands.Cog.listener()
     async def on_interaction(self, interaction: discord.Interaction):
@@ -124,8 +299,6 @@ class Register(commands.Cog):
                             embed=create_embed(f"I don't have permission to give {role_to_give.mention} role.",
                                                discord.Colour.red()))
 
-
-        # Take roles from taken_roles list
         taken_roles = record.get("taken_roles", [])
         if taken_roles:
             for role_mention in taken_roles:
@@ -141,7 +314,6 @@ class Register(commands.Cog):
                         await send(
                             embed=create_embed(f"I don't have permission to take {role_to_take.mention} role.",
                                                discord.Colour.red()))
-
     async def register_by_age(self, ctx_or_interaction, member, age):
         guild, send, channel = await check_if_ctx_or_interaction(ctx_or_interaction)
 
@@ -181,175 +353,6 @@ class Register(commands.Cog):
                         await send(embed=register_error)
             else:
                 await send(embed=channel_error)
-
-
-    @commands.hybrid_command(name="kayıt_setup", description="Kayıt kanalını ve rollerini ayarlar.")
-    async def kayıt_setup(self, ctx, channel: discord.TextChannel, description = None, nickname_edit: bool = False,
-                          username_edit: bool = False, age_roles: bool = True, given_roles: str = None,
-                          taken_roles: str = None, modal_embed: bool = False):
-        if ctx.message.author.guild_permissions.manage_guild:
-            record = self.mongo_db['register'].find_one({"guild_id": ctx.guild.id})
-            if record is None:
-                # If the record doesn't exist, insert a new record with the given parameters
-                self.mongo_db['register'].insert_one({
-                    "guild_id": ctx.guild.id,
-                    "channel_id": channel.id,
-                    "nickname_edit": nickname_edit,
-                    "username_edit": username_edit,
-                    "age_roles": age_roles,
-                    "modal_embed": modal_embed,
-                    "description": description
-                })
-                await ctx.send(embed=create_embed(
-                    f"Kayıt kanalı {channel.mention} olarak ayarlandı. \n**Düzenleme özellikleri:** \n*Nickname Edit:* {nickname_edit}, *Username Edit:* {username_edit}, *Age Roles:* {age_roles}",
-                    discord.Colour.green()))
-            else:
-                # If the record already exists, update the existing record with the given parameters
-                self.mongo_db['register'].update_one(
-                    {"guild_id": ctx.guild.id},
-                    {"$set": {
-                        "channel_id": channel.id,
-                        "nickname_edit": nickname_edit,
-                        "username_edit": username_edit,
-                        "age_roles": age_roles,
-                        "modal_embed": modal_embed,
-                        "description": description
-                    }}
-                )
-                await ctx.send(embed=create_embed(
-                    f"Kayıt kanalı {channel.mention} olarak güncellendi. \n**Düzenleme özellikleri:** \n*Nickname Edit:* {nickname_edit}, *Username Edit:* {username_edit}, *Age Roles:* {age_roles}",
-                    discord.Colour.green()))
-
-            # Create 18+, 18- and Unregistered roles if they don't exist
-            if age_roles:
-                roles_to_create = [("18+", discord.Colour(0x9bacc5)), ("18-", discord.Colour(0xcc7e36)),
-                                   ("Kayıtsız Üye", discord.Colour(0x86b4a4))]
-
-                for role_name, role_color in roles_to_create:
-                    existing_role = discord.utils.get(ctx.guild.roles, name=role_name)
-                    if existing_role is None:
-                        await ctx.guild.create_role(name=role_name, colour=role_color)
-                        await ctx.send(embed=create_embed(f"Rol '{role_name}' oluşturuldu.", discord.Colour.green()))
-                    else:
-                        await ctx.send(embed=create_embed(f"Rol '{role_name}' zaten var. Yeni bir rol oluşturulmadı.",
-                                                               discord.Colour.orange()))
-
-            # Process given_roles and taken_roles if provided
-            if given_roles:
-                given_roles = [role.strip() for role in given_roles.split(',')]
-                self.mongo_db['register'].update_one({"guild_id": ctx.guild.id}, {"$set": {"given_roles": given_roles}})
-                await ctx.send(
-                    embed=create_embed(f"Roles to be given after registration: {', '.join(given_roles)}",
-                                            discord.Colour.green()))
-
-            if taken_roles:
-                taken_roles = [role.strip() for role in taken_roles.split(',')]
-                self.mongo_db['register'].update_one({"guild_id": ctx.guild.id}, {"$set": {"taken_roles": taken_roles}})
-                await ctx.send(
-                    embed=create_embed(f"Roles to be taken after registration: {', '.join(taken_roles)}",
-                                            discord.Colour.green()))
-        else:
-            await ctx.send(embed=create_embed("Bunu yapmaya iznin yok.", discord.Colour.red()))
-
-    @commands.hybrid_command(name="kayıt_channel_show", description="Shows the registration channel.")
-    async def kayıt_channel_show(self, ctx):
-        if ctx.message.author.guild_permissions.manage_guild:
-            record = self.mongo_db['register'].find_one({"guild_id": ctx.guild.id})
-            if record is not None:
-                channel_id = record.get("channel_id")
-                nickname_edit = record.get("nickname_edit", True)
-                username_edit = record.get("username_edit", True)
-
-                embed = discord.Embed(title="Kayıt Kanalı ve Ayarları", color=discord.Colour.blurple())
-                embed.add_field(name="Kayıt Kanalı", value=f"<#{int(channel_id)}>", inline=False)
-                embed.add_field(name="Nickname Düzenleme", value="Aktif" if nickname_edit else "Pasif", inline=False)
-                embed.add_field(name="Username Düzenleme", value="Aktif" if username_edit else "Pasif", inline=False)
-
-                await ctx.send(embed=embed)
-            else:
-                await ctx.send(embed=create_embed("Kayıt kanalı ayarlanmadı.", discord.Colour.red()))
-        else:
-            await ctx.send(embed=create_embed("Bunu yapmaya iznin yok.", discord.Colour.red()))
-
-    @commands.hybrid_command(name="kayıt_channel_set", description="Sets the age role registration channel.")
-    async def kayıt_channel_set(self, ctx, channel: discord.TextChannel):
-        if ctx.message.author.guild_permissions.manage_guild:
-            record = self.mongo_db['register'].find_one({"guild_id": ctx.guild.id})
-            if record is None:
-                self.mongo_db['register'].insert_one({"guild_id": ctx.guild.id, "channel_id": channel.id})
-            else:
-                self.mongo_db['register'].update_one({"guild_id": ctx.guild.id}, {"$set": {"channel_id": channel.id}})
-            await ctx.send(embed=create_embed(f"Kayıt kanalı {channel.mention} olarak ayarlandı.", discord.Colour.green()))
-        else:
-            await ctx.send(embed=create_embed("Bunu yapmaya iznin yok.", discord.Colour.red()))
-
-    @commands.hybrid_command(name="kayıt_channel_remove", description="Removes the age role registration channel.")
-    async def kayıt_channel_remove(self, ctx, channel: discord.TextChannel):
-        if ctx.message.author.guild_permissions.manage_guild:
-            record = self.mongo_db['register'].find_one({"guild_id": ctx.guild.id})
-            if record is None:
-                await ctx.send(embed=create_embed("Kayıt kanalı ayarlanmadı.", discord.Colour.red()))
-            else:
-                self.mongo_db['register'].delete_one({"guild_id": ctx.guild.id})
-                await ctx.send(embed=create_embed("Kayıt kanalı kaldırıldı.", discord.Colour.green()))
-        else:
-            await ctx.send(embed=create_embed("Bunu yapmaya iznin yok.", discord.Colour.red()))
-
-    @commands.hybrid_command(name="kayıt_settings", description="Changes registration settings.")
-    async def kayıt_settings(self, ctx, nickname: bool = None, username: bool = None, given_roles: str = None,
-                             taken_roles: str = None, age_roles: bool = None, modal_embed: bool = None):
-        if ctx.message.author.guild_permissions.manage_guild:
-            record = self.mongo_db['register'].find_one({"guild_id": ctx.guild.id})
-            if record is None:
-                self.mongo_db['register'].insert_one(
-                    {"guild_id": ctx.guild.id, "channel_id": ctx.channel.id, "nickname_edit": True,
-                     "username_edit": True})
-                await ctx.send(embed=create_embed("Kayıt kanalı ayarlanmadı. Önce kayıt kanalını ayarlayın.",
-                                                       discord.Colour.red()))
-                return
-
-            if nickname is not None:
-                self.mongo_db['register'].update_one({"guild_id": ctx.guild.id}, {"$set": {"nickname_edit": nickname}})
-                await ctx.send(
-                    embed=create_embed(f"Nickname edit feature is turned {'on' if nickname else 'off'}.",
-                                            discord.Colour.green()))
-
-            if username is not None:
-                self.mongo_db['register'].update_one({"guild_id": ctx.guild.id}, {"$set": {"username_edit": username}})
-                await ctx.send(
-                    embed=create_embed(f"Username edit feature is turned {'on' if username else 'off'}.",
-                                            discord.Colour.green()))
-
-            if given_roles is not None:
-                given_roles = [role.strip() for role in given_roles.split(',')]
-                self.mongo_db['register'].update_one({"guild_id": ctx.guild.id}, {"$set": {"given_roles": given_roles}})
-                await ctx.send(
-                    embed=create_embed(f"Roles to be given after registration: {', '.join(given_roles)}",
-                                            discord.Colour.green()))
-
-            if taken_roles is not None:
-                taken_roles = [role.strip() for role in taken_roles.split(',')]
-                self.mongo_db['register'].update_one({"guild_id": ctx.guild.id}, {"$set": {"taken_roles": taken_roles}})
-                await ctx.send(
-                    embed=create_embed(f"Roles to be taken after registration: {', '.join(taken_roles)}",
-                                            discord.Colour.green()))
-
-            if age_roles is not None:
-                self.mongo_db['register'].update_one({"guild_id": ctx.guild.id},
-                                                     {"$set": {"age_roles": age_roles}})
-                await ctx.send(
-                    embed=create_embed(f"Age-based roles feature is turned {'on' if age_roles else 'off'}.",
-                                            discord.Colour.green()))
-
-            if modal_embed is not None:
-                self.mongo_db['register'].update_one({"guild_id": ctx.guild.id},
-                                                     {"$set": {"modal_embed": modal_embed}})
-                await ctx.send(
-                    embed=create_embed(f"Modal embed feature is turned {'on' if modal_embed else 'off'}.",
-                                            discord.Colour.green()))
-
-        else:
-            await ctx.send(embed=create_embed("Bunu yapmaya iznin yok.", discord.Colour.red()))
 
 
 async def setup(bot):
