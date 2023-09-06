@@ -10,7 +10,6 @@ This is a Discord bot that I made for my own server. It's a work in progress, bu
 
 ![contro bot features](https://i.imgur.com/yVG7wtx.jpeg)
 
-
 #### 🎉 **Giveaways**
 - `/giveaway_create`: Start a new giveaway on the server.
 - `/giveaway_shuffle`: Randomize the list of participants in a giveaway.
