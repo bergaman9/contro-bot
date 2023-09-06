@@ -485,9 +485,9 @@ class Utility(commands.Cog):
 
         await ctx.send(f"{count} kullanıcının ismi düzenlendi.")
 
-    @commands.hybrid_command(name="steal_emoji", description="Steals emoji from another server.")
+    @commands.hybrid_command(name="copy_emoji", description="Copy an emoji from another server if the bot is a member of that server.")
     @commands.has_permissions(manage_emojis=True)
-    async def steal_emoji(self, ctx, emoji: discord.Emoji):
+    async def copy_emoji(self, ctx, emoji: discord.Emoji):
         guild = ctx.guild
         emoji_url = emoji.url
         emoji_name = emoji.name
@@ -500,7 +500,6 @@ class Utility(commands.Cog):
                 await guild.create_custom_emoji(name=emoji_name, image=data.read())
                 await ctx.send(embed=create_embed(description=f"Emoji {emoji} is added to the server.",
                                                   color=discord.Color.green()))
-
 
 async def setup(bot):
     await bot.add_cog(Utility(bot))
