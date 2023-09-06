@@ -57,6 +57,7 @@ This is a Discord bot that I made for my own server. It's a work in progress, bu
 - `/whois`: Get information about a member.
 - `/server_info`: Get details about the server.
 - `/avatar`: Display a member's avatar.
+- `/copy_emoji`: Copy an emoji from another server if the bot is a member of that server.
 
 #### 📊 **Invite Tracker**
 - `/leaderboard`: Show the invite leaderboard of the server.
