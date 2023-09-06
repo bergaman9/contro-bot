@@ -103,7 +103,7 @@ class Utility(commands.Cog):
             else:
                 await ctx.send(embed=create_embed(description="Bir değişiklik yapılmadı.", color=discord.Color.red()))
 
-    @commands.command(name="advertisements", description="Prints all custom activities that are discord invites")
+    @commands.hybrid_command(name="advertisements", description="Prints all custom activities that are discord invites")
     @commands.has_permissions(manage_guild=True)
     async def advertisements(self, ctx):
         guild = ctx.guild
