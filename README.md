@@ -65,7 +65,7 @@ This is a Discord bot that I made for my own server. It's a work in progress, bu
 #### 🛠️ **Utility**
 - `/advertisements`: Show the advertisements in the server.
 - `/edit_nicknames`: Edit the nicknames of all members in the server.
-- `/reset_nicks`: Reset the nicknames of all members in the server.
+- `/reset_nicknames`: Reset the nicknames of all members in the server.
 - `/status_role_set`: Set up the status role system.
 - `/status_role`: Assign a role based on a member's status.
 - `/poll`: Create a poll in a channel.

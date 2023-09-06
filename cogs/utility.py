@@ -136,9 +136,9 @@ class Utility(commands.Cog):
                               {"$set": {"custom_status": cleaned_custom_status, "role_id": role.id}}, upsert=True)
         await ctx.send(f"Status role set to {role.mention} for custom status '{custom_status}'.")
 
-    @commands.hybrid_command(name="reset_nicks", description="Resets everyone's nickname.")
+    @commands.hybrid_command(name="reset_nicknames", description="Resets everyone's nickname.")
     @commands.has_permissions(manage_guild=True)
-    async def reset_nicks(self, ctx):
+    async def reset_nicknames(self, ctx):
         async for member in ctx.guild.fetch_members(limit=5000):
             if member.nick:
                 await member.edit(nick=None)
@@ -460,7 +460,7 @@ class Utility(commands.Cog):
             picture = discord.File(f)
             await ctx.send(file=picture)
 
-    @commands.hybrid_command(name="edit_nicknames", description="Düzenle")
+    @commands.hybrid_command(name="edit_nicknames", description="Edits everyone's nickname.")
     @commands.has_permissions(manage_guild=True)
     async def edit_nicknames(self, ctx, role_name: str, new_name):
 
