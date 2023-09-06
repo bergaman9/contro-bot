@@ -11,8 +11,6 @@ turkoyto_payload={"type": 2, "application_id":"302050872383242240","guild_id":os
 teknominator_payload={"type": 2, "application_id":"302050872383242240","guild_id":os.getenv("TEKNOMINATOR_GID"), "session_id": os.getenv("SESSION_ID"),"channel_id": os.getenv("TEKNOMINATOR_CID"), "data": {"version": "1051151064008769576", "id": "947088344167366698", "name": "bump","type": 1}}
 
 
-print(os.getenv("AUTHORIZATION"), os.getenv("TURKOYTO_GID"), os.getenv("SESSION_ID"), os.getenv("TURKOYTO_CID"), os.getenv("TEKNOMINATOR_GID"), os.getenv("TEKNOMINATOR_CID"))
-
 class Bump(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
