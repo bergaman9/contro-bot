@@ -37,7 +37,7 @@ class Bot(commands.Bot):
                 client_id='0c7f24e228844860a8a920d2e69ed11d',
                 client_secret='be5c4415a8bc461a83f744822a803edf'
             )
-            node: wavelink.Node = wavelink.Node(uri="ssl.horizxon.studio:443", password="horizxon.studio", secure=True)
+            node: wavelink.Node = wavelink.Node(uri="suki.nathan.to:443", password="adowbongmanacc", secure=True)
             await wavelink.NodePool.connect(client=self, nodes=[node], spotify=sc)
             print(f"Connected to lavalink {node.uri}")
         except Exception as e:
