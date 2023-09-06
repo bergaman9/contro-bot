@@ -10,6 +10,8 @@ This is a Discord bot that I made for my own server. It's a work in progress, bu
 
 ![contro bot features](https://i.imgur.com/yVG7wtx.jpeg)
 
+##### Prefix `>` or `/`
+
 #### 🎉 **Giveaways**
 - `/giveaway_create`: Start a new giveaway on the server.
 - `/giveaway_shuffle`: Randomize the list of participants in a giveaway.
@@ -35,6 +37,7 @@ This is a Discord bot that I made for my own server. It's a work in progress, bu
 - `/set_nick`: Change the nickname of a member.
 - `/reset_nick`: Reset a member's nickname to their original name.
 - `/send_dm`: Directly message a member.
+- `/filter`: You can set filters for the server.
 
 #### 😄 **Fun**
 - `/birthday`: Set your birthday and receive your zodiac sign.
@@ -45,18 +48,35 @@ This is a Discord bot that I made for my own server. It's a work in progress, bu
 - `/word`: Get information about a specific word.
 - `/reddit`: Display content from a specified Reddit subreddit.
 - `/spotify`: Show the top 5 songs according to your query.
+- `8ball`: Ask the magic 8ball a question.
+- `echo`: Repeat a message.
+- `reverse`: Reverse a message.
+- `fact`: Get a random fact.
+- `love`: Express love towards a mentioned member.
+- `lovecalculator`: Calculate love percentage between two members.
+- `game`: Get information about a game.
+- `movie`: Get information about a movie.
+- `tv`: Get information about a TV show.
 
 #### 🎮 **Game Stats**
 - `/topgames`: Show the most-played games on the server.
 - `/playing`: Display members who are currently playing a game.
 
 #### 🛠️ **Utility**
+- `/advertisements`: Show the advertisements in the server.
+- `/edit_nicknames`: Edit the nicknames of all members in the server.
+- `/reset_nicks`: Reset the nicknames of all members in the server.
+- `/status_role_set`: Set up the status role system.
 - `/status_role`: Assign a role based on a member's status.
 - `/poll`: Create a poll in a channel.
 - `/whois`: Get information about a member.
+- `/give_everyone`: Give a role to all members in the server.
 - `/server_info`: Get details about the server.
 - `/avatar`: Display a member's avatar.
+- `/emote`: Display the emoji information.
+- `/emoji_list`: Show all emojis in the server.
 - `/copy_emoji`: Copy an emoji from another server if the bot is a member of that server.
+- `/upload`: Upload an image to the server.
 
 #### 📊 **Invite Tracker**
 - `/leaderboard`: Show the invite leaderboard of the server.
@@ -66,6 +86,9 @@ This is a Discord bot that I made for my own server. It's a work in progress, bu
 - `/kayıt`: Register by using this command.
 - `/kayıt_setup`: Set up the registration channel and roles.
 - `/kayıt_channel`: Show the registration channel.
+- `/kayıt_channel_set`: Set the registration channel.
+- `/kayıt_channel_remove`: Remove the registration channel.
+- `/kayıt_settings`: Show the registration settings.
   
 #### 💬 **Dropdown Role Commands**
 - `/dropdown_roles`: Give roles via a dropdown menu.
