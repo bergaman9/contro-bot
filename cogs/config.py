@@ -103,16 +103,20 @@ class Config(commands.Cog):
                 await interaction.response.send_modal(IdeaModal())
 
         if interaction.type == discord.InteractionType.modal_submit:
-            idea = interaction.data["components"][0]["components"][0]["value"]
-            embed = discord.Embed(description=idea, color=discord.Color.pink())
-            embed.set_author(name="Idea of " + interaction.user.name, icon_url=interaction.user.avatar.url)
-            channel = self.bot.get_channel(970327943312191488)
-            message = await channel.send(embed=embed)
-            await interaction.response.send_message(embed=discord.Embed(title="Your idea has been sent to the developer.", description="Thank you for your idea.", color=discord.Color.pink()))
-            await message.add_reaction("👍")
-            await message.add_reaction("👎")
-            await asyncio.sleep(30)
-            await interaction.message.delete()
+            if interaction.data.get('components')[0].get('components')[0].get('custom_id') == "idea_text":
+                idea = interaction.data.get('components')[0].get('components')[0].get('value')
+                print(idea)
+                embed = discord.Embed(description=idea, color=discord.Color.pink())
+                embed.set_author(name="Idea of " + interaction.user.name, icon_url=interaction.user.avatar.url)
+                channel = self.bot.get_channel(970327943312191488)
+                message = await channel.send(embed=embed)
+                await interaction.response.send_message(
+                    embed=discord.Embed(title="Your idea has been sent to the developer.",
+                                        description="Thank you for your idea.", color=discord.Color.pink()))
+                await message.add_reaction("👍")
+                await message.add_reaction("👎")
+                await asyncio.sleep(30)
+                await interaction.message.delete()
 
 async def setup(bot):
     await bot.add_cog(Config(bot))
