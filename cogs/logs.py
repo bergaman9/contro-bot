@@ -5,7 +5,8 @@ from discord import app_commands
 import re
 
 
-from utils import get_category_by_name, create_voice_channel, create_embed, initialize_mongodb, calculate_how_long_ago_member_joined, calculate_how_long_ago_member_created
+from utils import get_category_by_name, create_voice_channel, create_embed, initialize_mongodb
+
 
 class Events(commands.Cog):
     def __init__(self, bot):
@@ -16,11 +17,34 @@ class Events(commands.Cog):
 
     @commands.Cog.listener()
     async def on_command_error(self, ctx, error):
-        if error:
-            await ctx.send(embed=create_embed(description=str(error), color=discord.Color.red()))
+        if isinstance(error, commands.MissingRequiredArgument):
+            await ctx.send(embed=create_embed("Please enter all the required arguments.", discord.Color.red()))
+            await ctx.message.delete()
+        elif isinstance(error, commands.NotOwner):
+            await ctx.send(embed=create_embed("You do not own this bot.", discord.Color.red()))
+            await ctx.message.delete()
+        elif isinstance(error, commands.MemberNotFound):
+            await ctx.send(embed=create_embed("Member couldn't found.", discord.Color.red()))
+            await ctx.message.delete()
+        elif isinstance(error, commands.CommandOnCooldown):
+            await ctx.send(
+                embed=create_embed(f"Please wait {error.retry_after:.2f} seconds before using this command again.",
+                                   discord.Color.red()))
+            await ctx.message.delete()
+        elif isinstance(error, commands.MissingPermissions):
+            await ctx.send(embed=create_embed("You can't do that :(", discord.Color.red()))
+            await ctx.message.delete()
+        elif isinstance(error, commands.BotMissingPermissions):
+            await ctx.send(embed=create_embed("Bot don't have required permissions.", discord.Color.red()))
+            await ctx.message.delete()
+        elif isinstance(error, commands.CommandInvokeError):
+            await ctx.send(embed=create_embed("Command raised an exception.", discord.Color.red()))
+            await ctx.message.delete()
+        else:
+            await ctx.send(embed=create_embed(f"Error: {error}", discord.Color.red()))
 
     @commands.hybrid_command(name="logging_channel_set", description="Set the logging channel for this guild.",
-                             usage="logging_channel_set <channel>")
+                             usage="logging_channel <channel>")
     @commands.has_permissions(manage_guild=True)
     @app_commands.describe(channel="The channel to set as logging channel.")
     async def logging_channel_set(self, ctx, channel: discord.TextChannel):
@@ -68,9 +92,7 @@ class Events(commands.Cog):
         if channel is None:
             return
 
-        created_ago = calculate_how_long_ago_member_created(member)
-        embed = discord.Embed(title="Member joined", description=f"{member.mention} joined \n We are now {len(member.guild.members)} members \nThe account is created `{created_ago}`",
-                              color=discord.Color.green())
+        embed = discord.Embed(title="Member joined", description=f"{member.mention} | {len(member.guild.members)}" ,color=member.color)
         embed.set_author(name=f"{member.name}#{member.discriminator}", icon_url=member.avatar.url)
         embed.set_thumbnail(url=member.avatar.url)
         embed.set_footer(text=f"ID: {member.id}")
@@ -86,9 +108,8 @@ class Events(commands.Cog):
         if channel is None:
             return
 
-        time_ago = calculate_how_long_ago_member_joined(member)
-        embed = discord.Embed(title="Member left", description=f"{member.mention} joined `{time_ago}` \nWe are now {len(member.guild.members)} members \n**Roles:** {', '.join([role.mention for role in member.roles if role.name != '@everyone'])}",
-                              color=discord.Color.red())
+        embed = discord.Embed(title="Member left", description=f"{member.mention} | {len(member.guild.members)}",
+                              color=member.color)
         embed.set_author(name=f"{member.name}#{member.discriminator}", icon_url=member.avatar.url)
         embed.set_thumbnail(url=member.avatar.url)
         embed.set_footer(text=f"ID: {member.id}")
@@ -96,43 +117,7 @@ class Events(commands.Cog):
 
     @commands.Cog.listener()
     async def on_member_update(self, before, after):
-        result = self.mongo_db['logger'].find_one({"guild_id": before.guild.id})
-        if result is None:
-            return
-
-        channel = before.guild.get_channel(result['channel_id'])
-        if channel is None:
-            return
-
-        # Takma ad değişikliği
         if before.display_name != after.display_name:
-            embed = discord.Embed(title="Name Change", color=discord.Color.orange())
-            embed.add_field(name="Before", value=before.display_name, inline=False)
-            embed.add_field(name="After", value=after.display_name, inline=False)
-
-        # Rol değişikliği
-        elif before.roles != after.roles:
-            added_roles = [role for role in after.roles if role not in before.roles]
-            removed_roles = [role for role in before.roles if role not in after.roles]
-
-            embed = discord.Embed(title="Role Update", color=discord.Color.purple())
-
-            if added_roles:
-                embed.add_field(name="Added Roles", value=", ".join([role.mention for role in added_roles]),
-                                inline=False)
-
-            if removed_roles:
-                embed.add_field(name="Removed Roles", value=", ".join([role.mention for role in removed_roles]),
-                                inline=False)
-
-        # Durum değişikliği
-        elif before.status != after.status:
-            embed = discord.Embed(title="Status Change", color=discord.Color.green())
-            embed.add_field(name="Before", value=str(before.status), inline=False)
-            embed.add_field(name="After", value=str(after.status), inline=False)
-
-        # Avatar değişikliği kontrolü
-        elif before.avatar.url != after.avatar.url:
             result = self.mongo_db['logger'].find_one({"guild_id": before.guild.id})
             if result is None:
                 return
@@ -141,22 +126,13 @@ class Events(commands.Cog):
             if channel is None:
                 return
 
-            embed = discord.Embed(title="Avatar Change", color=discord.Color.purple())
+            embed = discord.Embed(title="Name change", color=after.color)
             embed.set_author(name=f"{after.name}#{after.discriminator}", icon_url=after.avatar.url)
-
-            # Eski ve yeni avatarları göstermek için thumbnail ve image kullanabiliriz.
-            embed.set_thumbnail(url=before.avatar.url)
-            embed.set_image(url=after.avatar.url)
-
-            embed.add_field(name="Before", value=f"[Click Here]({before.avatar.url})", inline=True)
-            embed.add_field(name="After", value=f"[Click Here]({after.avatar.url})", inline=True)
-
+            embed.set_thumbnail(url=after.avatar.url)
+            embed.add_field(name="Before", value=before.display_name, inline=False)
+            embed.add_field(name="After", value=after.display_name, inline=False)
             embed.set_footer(text=f"ID: {after.id}")
-
             await channel.send(embed=embed)
-
-        else:
-            return
 
     @commands.Cog.listener()
     async def on_user_update(self, before, after):
@@ -169,7 +145,7 @@ class Events(commands.Cog):
             if channel is None:
                 return
 
-            embed = discord.Embed(title="Name change", color=discord.Color.blue())
+            embed = discord.Embed(title="Name change", color=after.color)
             embed.set_author(name=f"{after.name}#{after.discriminator}", icon_url=after.avatar.url)
             embed.set_thumbnail(url=after.avatar.url)
             embed.add_field(name="Before", value=before.name, inline=False)
@@ -235,19 +211,19 @@ class Events(commands.Cog):
                     if role in after.roles:
                         await after.remove_roles(role)
 
-        # if after.channel is not None:
-        #     if after.channel.name == "Voice Channel":
-        #         channel = await create_voice_channel(after.channel.guild, f'{member.name}-meeting'.lower(),
-        #                                              category_name="Voice Channels", user_limit=after.channel.user_limit)
-        #     if channel is not None:
-        #         await member.move_to(channel)
-        #
-        # if before.channel is not None:
-        #     if before.channel.category.id == get_category_by_name(before.channel.guild, category_name="Voice Channels").id:
-        #         await logging_channel.send("User left a empty voice channel.")
-        #         if len(before.channel.members) == 0:
-        #             print("channel is now empty")
-        #             await before.channel.delete()
+    @commands.Cog.listener()
+    async def on_presence_update(self, before, after):
+        if after.activity is not None and after.activity.type == discord.ActivityType.custom:
+            message = after.activity.name
+            if message.startswith(("https://", "http://", "www.", "discord.gg/")):
+                result = self.mongo_db['logger'].find_one({"guild_id": after.guild.id})
+                if result is None:
+                    return
+                channel = after.guild.get_channel(result['channel_id'])
+                embed = discord.Embed(title="Custom status advertising", description=f"{after.mention} is advertising in their custom status: {message}", color=discord.Color.red())
+                await channel.send(embed=embed)
+
+
 
     # MESSAGES
     @commands.Cog.listener()
@@ -631,7 +607,6 @@ class Events(commands.Cog):
             other_members_str = ", ".join(other_members)
             if other_members:
                 embed.add_field(name="Members in the channel", value=other_members_str, inline=False)
-            embed.set_footer(text=f"ID: {member.id}")
             await logging_channel.send(embed=embed)
 
         if before.channel and not after.channel:
@@ -643,13 +618,12 @@ class Events(commands.Cog):
             other_members_str = ", ".join(other_members)
             if other_members:
                 embed.add_field(name="Members in the channel", value=other_members_str, inline=False)
-            embed.set_footer(text=f"ID: {member.id}")
             await logging_channel.send(embed=embed)
 
         if before.channel and after.channel:
             if before.channel.id != after.channel.id:
                 embed = discord.Embed(title="Member switched voice channel",
-                                      description=f"{member.mention} switched from {before.channel.mention} to {after.channel.mention}",
+                                      description=f"{member.name} switched from {before.channel.mention} to {after.channel.mention}",
                                       color=discord.Color.blue())
                 # Üyenin ayrıldığı kanaldaki diğer üyeleri al
                 before_members = [m.mention for m in before.channel.members]
@@ -657,11 +631,8 @@ class Events(commands.Cog):
                 # Üyenin katıldığı kanaldaki diğer üyeleri al
                 after_members = [m.mention for m in after.channel.members]
                 after_members_str = ", ".join(after_members)
-                if before_members:
-                    embed.add_field(name="Members in the channel before", value=before_members_str, inline=True)
-                if after_members:
-                    embed.add_field(name="Members in the channel after", value=after_members_str, inline=True)
-                embed.set_footer(text=f"ID: {member.id}")
+                embed.add_field(name="Members in the channel before", value=before_members_str, inline=True)
+                embed.add_field(name="Members in the channel after", value=after_members_str, inline=True)
                 await logging_channel.send(embed=embed)
             else:
                 if member.voice.self_stream:
@@ -671,20 +642,17 @@ class Events(commands.Cog):
                                           color=discord.Color.blue())
                     if invite:
                         embed.add_field(name="Stream URL", value=invite.url, inline=True)
-                    embed.set_footer(text=f"ID: {member.id}")
                     await logging_channel.send(embed=embed)
                     self.current_streamers.append(member.id)
                 elif member.voice.self_mute:
                     embed = discord.Embed(title="User muted",
                                           description=f"{member.name} muted themselves in {after.channel.mention}",
                                           color=discord.Color.blue())
-                    embed.set_footer(text=f"ID: {member.id}")
                     await logging_channel.send(embed=embed)
                 elif member.voice.self_deaf:
                     embed = discord.Embed(title="User deafened",
                                           description=f"{member.name} deafened themselves in {after.channel.mention}",
                                           color=discord.Color.blue())
-                    embed.set_footer(text=f"ID: {member.id}")
                     await logging_channel.send(embed=embed)
                 else:
                     for streamer in self.current_streamers:
@@ -693,10 +661,10 @@ class Events(commands.Cog):
                                 embed = discord.Embed(title="Member stopped streaming",
                                                       description=f"{member.name} stopped streaming in {after.channel.mention}",
                                                       color=discord.Color.blue())
-                                embed.set_footer(text=f"ID: {member.id}")
                                 await logging_channel.send(embed=embed)
                                 self.current_streamers.remove(member.id)
                             break
+
 
 async def setup(bot):
     await bot.add_cog(Events(bot))
