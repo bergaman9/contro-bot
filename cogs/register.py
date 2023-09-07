@@ -113,8 +113,8 @@ class Register(commands.Cog):
         else:
             await ctx.send(embed=create_embed("Bunu yapmaya iznin yok.", discord.Colour.red()))
 
-    @commands.hybrid_command(name="kayıt_channel_show", description="Shows the registration channel.")
-    async def kayıt_channel_show(self, ctx):
+    @commands.hybrid_command(name="kayıt_settings_show", description="Shows the registration channel.")
+    async def kayıt_settings_show(self, ctx):
         if ctx.message.author.guild_permissions.manage_guild:
             record = self.mongo_db['register'].find_one({"guild_id": ctx.guild.id})
             if record is not None:
@@ -123,9 +123,13 @@ class Register(commands.Cog):
                 username_edit = record.get("username_edit", True)
 
                 embed = discord.Embed(title="Kayıt Kanalı ve Ayarları", color=discord.Colour.blurple())
-                embed.add_field(name="Kayıt Kanalı", value=f"<#{int(channel_id)}>", inline=False)
-                embed.add_field(name="Nickname Düzenleme", value="Aktif" if nickname_edit else "Pasif", inline=False)
-                embed.add_field(name="Username Düzenleme", value="Aktif" if username_edit else "Pasif", inline=False)
+                embed.add_field(name="Kayıt Kanalı", value=f"<#{int(channel_id)}>", inline=True)
+                embed.add_field(name="Yaş Rolleri", value="Aktif" if record.get("age_roles") else "Pasif", inline=True)
+                embed.add_field(name="Modal Embed", value="Aktif" if record.get("modal_embed") else "Pasif", inline=True)
+                embed.add_field(name="Nickname Düzenleme", value="Aktif" if nickname_edit else "Pasif", inline=True)
+                embed.add_field(name="Username Düzenleme", value="Aktif" if username_edit else "Pasif", inline=True)
+
+
 
                 await ctx.send(embed=embed)
             else:
@@ -161,28 +165,28 @@ class Register(commands.Cog):
             await ctx.send(embed=create_embed("Bunu yapmaya iznin yok.", discord.Colour.red()))
 
     @commands.hybrid_command(name="kayıt_settings", description="Changes registration settings.")
-    async def kayıt_settings(self, ctx, nickname: bool = None, username: bool = None, given_roles: str = None,
+    async def kayıt_settings(self, ctx, nickname_edit: bool = None, username_edit: bool = None, given_roles: str = None,
                              taken_roles: str = None, age_roles: bool = None, modal_embed: bool = None):
         if ctx.message.author.guild_permissions.manage_guild:
             record = self.mongo_db['register'].find_one({"guild_id": ctx.guild.id})
             if record is None:
                 self.mongo_db['register'].insert_one(
                     {"guild_id": ctx.guild.id, "channel_id": ctx.channel.id, "nickname_edit": True,
-                     "username_edit": True})
+                     "username_edit": True, "age_roles": True, "modal_embed": True})
                 await ctx.send(embed=create_embed("Kayıt kanalı ayarlanmadı. Önce kayıt kanalını ayarlayın.",
                                                   discord.Colour.red()))
                 return
 
-            if nickname is not None:
-                self.mongo_db['register'].update_one({"guild_id": ctx.guild.id}, {"$set": {"nickname_edit": nickname}})
+            if nickname_edit is not None:
+                self.mongo_db['register'].update_one({"guild_id": ctx.guild.id}, {"$set": {"nickname_edit": nickname_edit}})
                 await ctx.send(
-                    embed=create_embed(f"Nickname edit feature is turned {'on' if nickname else 'off'}.",
+                    embed=create_embed(f"Nickname edit feature is turned {'on' if nickname_edit else 'off'}.",
                                        discord.Colour.green()))
 
-            if username is not None:
-                self.mongo_db['register'].update_one({"guild_id": ctx.guild.id}, {"$set": {"username_edit": username}})
+            if username_edit is not None:
+                self.mongo_db['register'].update_one({"guild_id": ctx.guild.id}, {"$set": {"username_edit": username_edit}})
                 await ctx.send(
-                    embed=create_embed(f"Username edit feature is turned {'on' if username else 'off'}.",
+                    embed=create_embed(f"Username edit feature is turned {'on' if username_edit else 'off'}.",
                                        discord.Colour.green()))
 
             if given_roles is not None:
@@ -219,6 +223,7 @@ class Register(commands.Cog):
     @commands.Cog.listener()
     async def on_interaction(self, interaction: discord.Interaction):
         if interaction.type == discord.InteractionType.modal_submit:
+            await interaction.response.defer()
             member = interaction.user
             name = interaction.data["components"][0]["components"][0]["value"]
             age = interaction.data["components"][1]["components"][0]["value"]
@@ -229,9 +234,9 @@ class Register(commands.Cog):
                 try:
                     await self.register_handler(interaction, member, name, age, username)
                 except:
-                    await interaction.response.send_message(embed=create_embed(description=f"Kayıt başarısız, {member.mention}", color=discord.Color.red()), ephemeral=True)
+                    await interaction.followup.send(embed=create_embed(description=f"Kayıt başarısız, {member.mention}", color=discord.Color.red()), ephemeral=True)
             else:
-                await interaction.response.send_message(embed=create_embed(description="Yaşınızı sayı olarak giriniz.", color=discord.Color.red()), ephemeral=True)
+                await interaction.followup.send(embed=create_embed(description="Yaşınızı sayı olarak giriniz.", color=discord.Color.red()), ephemeral=True)
 
         if interaction.data.get("custom_id") == "register_button":
             guild_config = self.mongo_db['register'].find_one({"guild_id": interaction.guild.id})
@@ -242,7 +247,7 @@ class Register(commands.Cog):
                 await interaction.response.send_modal(RegisterModal(include_username=False))
     async def register_handler(self, ctx_or_interaction, member, name, age, username=None):
         try:
-            guild, send, channel = await check_if_ctx_or_interaction(ctx_or_interaction)
+            guild, send, channel, followup_send = await check_if_ctx_or_interaction(ctx_or_interaction)
 
             await self.register_by_age(ctx_or_interaction, member, age)
 
@@ -266,22 +271,22 @@ class Register(commands.Cog):
                 try:
                     await member.edit(nick=nickname)
                 except discord.Forbidden:
-                    await send(embed=create_embed("I don't have permission to change nicknames.", discord.Colour.red()))
+                    await followup_send(embed=create_embed("I don't have permission to change nicknames.", discord.Colour.red()))
                 except discord.HTTPException:
-                    await send(embed=create_embed("Failed to change the nickname.", discord.Colour.red()))
+                    await followup_send(embed=create_embed("Failed to change the nickname.", discord.Colour.red()))
             elif nickname_edit:
                 nickname = f"{name.title()} | {age}"
                 try:
                     await member.edit(nick=nickname)
                 except discord.Forbidden:
-                    await send(embed=create_embed("I don't have permission to change nicknames.", discord.Colour.red()))
+                    await followup_send(embed=create_embed("I don't have permission to change nicknames.", discord.Colour.red()))
                 except discord.HTTPException:
-                    await send(embed=create_embed("Failed to change the nickname.", discord.Colour.red()))
+                    await followup_send(embed=create_embed("Failed to change the nickname.", discord.Colour.red()))
             elif username_edit and username:
                 try:
                     await member.edit(nick=username)
                 except discord.HTTPException:
-                    await send(embed=create_embed("Failed to change the username.", discord.Colour.red()))
+                    await followup_send(embed=create_embed("Failed to change the username.", discord.Colour.red()))
 
             # Give roles from given_roles list
             given_roles = record.get("given_roles", [])
@@ -292,11 +297,11 @@ class Register(commands.Cog):
                     if role_to_give:
                         try:
                             await member.add_roles(role_to_give)
-                            await send(
+                            await followup_send(
                                 embed=create_embed(f"{role_to_give.mention} role has been given to {member.mention}.",
                                                    discord.Colour.green()))
                         except discord.Forbidden:
-                            await send(
+                            await followup_send(
                                 embed=create_embed(f"I don't have permission to give {role_to_give.mention} role.",
                                                    discord.Colour.red()))
 
@@ -319,7 +324,9 @@ class Register(commands.Cog):
             print(e)
 
     async def register_by_age(self, ctx_or_interaction, member, age):
-        guild, send, channel = await check_if_ctx_or_interaction(ctx_or_interaction)
+        guild, send, channel, followup_send = await check_if_ctx_or_interaction(ctx_or_interaction)
+
+        print(guild, send, channel, followup_send)
 
         record = find_guild_in_register_collection(guild.id)
         if record is None:
@@ -341,22 +348,24 @@ class Register(commands.Cog):
                     try:
                         await member.add_roles(role_18_plus)
                         await member.remove_roles(role_18_minus, role_unregistered)
-                        await send(embed=create_embed(
+                        await followup_send(embed=create_embed(
                             f"{member.mention} için {role_18_plus.mention} rolü verilerek kaydı tamamlandı!",
                             discord.Colour.blurple()))
                     except:
-                        await send(embed=register_error)
+                        await followup_send(embed=register_error)
                 elif 0 <= int(age) <= 17:
                     try:
                         await member.add_roles(role_18_minus)
                         await member.remove_roles(role_18_plus, role_unregistered)
-                        await send(embed=create_embed(
+                        await followup_send(embed=create_embed(
                             f"{member.mention} için {role_18_minus.mention} rolü verilerek kaydı tamamlandı!",
                             discord.Colour.blurple()))
                     except:
-                        await send(embed=register_error)
+                        await followup_send(embed=register_error)
             else:
                 await send(embed=channel_error)
+
+
 
 async def setup(bot):
     await bot.add_cog(Register(bot))

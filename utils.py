@@ -5,6 +5,8 @@ import os, re
 import dotenv
 import requests
 from PIL import Image, ImageChops, ImageDraw
+import datetime
+from datetime import datetime, timedelta
 
 dotenv.load_dotenv()
 MONGO_DB = os.getenv("MONGO_DB")
@@ -118,11 +120,12 @@ async def check_if_ctx_or_interaction(ctx_or_interaction):
         # interaction için kod buraya
         guild = ctx_or_interaction.guild
         send = ctx_or_interaction.response.send_message
+        followup_send = ctx_or_interaction.followup.send
         channel = ctx_or_interaction.channel
     else:
         raise ValueError("Unknown context received")
 
-    return guild, send, channel
+    return guild, send, channel, followup_send
 
 
 def check_video_url(message_content):
@@ -132,3 +135,55 @@ def check_video_url(message_content):
         if platform in message_content:
             return True
     return False
+
+def calculate_how_long_ago_member_joined(member):
+    time_difference = datetime.utcnow() - member.joined_at.replace(tzinfo=None)
+
+    years, days_remainder = divmod(time_difference.days, 365)
+    days = days_remainder
+    hours, remainder = divmod(time_difference.seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+
+    if years > 0:
+        return f"{years} years ago" if years > 1 else "1 year ago"
+
+    if days > 0:
+        return f"{days} days ago" if days > 1 else "1 day ago"
+
+    if hours > 0:
+        return f"{hours} hours ago" if hours > 1 else "1 hour ago"
+
+    if minutes > 0:
+        return f"{minutes} minutes ago" if minutes > 1 else "1 minute ago"
+
+    return f"{seconds} seconds ago" if seconds > 0 else "just now"
+
+
+def calculate_how_long_ago_member_created(member):
+    time_difference = datetime.utcnow() - member.created_at.replace(tzinfo=None)
+
+    years, days_remainder = divmod(time_difference.days, 365)
+    days = days_remainder
+    hours, remainder = divmod(time_difference.seconds, 3600)
+
+    if years > 0:
+        if days > 0:
+            return f"{years} year{'s' if years > 1 else ''}, {days} day{'s' if days > 1 else ''} ago"
+        return f"{years} year{'s' if years > 1 else ''} ago"
+
+    if days > 0:
+        if hours > 0:
+            return f"{days} day{'s' if days > 1 else ''}, {hours} hour{'s' if hours > 1 else ''} ago"
+        return f"{days} day{'s' if days > 1 else ''} ago"
+
+    if hours > 0:
+        minutes, _ = divmod(remainder, 60)
+        if minutes > 0:
+            return f"{hours} hour{'s' if hours > 1 else ''}, {minutes} minute{'s' if minutes > 1 else ''} ago"
+        return f"{hours} hour{'s' if hours > 1 else ''} ago"
+
+    minutes, seconds = divmod(remainder, 60)
+    if minutes > 0:
+        return f"{minutes} minute{'s' if minutes > 1 else ''} ago"
+
+    return f"{seconds} second{'s' if seconds != 1 else ''} ago"
