@@ -42,10 +42,7 @@ class Register(commands.Cog):
     @commands.hybrid_command(name="kayıt", description="Kayıt olmak için kullanılır.", aliases=["register"])
     @app_commands.describe(name="İsminizi girin.", age="Yaşınızı girin.", username="Kullanıcı adınızı girin.")
     async def kayıt(self, ctx, name, age, username=None):
-        try:
-            await self.register_handler(ctx, ctx.author, name, age, username)
-        except Exception as e:
-            print(e)
+        await self.register_handler(ctx, ctx.author, name, age, username)
 
     @commands.hybrid_command(name="kayıt_setup", description="Kayıt kanalını ve rollerini ayarlar.")
     @app_commands.describe(channel="Kayıt kanalı ayarlayın.", description="Kayıt kanalı için açıklama girin.", nickname_edit="Nickname düzenlemeyi ayarlayın.", username_edit="Username düzenlemeyi ayarlayın.", age_roles="Yaş rollerini etiketleyerek seçin.", given_roles="Verilecek rolleri etiketleyerek seçin.", taken_roles="Alınacak rolleri etiketleyerek seçin.", modal_embed="Modal embed ayarlayın.")
@@ -244,79 +241,83 @@ class Register(commands.Cog):
             else:
                 await interaction.response.send_modal(RegisterModal(include_username=False))
     async def register_handler(self, ctx_or_interaction, member, name, age, username=None):
-        guild, send, channel = await check_if_ctx_or_interaction(ctx_or_interaction)
+        try:
+            guild, send, channel = await check_if_ctx_or_interaction(ctx_or_interaction)
 
-        await self.register_by_age(ctx_or_interaction, member, age)
+            await self.register_by_age(ctx_or_interaction, member, age)
 
-        record = find_guild_in_register_collection(guild.id)
-        if record is None:
-            return
+            record = find_guild_in_register_collection(guild.id)
+            if record is None:
+                return
 
-        # Logs the form values to the logging channel
-        logging_channel_id = self.mongo_db['logger'].find_one({"guild_id": guild.id})["channel_id"]
-        logging_channel = self.bot.get_channel(logging_channel_id)
-        if logging_channel:
-            embed = discord.Embed(title="Üye kayıt oldu", description=f"{member.mention} kayıt oldu.",
-                                  color=discord.Color.green())
-            embed.add_field(name="Form Bilgisi", value=f"{name.title()} {age} {username}", inline=True)
-            await logging_channel.send(embed=embed)
+            # Logs the form values to the logging channel
+            logging_channel_id = self.mongo_db['logger'].find_one({"guild_id": guild.id})["channel_id"]
+            logging_channel = self.bot.get_channel(logging_channel_id)
+            if logging_channel:
+                embed = discord.Embed(title="Üye kayıt oldu", description=f"{member.mention} kayıt oldu.",
+                                      color=discord.Color.green())
+                embed.add_field(name="Form Bilgisi", value=f"{name.title()} {age} {username}", inline=True)
+                await logging_channel.send(embed=embed)
 
-        nickname_edit = record.get("nickname_edit", True)
-        username_edit = record.get("username_edit", True)
-        if nickname_edit and username_edit:
-            nickname = f"{name.title()} | {age} | {username}" if username else f"{name.title()} | {age}"
-            try:
-                await member.edit(nick=nickname)
-            except discord.Forbidden:
-                await send(embed=create_embed("I don't have permission to change nicknames.", discord.Colour.red()))
-            except discord.HTTPException:
-                await send(embed=create_embed("Failed to change the nickname.", discord.Colour.red()))
-        elif nickname_edit:
-            nickname = f"{name.title()} | {age}"
-            try:
-                await member.edit(nick=nickname)
-            except discord.Forbidden:
-                await send(embed=create_embed("I don't have permission to change nicknames.", discord.Colour.red()))
-            except discord.HTTPException:
-                await send(embed=create_embed("Failed to change the nickname.", discord.Colour.red()))
-        elif username_edit and username:
-            try:
-                await member.edit(username=username)
-            except discord.HTTPException:
-                await send(embed=create_embed("Failed to change the username.", discord.Colour.red()))
+            nickname_edit = record.get("nickname_edit", True)
+            username_edit = record.get("username_edit", True)
+            if nickname_edit and username_edit:
+                nickname = f"{name.title()} | {age} | {username}" if username else f"{name.title()} | {age}"
+                try:
+                    await member.edit(nick=nickname)
+                except discord.Forbidden:
+                    await send(embed=create_embed("I don't have permission to change nicknames.", discord.Colour.red()))
+                except discord.HTTPException:
+                    await send(embed=create_embed("Failed to change the nickname.", discord.Colour.red()))
+            elif nickname_edit:
+                nickname = f"{name.title()} | {age}"
+                try:
+                    await member.edit(nick=nickname)
+                except discord.Forbidden:
+                    await send(embed=create_embed("I don't have permission to change nicknames.", discord.Colour.red()))
+                except discord.HTTPException:
+                    await send(embed=create_embed("Failed to change the nickname.", discord.Colour.red()))
+            elif username_edit and username:
+                try:
+                    await member.edit(username=username)
+                except discord.HTTPException:
+                    await send(embed=create_embed("Failed to change the username.", discord.Colour.red()))
 
-        # Give roles from given_roles list
-        given_roles = record.get("given_roles", [])
-        if given_roles:
-            for role_mention in given_roles:
-                role_id = int(role_mention.strip("<@&>"))
-                role_to_give = guild.get_role(role_id)
-                if role_to_give:
-                    try:
-                        await member.add_roles(role_to_give)
-                        await send(
-                            embed=create_embed(f"{role_to_give.mention} role has been given to {member.mention}.",
-                                               discord.Colour.green()))
-                    except discord.Forbidden:
-                        await send(
-                            embed=create_embed(f"I don't have permission to give {role_to_give.mention} role.",
-                                               discord.Colour.red()))
+            # Give roles from given_roles list
+            given_roles = record.get("given_roles", [])
+            if given_roles:
+                for role_mention in given_roles:
+                    role_id = int(role_mention.strip("<@&>"))
+                    role_to_give = guild.get_role(role_id)
+                    if role_to_give:
+                        try:
+                            await member.add_roles(role_to_give)
+                            await send(
+                                embed=create_embed(f"{role_to_give.mention} role has been given to {member.mention}.",
+                                                   discord.Colour.green()))
+                        except discord.Forbidden:
+                            await send(
+                                embed=create_embed(f"I don't have permission to give {role_to_give.mention} role.",
+                                                   discord.Colour.red()))
 
-        taken_roles = record.get("taken_roles", [])
-        if taken_roles:
-            for role_mention in taken_roles:
-                role_id = int(role_mention.strip("<@&>"))
-                role_to_take = guild.get_role(role_id)
-                if role_to_take in member.roles:
-                    try:
-                        await member.remove_roles(role_to_take)
-                        await send(
-                            embed=create_embed(f"{role_to_take.mention} role has been taken from {member.mention}.",
-                                               discord.Colour.green()))
-                    except discord.Forbidden:
-                        await send(
-                            embed=create_embed(f"I don't have permission to take {role_to_take.mention} role.",
-                                               discord.Colour.red()))
+            taken_roles = record.get("taken_roles", [])
+            if taken_roles:
+                for role_mention in taken_roles:
+                    role_id = int(role_mention.strip("<@&>"))
+                    role_to_take = guild.get_role(role_id)
+                    if role_to_take in member.roles:
+                        try:
+                            await member.remove_roles(role_to_take)
+                            await send(
+                                embed=create_embed(f"{role_to_take.mention} role has been taken from {member.mention}.",
+                                                   discord.Colour.green()))
+                        except discord.Forbidden:
+                            await send(
+                                embed=create_embed(f"I don't have permission to take {role_to_take.mention} role.",
+                                                   discord.Colour.red()))
+        except Exception as e:
+            print(e)
+
     async def register_by_age(self, ctx_or_interaction, member, age):
         guild, send, channel = await check_if_ctx_or_interaction(ctx_or_interaction)
 
@@ -356,7 +357,6 @@ class Register(commands.Cog):
                         await send(embed=register_error)
             else:
                 await send(embed=channel_error)
-
 
 async def setup(bot):
     await bot.add_cog(Register(bot))
