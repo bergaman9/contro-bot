@@ -20,7 +20,6 @@ class Bump(commands.Cog):
     async def send_payload(self):
         await self.bot.wait_until_ready()  # Bot tamamen hazır olmadan döngüyü başlatma
         response = requests.post("https://discord.com/api/v9/interactions", headers=headers, json=turkoyto_payload)
-        print(response.status_code)
         if response.status_code == 204:
             print("Türk Oyuncu Topluluğu öne çıkarıldı.")
         await asyncio.sleep(1800)  # asyncio.sleep kullanarak bekleme süresi

@@ -5,7 +5,7 @@ from discord import app_commands
 import re
 
 
-from utils import get_category_by_name, create_voice_channel, create_embed, initialize_mongodb
+from utils import get_category_by_name, create_voice_channel, create_embed, initialize_mongodb, calculate_how_long_ago_member_joined, calculate_how_long_ago_member_created
 
 
 class Events(commands.Cog):
@@ -83,6 +83,7 @@ class Events(commands.Cog):
 
     # MEMBERS
     @commands.Cog.listener()
+    @commands.Cog.listener()
     async def on_member_join(self, member):
         result = self.mongo_db['logger'].find_one({"guild_id": member.guild.id})
         if result is None:
@@ -92,7 +93,10 @@ class Events(commands.Cog):
         if channel is None:
             return
 
-        embed = discord.Embed(title="Member joined", description=f"{member.mention} | {len(member.guild.members)}" ,color=member.color)
+        created_ago = calculate_how_long_ago_member_created(member)
+        embed = discord.Embed(title="Member joined",
+                              description=f"{member.mention} joined \n We are now {len(member.guild.members)} members \nThe account is created `{created_ago}`",
+                              color=discord.Color.green())
         embed.set_author(name=f"{member.name}#{member.discriminator}", icon_url=member.avatar.url)
         embed.set_thumbnail(url=member.avatar.url)
         embed.set_footer(text=f"ID: {member.id}")
