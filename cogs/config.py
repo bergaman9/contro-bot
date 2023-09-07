@@ -73,7 +73,6 @@ class Config(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-
     @commands.hybrid_command(name="ping", description="Shows the latency between in the bot and the Discord API.", aliases=["latency", "info"])
     async def ping(self, ctx: commands.Context):
         latency = round(self.bot.latency * 1000)  # latency in ms

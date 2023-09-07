@@ -52,7 +52,8 @@ async def on_ready():
     count = len(bot.guilds)
     print(f'Logged on as {count}, your bot {bot.user}!')
     global startTime
-    startTime = time.time()
+    bot.startTime = time.time()
+
 
 @bot.tree.command(name="hello", description="Hello")
 async def hello(interaction: discord.Interaction, user: discord.Member):
