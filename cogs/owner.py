@@ -69,7 +69,7 @@ class Owner(commands.Cog):
             guilds_sorted = sorted(self.bot.guilds, key=lambda g: g.created_at,
                                    reverse=True)  # Sunucuları tarihe göre sırala
 
-            each_page = 10
+            each_page = 7
             pages = math.ceil(len(guilds_sorted) / each_page)
             embeds = []
 

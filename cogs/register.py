@@ -42,7 +42,10 @@ class Register(commands.Cog):
     @commands.hybrid_command(name="kayıt", description="Kayıt olmak için kullanılır.", aliases=["register"])
     @app_commands.describe(name="İsminizi girin.", age="Yaşınızı girin.", username="Kullanıcı adınızı girin.")
     async def kayıt(self, ctx, name, age, username=None):
-        await self.register_handler(ctx, ctx.author, name, age, username)
+        try:
+            await self.register_handler(ctx, ctx.author, name, age, username)
+        except Exception as e:
+            print(e)
 
     @commands.hybrid_command(name="kayıt_setup", description="Kayıt kanalını ve rollerini ayarlar.")
     @app_commands.describe(channel="Kayıt kanalı ayarlayın.", description="Kayıt kanalı için açıklama girin.", nickname_edit="Nickname düzenlemeyi ayarlayın.", username_edit="Username düzenlemeyi ayarlayın.", age_roles="Yaş rollerini etiketleyerek seçin.", given_roles="Verilecek rolleri etiketleyerek seçin.", taken_roles="Alınacak rolleri etiketleyerek seçin.", modal_embed="Modal embed ayarlayın.")
