@@ -279,7 +279,7 @@ class Register(commands.Cog):
                     await send(embed=create_embed("Failed to change the nickname.", discord.Colour.red()))
             elif username_edit and username:
                 try:
-                    await member.edit(username=username)
+                    await member.edit(nick=username)
                 except discord.HTTPException:
                     await send(embed=create_embed("Failed to change the username.", discord.Colour.red()))
 
