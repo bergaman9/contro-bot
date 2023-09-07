@@ -51,8 +51,6 @@ async def on_ready():
     await bot.tree.sync()
     count = len(bot.guilds)
     print(f'Logged on as {count}, your bot {bot.user}!')
-    global startTime
-    bot.startTime = time.time()
 
 
 @bot.tree.command(name="hello", description="Hello")
