@@ -73,20 +73,19 @@ class Config(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
+
     @commands.hybrid_command(name="ping", description="Shows the latency between in the bot and the Discord API.", aliases=["latency", "info"])
     async def ping(self, ctx: commands.Context):
         latency = round(self.bot.latency * 1000)  # latency in ms
         cpu_percent = psutil.cpu_percent(interval=1)
         ram_percent = psutil.virtual_memory().percent
-
         embed = discord.Embed(title='Ping & Hosting Info', color=discord.Color.pink())
         embed.add_field(name='Ping', value=f'{latency}ms', inline=True)
         embed.add_field(name='CPU Usage', value=f'{cpu_percent}%', inline=True)
         embed.add_field(name='RAM Usage', value=f'{ram_percent}%', inline=True)
         embed.add_field(name='Hosting Region', value='🇪🇺 Europe', inline=True)
         embed.add_field(name='Hosting Provider', value='🐳 DigitalOcean', inline=True)
-        embed.add_field(name='Uptime', value=str(timedelta(seconds=int(round(time.time() - self.bot.startTime)))),
-                        inline=True)
+        embed.add_field(name='Uptime', value=str(timedelta(seconds=int(round(time.time() - self.bot.startTime)))), inline=True)
         embed.add_field(name='Active Servers', value=f'{len(self.bot.guilds)}', inline=True)
         embed.add_field(name='Active Users', value=f'{len(self.bot.users)}', inline=True)
         embed.add_field(name='Active Commands', value=f'{len(self.bot.commands)}', inline=True)
