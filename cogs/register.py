@@ -165,6 +165,7 @@ class Register(commands.Cog):
             await ctx.send(embed=create_embed("Bunu yapmaya iznin yok.", discord.Colour.red()))
 
     @commands.hybrid_command(name="kayıt_settings", description="Changes registration settings.")
+    @app_commands.describe(nickname_edit="Nickname düzenlemeyi ayarlayın.", username_edit="Username düzenlemeyi ayarlayın.", age_roles="Yaş rollerini etiketleyerek seçin.", given_roles="Verilecek rolleri etiketleyerek seçin.", taken_roles="Alınacak rolleri etiketleyerek seçin.", modal_embed="Modal embed ayarlayın.")
     async def kayıt_settings(self, ctx, nickname_edit: bool = None, username_edit: bool = None, given_roles: str = None,
                              taken_roles: str = None, age_roles: bool = None, modal_embed: bool = None):
         if ctx.message.author.guild_permissions.manage_guild:
