@@ -112,8 +112,10 @@ class Events(commands.Cog):
         if channel is None:
             return
 
-        embed = discord.Embed(title="Member left", description=f"{member.mention} | {len(member.guild.members)}",
-                              color=member.color)
+        time_ago = calculate_how_long_ago_member_joined(member)
+        embed = discord.Embed(title="Member left",
+                              description=f"{member.mention} joined `{time_ago}` \nWe are now {len(member.guild.members)} members \n**Roles:** {', '.join([role.mention for role in member.roles if role.name != '@everyone'])}",
+                              color=discord.Color.red())
         embed.set_author(name=f"{member.name}#{member.discriminator}", icon_url=member.avatar.url)
         embed.set_thumbnail(url=member.avatar.url)
         embed.set_footer(text=f"ID: {member.id}")
