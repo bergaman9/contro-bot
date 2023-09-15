@@ -74,21 +74,21 @@ async def on_member_update(before, after):
         if discord.utils.get(after.roles, name="Çavuş") is None and discord.utils.get(before.roles,                                                                          name="Çavuş") is not None:
             await after.add_roles(discord.utils.get(after.guild.roles, name="Er"))
 
-    if after.guild == guild:
-        # Check if the member is a Çavuş, Subay, or Vekil
-        is_cavus_or_higher = any(role.name in ["Çavuş", "Subay", "Vekil"] for role in after.roles)
-
-        # Check if the member has the Çekiliş role
-        has_cekilis_role = discord.utils.get(after.roles, name="Çekiliş") is not None
-
-        if is_cavus_or_higher and not has_cekilis_role:
-            # Add the "Çekiliş" role if they have Çavuş, Subay, or Vekil role but not the Çekiliş role
-            role = discord.utils.get(after.guild.roles, name="Çekiliş")
-            await after.add_roles(role)
-        elif not is_cavus_or_higher and has_cekilis_role:
-            # Remove the "Çekiliş" role if they don't have Çavuş, Subay, or Vekil role but have the Çekiliş role
-            role = discord.utils.get(after.guild.roles, name="Çekiliş")
-            await after.remove_roles(role)
+    # if after.guild == guild:
+    #     # Check if the member is a Çavuş, Subay, or Vekil
+    #     is_cavus_or_higher = any(role.name in ["Çavuş", "Subay", "Vekil"] for role in after.roles)
+    #
+    #     # Check if the member has the Çekiliş role
+    #     has_cekilis_role = discord.utils.get(after.roles, name="Çekiliş") is not None
+    #
+    #     if is_cavus_or_higher and not has_cekilis_role:
+    #         # Add the "Çekiliş" role if they have Çavuş, Subay, or Vekil role but not the Çekiliş role
+    #         role = discord.utils.get(after.guild.roles, name="Çekiliş")
+    #         await after.add_roles(role)
+    #     elif not is_cavus_or_higher and has_cekilis_role:
+    #         # Remove the "Çekiliş" role if they don't have Çavuş, Subay, or Vekil role but have the Çekiliş role
+    #         role = discord.utils.get(after.guild.roles, name="Çekiliş")
+    #         await after.remove_roles(role)
 
 @bot.command()
 async def uptime(ctx):
