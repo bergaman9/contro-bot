@@ -62,7 +62,7 @@ class DropdownRoles(commands.Cog):
                     await member.add_roles(role)
                     response_message += f'{role.mention} rolü {member.mention} üyesine verildi.\n'
 
-            await interaction.response.send_message(embed=create_embed(description=response_message, color=discord.Color.green()), ephemeral=True)
+            #await interaction.response.send_message(embed=create_embed(description=response_message, color=discord.Color.green()), ephemeral=True)
 
 
 async def setup(bot):
