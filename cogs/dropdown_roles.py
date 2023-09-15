@@ -64,7 +64,7 @@ class DropdownRoles(commands.Cog):
 
             #await interaction.response.send_message(embed=create_embed(description=response_message, color=discord.Color.green()), ephemeral=True)
 
-
+            await interaction.response.defer()
 
 async def setup(bot):
     await bot.add_cog(DropdownRoles(bot))
