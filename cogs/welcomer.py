@@ -47,14 +47,10 @@ class Welcomer(commands.Cog):
         color = guild_config["color"]
         fill_color = guild_config["fill"]
         background_url = guild_config["background_url"]
-        welcome_text = guild_config["welcome_text"]
-
-        print(welcome_text)
-
-        if not welcome_text:
+        try:
+            welcome_text = guild_config["welcome_text"]
+        except:
             welcome_text = "HOŞ GELDİN!"
-
-        print(welcome_text)
 
         # Download the background image and get its filename
         background_filename = download_background(background_url)
