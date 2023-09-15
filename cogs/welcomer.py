@@ -47,6 +47,7 @@ class Welcomer(commands.Cog):
         color = guild_config["color"]
         fill_color = guild_config["fill"]
         background_url = guild_config["background_url"]
+        welcome_text = guild_config["welcome_text"]
 
         # Download the background image and get its filename
         background_filename = download_background(background_url)
@@ -77,7 +78,7 @@ class Welcomer(commands.Cog):
         draw = ImageDraw.Draw(background)
         welcomeFont = ImageFont.truetype("attributes/Fonts/GothamNarrow-Bold.otf", 100)
         memberFont = ImageFont.truetype("attributes/Fonts/GothamNarrow-Bold.otf", 42)
-        welcome_text = "HOŞ GELDİN!"
+        welcome_text = welcome_text if welcome_text else "HOŞ GELDİN!"
         member_text = f"{member.name}#{member.discriminator}"  # <- Text under the Profilepicture with the Membercount
 
         W, H = (1024, 500)  # Canvas Dimensions
@@ -95,7 +96,7 @@ class Welcomer(commands.Cog):
 
         file = discord.File(filename)
 
-        embed = discord.Embed(title="HOŞ GELDİN!", description=description, color=color)
+        embed = discord.Embed(title=welcome_text, description=description, color=color)
         embed.set_image(url=f"attachment://{filename}")
 
         await channel.send(file=file, embed=embed)
@@ -108,7 +109,7 @@ class Welcomer(commands.Cog):
     @app_commands.describe(welcome_channel="The channel where the welcome message will be sent.", description="The description of the welcome message.", color="The color of the embed.", fill_color="The color of the text.", background_url="The URL of the background image.")
     @commands.has_permissions(manage_guild=True)
     async def welcomer_set(self, ctx, welcome_channel: discord.TextChannel, description: str, color: str,
-                           fill_color: str, background_url: str):
+                           fill_color: str, background_url: str, welcome_text = "HOŞ GELDİN!"):
         guild_id = str(ctx.guild.id)
 
         # Save the welcome configurations to MongoDB
@@ -120,7 +121,8 @@ class Welcomer(commands.Cog):
                     "description": description,
                     "color": hex_to_int(color),
                     "fill": str(f"#{fill_color}"),
-                    "background_url": background_url
+                    "background_url": background_url,
+                    "welcome_text": welcome_text
                 }
             },
             upsert=True
