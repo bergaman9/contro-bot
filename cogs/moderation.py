@@ -41,7 +41,7 @@ class Moderation(commands.Cog):
                     if not message.attachments:
                         await message.delete()
                         message = await message.channel.send(
-                            embed=create_embed(f"{message.author.mention} bu kanalda sadece resim paylaşabilirsin!",
+                            embed=create_embed(f"{message.author.mention}, you can only share images in this channel!",
                                                discord.Colour.red()))
                         await asyncio.sleep(3)
                         await message.delete()
@@ -51,7 +51,7 @@ class Moderation(commands.Cog):
                                 await message.delete()
                                 message = await message.channel.send(
                                     embed=create_embed(
-                                        f"{message.author.mention} bu kanalda sadece resim paylaşabilirsin!",
+                                        f"{message.author.mention}, you can only share images in this channel!",
                                         discord.Colour.red()))
                                 await asyncio.sleep(3)
                                 await message.delete()
@@ -62,7 +62,7 @@ class Moderation(commands.Cog):
                     if not check_video_url(message.content):
                         await message.delete()
                         message = await message.channel.send(embed=create_embed(
-                            f"{message.author.mention} bu kanalda sadece video paylaşabilirsin!",
+                            f"{message.author.mention}, you can only share videos in this channel!",
                             discord.Colour.red()))
                         await asyncio.sleep(3)
                         await message.delete()
@@ -71,7 +71,7 @@ class Moderation(commands.Cog):
                             if not attachment.filename.endswith((".mp4", ".mov", ".avi", ".mkv")):
                                 await message.delete()
                                 message = await message.channel.send(embed=create_embed(
-                                    f"{message.author.mention} bu kanalda sadece video paylaşabilirsin!",
+                                    f"{message.author.mention}, you can only share videos in this channel!",
                                     discord.Colour.red()))
                                 await asyncio.sleep(3)
                                 await message.delete()
@@ -86,7 +86,7 @@ class Moderation(commands.Cog):
 
                     await message.delete()
                     message = await message.channel.send(
-                        embed=create_embed(f"{message.author.mention} bu kanalda sadece link paylaşabilirsin!",
+                        embed=create_embed(f"{message.author.mention}, you can only share links in this channel!",
                                            discord.Colour.red()))
                     await asyncio.sleep(3)
                     await message.delete()
