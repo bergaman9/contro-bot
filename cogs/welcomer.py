@@ -49,6 +49,9 @@ class Welcomer(commands.Cog):
         background_url = guild_config["background_url"]
         welcome_text = guild_config["welcome_text"]
 
+        if not welcome_text:
+            welcome_text = "HOŞ GELDİN!"
+
         # Download the background image and get its filename
         background_filename = download_background(background_url)
 
@@ -78,7 +81,6 @@ class Welcomer(commands.Cog):
         draw = ImageDraw.Draw(background)
         welcomeFont = ImageFont.truetype("attributes/Fonts/GothamNarrow-Bold.otf", 100)
         memberFont = ImageFont.truetype("attributes/Fonts/GothamNarrow-Bold.otf", 42)
-        welcome_text = welcome_text if welcome_text else "HOŞ GELDİN!"
         member_text = f"{member.name}#{member.discriminator}"  # <- Text under the Profilepicture with the Membercount
 
         W, H = (1024, 500)  # Canvas Dimensions
