@@ -156,6 +156,7 @@ class Utility(commands.Cog):
     @commands.hybrid_command(name="give_everyone", description="gives everyone a role.")
     @commands.has_permissions(manage_guild=True)
     async def give_everyone(self, ctx, role: discord.Role):
+        await ctx.defer()
         for member in ctx.guild.members:
             await member.add_roles(role)
         await ctx.send(f"{role.mention} role has been given to everyone.")
