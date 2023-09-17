@@ -102,8 +102,28 @@ class Moderation(commands.Cog):
             except Exception as e:
                 print(f"An error occurred: {e}")
 
+    @commands.hybrid_command(name="autorole_set", description="Sets autorole for the guild.")
+    @app_commands.describe(roles="Roles to set.")
+    @commands.has_permissions(manage_guild=True)
+    async def autorole_set(self, ctx, roles: commands.Greedy[discord.Role]):
+        await ctx.defer()
+        self.mongo_db['autorole'].update_one(
+            {"guild_id": ctx.guild.id},
+            {
+                "$set": {
+                    "roles": [role.id for role in roles]
+                }
+            },
+            upsert=True
+        )
+        await ctx.send(embed=create_embed("Autorole has been set.", discord.Colour.green()))
 
-
+    @commands.Cog.listener()
+    async def on_member_join(self, member):
+        record = self.mongo_db['autorole'].find_one({"guild_id": member.guild.id})
+        if record:
+            roles = [member.guild.get_role(role_id) for role_id in record["roles"]]
+            await member.add_roles(*roles)
 
 
     @commands.hybrid_command(name="filter", description="Filter commands.", aliases=['filters'])
