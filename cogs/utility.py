@@ -158,7 +158,8 @@ class Utility(commands.Cog):
     async def give_everyone(self, ctx, role: discord.Role):
         await ctx.defer()
         for member in ctx.guild.members:
-            await member.add_roles(role)
+            if not member.bot:
+                await member.add_roles(role)
         await ctx.send(f"{role.mention} role has been given to everyone.")
 
     @app_commands.command(name="mass_dm", description="DMs everyone in the server.")
