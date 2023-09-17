@@ -118,6 +118,13 @@ class Moderation(commands.Cog):
         )
         await ctx.send(embed=create_embed("Autorole has been set.", discord.Colour.green()))
 
+    @commands.hybrid_command(name="autorole_remove", description="Removes autorole for the guild.")
+    @commands.has_permissions(manage_guild=True)
+    async def autorole_remove(self, ctx):
+        await ctx.defer()
+        self.mongo_db['autorole'].delete_one({"guild_id": ctx.guild.id})
+        await ctx.send(embed=create_embed("Autorole has been removed.", discord.Colour.green()))
+
     @commands.Cog.listener()
     async def on_member_join(self, member):
         record = self.mongo_db['autorole'].find_one({"guild_id": member.guild.id})
