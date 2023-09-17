@@ -155,16 +155,10 @@ class Utility(commands.Cog):
 
     @commands.hybrid_command(name="give_everyone", description="gives everyone a role.")
     @commands.has_permissions(manage_guild=True)
-    async def give_everyone(self, ctx, name: str):
-        role = discord.utils.get(ctx.guild.roles, name=name)
-
+    async def give_everyone(self, ctx, role: discord.Role):
         for member in ctx.guild.members:
-            if not member.bot:
-                if role not in member.roles:
-                    await member.add_roles(role)
-                    await ctx.send(f"{member.mention} has been given the {role.name} role.")
-
-        await ctx.send(f"Everyone has been given the {role.name} role.")
+            await member.add_roles(role)
+        await ctx.send(f"{role.mention} role has been given to everyone.")
 
     @app_commands.command(name="mass_dm", description="DMs everyone in the server.")
     @commands.has_permissions(manage_guild=True)
