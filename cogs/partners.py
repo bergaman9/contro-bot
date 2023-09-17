@@ -14,7 +14,8 @@ class Partners(commands.Cog):
     @commands.cooldown(1, 604800, commands.BucketType.guild)
     @commands.has_permissions(manage_guild=True)
     async def partner(self, ctx, description=None):
-        partner_channel = self.mongo_db["partners"].find_one({"guild_id": str(ctx.guild.id)})["channel_id"]
+        partner_channel_id = self.mongo_db["partners"].find_one({"guild_id": str(ctx.guild.id)})["channel_id"]
+        partner_channel = ctx.guild.get_channel(int(partner_channel_id))
         invite_link = await get_invite_link(ctx.guild)  # Assuming get_invite_link() generates an invite link
         partners_collection = self.mongo_db["partners"]
 
