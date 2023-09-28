@@ -347,7 +347,7 @@ class Fun(commands.Cog):
         description = random_sub.selftext
 
         embed = discord.Embed(title=name, description=f"{description} \n**Reddit:** {link}", color=0xff4500)
-        embed.set_footer(text=f"/r/{sub} | 👍 {random_sub.score} | 💬 {random_sub.num_comments}")
+        embed.set_footer(text=f"/r/{sub} - 👍 {random_sub.score} - 💬 {random_sub.num_comments}")
 
         if url.endswith(('png', 'jpg', 'jpeg', 'gif')):  # Make sure URL exists
             embed.set_image(url=url)
