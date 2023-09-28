@@ -397,8 +397,7 @@ class Utility(commands.Cog):
 
         await interaction.channel.send(
             embed=discord.Embed(title=title, description=description, color=int(color, base=16)), view=view)
-        await interaction.response.send_message("Embed with links is created!", ephemeral=True)
-
+        await interaction.response.send_message(embed=create_embed(description="Embed with links is created!", color=discord.Color.green()), ephemeral=True)
     @commands.hybrid_command(name="emote", description="Shows emote info.")
     @commands.has_permissions(manage_messages=True)
     async def emote(self, ctx, emoji: discord.Emoji):

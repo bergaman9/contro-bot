@@ -10,6 +10,8 @@ import wavelink
 from wavelink.ext import spotify
 import dotenv
 
+from utils import create_embed
+
 intents = discord.Intents.all()
 intents.message_content = True
 intents.members = True
@@ -100,19 +102,23 @@ async def uptime(ctx):
 @commands.is_owner()
 async def load(ctx, extension):
     await bot.load_extension(f'cogs.{extension}')
-    await ctx.send("Loaded cog!")
+    await ctx.send(create_embed(description=f"Loaded cog!", color=discord.Color.green()))
 
 @bot.command()
 @commands.is_owner()
 async def unload(ctx, extension):
     await bot.unload_extension(f'cogs.{extension}')
-    await ctx.send("Unloaded cog!")
+    await ctx.send(embed=create_embed(description=f"Unloaded cog!", color=discord.Color.green()))
 
 @bot.command()
 @commands.is_owner()
 async def reload(ctx, extension):
-    await bot.reload_extension(f'cogs.{extension}')
-    await ctx.send("Reloaded cog!")
+    try:
+        await bot.reload_extension(f'cogs.{extension}')
+        await bot.tree.sync()
+        await ctx.send(embed=create_embed(description=f"Reloaded cog!", color=discord.Color.green()))
+    except Exception as e:
+        await ctx.send(embed=create_embed(description=f"Error: {e}", color=discord.Color.red()))
 
 async def cogs_load():
     for fn in os.listdir("./cogs"):
