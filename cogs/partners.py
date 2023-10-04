@@ -68,16 +68,19 @@ class Partners(commands.Cog):
                 partners_collection.insert_one(new_partner_data)
 
             # Sending partner message to all partner channels
-            for partner in partners:
-                if partner["guild_id"] != server_id:
-                    partner_channel_id = partner["channel_id"]
-                    partner_channel = self.bot.get_channel(partner_channel_id)
-                    if partner_channel:
-                        partner_message = f"<:blank:1035876485082382426> \n🤝 **{ctx.guild.name}**"
-                        if description is not None:
-                            partner_message += f"\n*{description}*"
-                        partner_message += f"\n🔗 {invite_link}"
-                        await partner_channel.send(partner_message)
+            try:
+                for partner in partners:
+                    if partner["guild_id"] != server_id:
+                        partner_channel_id = partner["channel_id"]
+                        partner_channel = self.bot.get_channel(partner_channel_id)
+                        if partner_channel:
+                            partner_message = f"<:blank:1035876485082382426> \n🤝 **{ctx.guild.name}**"
+                            if description is not None:
+                                partner_message += f"\n*{description}*"
+                            partner_message += f"\n🔗 {invite_link}"
+                            await partner_channel.send(partner_message
+            except Exception as e:
+                print(e)
 
             await ctx.send("Partner channel has been set up and existing partner data has been updated.")
         except Exception as e:
