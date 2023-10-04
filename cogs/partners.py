@@ -124,27 +124,29 @@ class Partners(commands.Cog):
 
         await ctx.send(embed=create_embed(description="Server has been bumped successfully.", color=discord.Color.green()))
 
-    @commands.hybrid_command(name="partner_settings", description="Update partner settings (description and partner_channel) in MongoDB.")
+    @commands.hybrid_command(name="partner_settings",
+                             description="Update partner settings (description and partner_channel) in MongoDB.")
     @commands.has_permissions(manage_guild=True)
     async def partner_settings(self, ctx, description, partner_channel: discord.TextChannel):
         server_id = str(ctx.guild.id)
         partners_collection = self.mongo_db["partners"]
         partner_data = partners_collection.find_one({"guild_id": server_id})
 
+        update_data = {
+            "description": description,
+            "channel_id": partner_channel.id
+        }
+
         if partner_data:
-            update_data = {}
-            if description is not None:
-                update_data["description"] = description
-            if partner_channel is not None:
-                update_data["channel_id"] = partner_channel.id
-
-            print(update_data)
-
             partners_collection.update_one({"guild_id": server_id}, {"$set": update_data})
-
-            await ctx.send(embed=create_embed(description="Partner settings updated successfully.", color=discord.Color.green()))
+            await ctx.send(
+                embed=create_embed(description="Partner settings updated successfully.", color=discord.Color.green()))
         else:
-            await ctx.send(embed=create_embed(description="Partner settings not found. Make sure you have set up the partner system using the /partner command first.", color=discord.Color.red()))
+            # Eğer partner_data bulunamazsa yeni bir kayıt ekler
+            update_data["guild_id"] = server_id  # guild_id'yi ekleyerek veriyi tamamlıyoruz
+            partners_collection.insert_one(update_data)
+            await ctx.send(embed=create_embed(description="Partner settings created and saved successfully.",
+                                              color=discord.Color.green()))
 
 
 async def setup(bot):
