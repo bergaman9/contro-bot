@@ -4,6 +4,7 @@ from discord.ext import commands
 
 from utils import get_invite_link, create_embed, initialize_mongodb
 
+
 class Partners(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -22,7 +23,8 @@ class Partners(commands.Cog):
 
             if partner_channel:
                 await partner_channel.purge()
-                await partner_channel.edit(topic="Contro botu sunucunuza ekleyip **/partner** komutunu kullanarak partner sistemine dahil olabilirsiniz. Arada bir **/bump** yaparak sunucunuzu kanalda öne çıkarabilirsiniz.")
+                await partner_channel.edit(
+                    topic="Contro botu sunucunuza ekleyip **/partner** komutunu kullanarak partner sistemine dahil olabilirsiniz. Arada bir **/bump** yaparak sunucunuzu kanalda öne çıkarabilirsiniz.")
 
             if not partner_channel:
                 overwrites = {
@@ -30,7 +32,8 @@ class Partners(commands.Cog):
                     ctx.guild.me: discord.PermissionOverwrite(send_messages=True)
                 }
                 partner_channel = await ctx.guild.create_text_channel("🤝・partnerler", overwrites=overwrites)
-                await partner_channel.edit(topic="Contro botu sunucunuza ekleyip **/partner** komutunu kullanarak partner sistemine dahil olabilirsiniz. Arada bir **/bump** yaparak sunucunuzu kanalda öne çıkarabilirsiniz.")
+                await partner_channel.edit(
+                    topic="Contro botu sunucunuza ekleyip **/partner** komutunu kullanarak partner sistemine dahil olabilirsiniz. Arada bir **/bump** yaparak sunucunuzu kanalda öne çıkarabilirsiniz.")
 
             server_id = str(ctx.guild.id)
             partners = partners_collection.find({})
@@ -68,19 +71,16 @@ class Partners(commands.Cog):
                 partners_collection.insert_one(new_partner_data)
 
             # Sending partner message to all partner channels
-            try:
-                for partner in partners:
-                    if partner["guild_id"] != server_id:
-                        partner_channel_id = partner["channel_id"]
-                        partner_channel = self.bot.get_channel(partner_channel_id)
-                        if partner_channel:
-                            partner_message = f"<:blank:1035876485082382426> \n🤝 **{ctx.guild.name}**"
-                            if description is not None:
-                                partner_message += f"\n*{description}*"
-                            partner_message += f"\n🔗 {invite_link}"
-                            await partner_channel.send(partner_message
-            except Exception as e:
-                print(e)
+            for partner in partners:
+                if partner["guild_id"] != server_id:
+                    partner_channel_id = partner["channel_id"]
+                    partner_channel = self.bot.get_channel(partner_channel_id)
+                    if partner_channel:
+                        partner_message = f"<:blank:1035876485082382426> \n🤝 **{ctx.guild.name}**"
+                        if description is not None:
+                            partner_message += f"\n*{description}*"
+                        partner_message += f"\n🔗 {invite_link}"
+                        await partner_channel.send(partner_message)
 
             await ctx.send("Partner channel has been set up and existing partner data has been updated.")
         except Exception as e:
@@ -125,7 +125,8 @@ class Partners(commands.Cog):
                     partner_message += f"\n🔗 {invite_link}"
                     await partner_channel.send(partner_message)
 
-        await ctx.send(embed=create_embed(description="Server has been bumped successfully.", color=discord.Color.green()))
+        await ctx.send(
+            embed=create_embed(description="Server has been bumped successfully.", color=discord.Color.green()))
 
     @commands.hybrid_command(name="partner_settings",
                              description="Update partner settings (description and partner_channel) in MongoDB.")
