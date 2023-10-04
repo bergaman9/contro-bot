@@ -1,9 +1,8 @@
 import discord
+from discord import app_commands
 from discord.ext import commands
-import pymongo
-import os
 
-from utils import get_invite_link, initialize_mongodb
+from utils import get_invite_link, create_embed, initialize_mongodb
 
 class Partners(commands.Cog):
     def __init__(self, bot):
@@ -11,80 +10,97 @@ class Partners(commands.Cog):
         self.mongo_db = initialize_mongodb()
 
     @commands.hybrid_command(name="partner", description="Join partner system.")
-    @commands.cooldown(1, 604800, commands.BucketType.guild)
+    @app_commands.describe(description="Write a description for your server.")
     @commands.has_permissions(manage_guild=True)
-    async def partner(self, ctx, description=None):
-        partner_channel_id = self.mongo_db["partners"].find_one({"guild_id": str(ctx.guild.id)})["channel_id"]
-        partner_channel = ctx.guild.get_channel(int(partner_channel_id))
-        invite_link = await get_invite_link(ctx.guild)  # Assuming get_invite_link() generates an invite link
-        partners_collection = self.mongo_db["partners"]
+    async def partner(self, ctx, description):
+        try:
+            await ctx.defer()
+            partner_channel_id = self.mongo_db["partners"].find_one({"guild_id": str(ctx.guild.id)})["channel_id"]
+            partner_channel = ctx.guild.get_channel(int(partner_channel_id))
+            invite_link = await get_invite_link(ctx.guild)  # Assuming get_invite_link() generates an invite link
+            partners_collection = self.mongo_db["partners"]
 
-        if partner_channel:
-            await partner_channel.purge()
-            await partner_channel.edit(topic="Contro botu sunucunuza ekleyip **/partner** komutunu kullanarak partner sistemine dahil olabilirsiniz. Arada bir **/bump** yaparak sunucunuzu kanalda öne çıkarabilirsiniz.")
+            if partner_channel:
+                await partner_channel.purge()
+                await partner_channel.edit(topic="Contro botu sunucunuza ekleyip **/partner** komutunu kullanarak partner sistemine dahil olabilirsiniz. Arada bir **/bump** yaparak sunucunuzu kanalda öne çıkarabilirsiniz.")
 
-        if not partner_channel:
-            overwrites = {
-                ctx.guild.default_role: discord.PermissionOverwrite(send_messages=False),
-                ctx.guild.me: discord.PermissionOverwrite(send_messages=True)
-            }
-            partner_channel = await ctx.guild.create_text_channel("🤝・partnerler", overwrites=overwrites)
-            await partner_channel.edit(topic="Contro botu sunucunuza ekleyip **/partner** komutunu kullanarak partner sistemine dahil olabilirsiniz. Arada bir **/bump** yaparak sunucunuzu kanalda öne çıkarabilirsiniz.")
-
-
-        server_id = str(ctx.guild.id)
-        partners = partners_collection.find({})
-        partner_data = partners_collection.find_one({"guild_id": server_id})
-
-        for partner in partners:
-            if partner["guild_id"] != server_id:
-                print(partner["guild_id"])
-                partner_message = f"<:blank:1035876485082382426> \n🤝 **{partner['server_name']}**"
-                if partner['description']:
-                    partner_message += f"\n*{partner['description']}*"
-                partner_message += f"\n🔗 {partner['invite']}"
-                await partner_channel.send(partner_message)
-
-        if partner_data:
-            partners_collection.update_one(
-                {"guild_id": server_id},
-                {
-                    "$set": {
-                        "invite": invite_link,
-                        "description": description,
-                        "channel_id": partner_channel.id,
-                        "server_name": ctx.guild.name
-                    }
+            if not partner_channel:
+                overwrites = {
+                    ctx.guild.default_role: discord.PermissionOverwrite(send_messages=False),
+                    ctx.guild.me: discord.PermissionOverwrite(send_messages=True)
                 }
-            )
-        else:
-            new_partner_data = {
-                "guild_id": server_id,
-                "invite": invite_link,
-                "description": description,
-                "channel_id": partner_channel.id,
-                "server_name": ctx.guild.name
-            }
-            partners_collection.insert_one(new_partner_data)
+                partner_channel = await ctx.guild.create_text_channel("🤝・partnerler", overwrites=overwrites)
+                await partner_channel.edit(topic="Contro botu sunucunuza ekleyip **/partner** komutunu kullanarak partner sistemine dahil olabilirsiniz. Arada bir **/bump** yaparak sunucunuzu kanalda öne çıkarabilirsiniz.")
 
-        # Sending partner message to all partner channels
-        for partner in partners:
-            if partner["guild_id"] != server_id:
-                partner_channel_id = partner["channel_id"]
-                partner_channel = self.bot.get_channel(partner_channel_id)
-                if partner_channel:
-                    partner_message = f"<:blank:1035876485082382426> \n🤝 **{ctx.guild.name}**"
-                    if description is not None:
-                        partner_message += f"\n*{description}*"
-                    partner_message += f"\n🔗 {invite_link}"
+            server_id = str(ctx.guild.id)
+            partners = partners_collection.find({})
+            partner_data = partners_collection.find_one({"guild_id": server_id})
+
+            for partner in partners:
+                if partner["guild_id"] != server_id:
+                    print(partner["guild_id"])
+                    partner_message = f"<:blank:1035876485082382426> \n🤝 **{partner['server_name']}**"
+                    if partner['description']:
+                        partner_message += f"\n*{partner['description']}*"
+                    partner_message += f"\n🔗 {partner['invite']}"
                     await partner_channel.send(partner_message)
 
-        await ctx.send("Partner channel has been set up and existing partner data has been updated.")
+            if partner_data:
+                partners_collection.update_one(
+                    {"guild_id": server_id},
+                    {
+                        "$set": {
+                            "invite": invite_link,
+                            "description": description,
+                            "channel_id": partner_channel.id,
+                            "server_name": ctx.guild.name
+                        }
+                    }
+                )
+            else:
+                new_partner_data = {
+                    "guild_id": server_id,
+                    "invite": invite_link,
+                    "description": description,
+                    "channel_id": partner_channel.id,
+                    "server_name": ctx.guild.name
+                }
+                partners_collection.insert_one(new_partner_data)
 
+            # Sending partner message to all partner channels
+            for partner in partners:
+                if partner["guild_id"] != server_id:
+                    partner_channel_id = partner["channel_id"]
+                    partner_channel = self.bot.get_channel(partner_channel_id)
+                    if partner_channel:
+                        partner_message = f"<:blank:1035876485082382426> \n🤝 **{ctx.guild.name}**"
+                        if description is not None:
+                            partner_message += f"\n*{description}*"
+                        partner_message += f"\n🔗 {invite_link}"
+                        await partner_channel.send(partner_message)
+
+            await ctx.send("Partner channel has been set up and existing partner data has been updated.")
+        except Exception as e:
+            print(e)
+
+    # @commands.Cog.listener()
+    # async def on_command_error(self, ctx, error):
+    #     if isinstance(error, commands.CommandOnCooldown):
+    #         remaining_time = error.retry_after
+    #         days = remaining_time // (60 * 60 * 24)
+    #         remaining_time %= (60 * 60 * 24)
+    #         hours = remaining_time // (60 * 60)
+    #         remaining_time %= (60 * 60)
+    #         minutes = remaining_time // 60
+    #         seconds = remaining_time % 60
+    #
+    #         time_str = f"{days} gün, {hours} saat, {minutes} dakika, {seconds:.2f} saniye"
+    #         await ctx.send(f"Bu komutu tekrar kullanmak için lütfen {time_str} bekleyin.")
 
     @commands.hybrid_command(name="bump", description="Bump the server's partner channels with the server invite link.")
     @commands.cooldown(1, 604800, commands.BucketType.guild)
     async def bump(self, ctx):
+        await ctx.defer()
         partner_channel = self.mongo_db["partners"].find_one({"guild_id": str(ctx.guild.id)})["channel_id"]
         if not partner_channel:
             return await ctx.send("Partner channel is not set up.")
@@ -106,12 +122,11 @@ class Partners(commands.Cog):
                     partner_message += f"\n🔗 {invite_link}"
                     await partner_channel.send(partner_message)
 
-        await ctx.send("Server bumped in all partner channels.")
+        await ctx.send(embed=create_embed(description="Server has been bumped successfully.", color=discord.Color.green()))
 
-    @commands.hybrid_command(name="partner_settings",
-                      description="Update partner settings (description and channel_id) in MongoDB.")
+    @commands.hybrid_command(name="partner_settings", description="Update partner settings (description and partner_channel) in MongoDB.")
     @commands.has_permissions(manage_guild=True)
-    async def partner_settings(self, ctx, description=None, partner_channel: discord.TextChannel = None):
+    async def partner_settings(self, ctx, description, partner_channel: discord.TextChannel):
         server_id = str(ctx.guild.id)
         partners_collection = self.mongo_db["partners"]
         partner_data = partners_collection.find_one({"guild_id": server_id})
@@ -127,10 +142,9 @@ class Partners(commands.Cog):
 
             partners_collection.update_one({"guild_id": server_id}, {"$set": update_data})
 
-            await ctx.send("Partner settings updated successfully.")
+            await ctx.send(embed=create_embed(description="Partner settings updated successfully.", color=discord.Color.green()))
         else:
-            await ctx.send(
-                "Partner settings not found. Make sure you have set up the partner system using the /partner command first.")
+            await ctx.send(embed=create_embed(description="Partner settings not found. Make sure you have set up the partner system using the /partner command first.", color=discord.Color.red()))
 
 
 async def setup(bot):

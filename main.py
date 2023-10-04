@@ -29,6 +29,7 @@ class Bot(commands.Bot):
         intents.members = True
 
         super().__init__(command_prefix=">", intents=intents, help_command=None)
+
     async def setup_hook(self) -> None:
         # Wavelink 2.0 has made connecting Nodes easier... Simply create each Node
         # and pass it to NodePool.connect with the client/bot.
@@ -37,7 +38,8 @@ class Bot(commands.Bot):
                 client_id='0c7f24e228844860a8a920d2e69ed11d',
                 client_secret='be5c4415a8bc461a83f744822a803edf'
             )
-            node: wavelink.Node = wavelink.Node(uri="suki.nathan.to:443", password="adowbongmanacc", secure=True)
+            node: wavelink.Node = wavelink.Node(uri="panel.sillydev.co.uk:6039", password="bestfreehosting",
+                                                secure=False)
             await wavelink.NodePool.connect(client=self, nodes=[node], spotify=sc)
             print(f"Connected to lavalink {node.uri}")
         except Exception as e:
