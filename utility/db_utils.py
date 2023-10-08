@@ -34,7 +34,17 @@ async def fetch_buttons_from_db():
 
 def fetch_buttons_for_guild(guild_id):
     mongo_db = initialize_mongodb()
+
+    color_priority = {
+        "success": 1,     # En yüksek öncelik
+        "primary": 2,
+        "danger": 3,
+        "secondary": 4   # En düşük öncelik
+    }
+
     buttons = list(mongo_db["buttons"].find({"guild_id": str(guild_id)}))
+    buttons.sort(key=lambda x: color_priority.get(x.get("color", "secondary"), 5))  # Eğer rengi tanımlı değilse en düşük öncelik
+
     return buttons
 
 def fetch_fields_by_data_source(data_source, guild_id):
