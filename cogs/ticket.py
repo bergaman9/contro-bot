@@ -47,8 +47,7 @@ class TicketModal(discord.ui.Modal):
                 dynamic_field = getattr(self, f"field_{index:02}")
                 self.add_item(dynamic_field)
 
-        except Exception as e:
-            print(f"An error occurred: {e}")
+        except:
             self.field_01 = discord.ui.TextInput(label='Destek almak istediğiniz konu nedir?',
                                                  placeholder="Yanıtınızı giriniz.", custom_id="field_01")
             self.add_item(self.field_01)
@@ -117,6 +116,7 @@ class TicketCloseButton(discord.ui.Button):
             self.mongo_db["tickets"].delete_one({"_id": channel_id})
 
             await interaction.channel.delete()
+            return
         else:
             await interaction.response.send_message(
                 embed=create_embed(description="Bu işlemi gerçekleştirmek için yetkiniz yok.",
@@ -189,7 +189,7 @@ class Ticket(commands.Cog):
                         support_role = await guild.create_role(name='Destek', color=discord.Color.green())
                     overwrites[support_role] = discord.PermissionOverwrite(read_messages=True)
 
-                category_id = self.mongo_db["settings"].find_one({"guild_id": guild.id})["support_category_channel"]
+                category_id = self.mongo_db["settings"].find_one({"guild_id": guild.id})["ticket_category_channel"]
                 category = guild.get_channel(category_id)
                 if category is None:
                     category = await guild.create_category(name="DESTEK")
