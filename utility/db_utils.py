@@ -1,6 +1,6 @@
 import discord
 
-from .utils import initialize_mongodb, async_initialize_mongodb
+from .utils import initialize_mongodb
 
 async def fetch_buttons_from_db():
     return [
@@ -29,20 +29,17 @@ def fetch_suggest_fields_from_db():
     ]
 
 async def fetch_buttons_from_db():
-    mongo_db = await async_initialize_mongodb()
-    cursor = mongo_db["buttons"].find({})
-    buttons = await cursor.to_list(length=100)  # Replace 100 with the maximum number of documents you expect to retrieve
+    mongo_db = initialize_mongodb()
+    return list(mongo_db["buttons"].find({}))
+
+def fetch_buttons_for_guild(guild_id):
+    mongo_db = initialize_mongodb()
+    buttons = list(mongo_db["buttons"].find({"guild_id": str(guild_id)}))
     return buttons
 
-async def fetch_buttons_for_guild(guild_id):
-    mongo_db = await async_initialize_mongodb()
-    cursor = mongo_db["buttons"].find({"guild_id": str(guild_id)})
-    buttons = await cursor.to_list(length=100)
-    return buttons
-
-async def fetch_fields_by_data_source(data_source):
-    mongo_db = await async_initialize_mongodb()
-    button = await mongo_db["buttons"].find_one({"data_source": data_source})
+def fetch_fields_by_data_source(data_source):
+    mongo_db = initialize_mongodb()
+    button = mongo_db["buttons"].find_one({"data_source": data_source})
     return button.get("fields", []) if button else []
 
 def insert_buttons_into_db():
