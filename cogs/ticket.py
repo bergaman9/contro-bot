@@ -42,7 +42,8 @@ class TicketModal(discord.ui.Modal):
                     custom_id=f"field_{index:02}",
                     max_length=data.get('max_length', None),
                     style=text_style,
-                    required=data.get('required', True)
+                    required=data.get('required', True),
+                    row=data.get('row', None)
                 )
 
                 setattr(self, f"field_{index:02}", field)
