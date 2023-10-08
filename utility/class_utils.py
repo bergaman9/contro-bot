@@ -71,6 +71,6 @@ class DynamicView(discord.ui.View):
             style_str = data.get("style", "primary")  # Varsayılan stil olarak "primary" kullanıldı.
             style = STYLE_MAPPING.get(style_str,
                                       discord.ButtonStyle.primary)  # Eğer stil bulunamazsa yine varsayılan olarak "primary" kullanılır.
-            self.add_item(DynamicButton(label=data["label"], custom_id=custom_id, style=style))
+            self.add_item(DynamicButton(label=data["label"], custom_id=custom_id, style=style, emoji=data.get("emoji", None), row=data.get("row", None)))
 
 
