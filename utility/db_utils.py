@@ -37,9 +37,10 @@ def fetch_buttons_for_guild(guild_id):
     buttons = list(mongo_db["buttons"].find({"guild_id": str(guild_id)}))
     return buttons
 
-def fetch_fields_by_data_source(data_source):
+def fetch_fields_by_data_source(data_source, guild_id):
     mongo_db = initialize_mongodb()
-    button = mongo_db["buttons"].find_one({"data_source": data_source})
+    filter_query = {"data_source": data_source, "guild_id": str(guild_id)}
+    button = mongo_db["buttons"].find_one(filter_query)
     return button.get("fields", []) if button else []
 
 def insert_buttons_into_db():

@@ -18,14 +18,15 @@ TEXT_STYLE_MAPPING = {
 
 
 class TicketModal(discord.ui.Modal):
-    def __init__(self, data_source: str, title: str):
+    def __init__(self, data_source: str, title: str, guild_id: str):
         super().__init__(title=title, custom_id="ticket_modal")
         self.data_source = data_source
+        self.guild_id = guild_id
         self.initialize_fields()
 
     def initialize_fields(self):
         try:
-            data_list = fetch_fields_by_data_source(self.data_source)
+            data_list = fetch_fields_by_data_source(self.data_source, self.guild_id)
 
             if not data_list:
                 raise ValueError("No data found")
@@ -250,7 +251,7 @@ class Ticket(commands.Cog):
                 button_data = buttons[index]
                 data_source = button_data.get("data_source", "default")
                 await interaction.response.send_modal(
-                    TicketModal(data_source=data_source, title=button_data["label"]))
+                    TicketModal(data_source=data_source, title=button_data["label"], guild_id=str(interaction.guild.id)))
             else:
                 print(f"No button matched for custom_id: {custom_id}")
         except Exception as e:
