@@ -2,59 +2,8 @@ import discord
 from discord.ext import commands
 import math
 from utils import initialize_mongodb
+from utility.class_utils import Paginator
 
-class GuildsView(discord.ui.View):
-    def __init__(self, embeds):
-        super().__init__(timeout=120)  # 2 minutes timeout
-        self.embeds = embeds
-        self.current_page = 0
-        self.max_pages = len(embeds) - 1  # Sayfa sayısını doğru bir şekilde ayarladık
-        self.page_info.label = f"1/{len(self.embeds)}"  # Sayfa bilgisini başlangıçta ayarla
-        self.message = None
-
-    async def send_initial_message(self, ctx):
-        self.message = await ctx.send(embed=self.embeds[self.current_page], view=self)
-
-    def refresh_buttons(self):
-        """Butonları yeniden ayarlar."""
-        # Previous butonunu kontrol eder
-        self.previous_button.disabled = self.current_page == 0
-
-        # Next butonunu kontrol eder
-        self.next_button.disabled = self.current_page == len(self.embeds) - 1
-
-        # Sayfa bilgisini günceller
-        self.page_info.label = f"{self.current_page + 1}/{len(self.embeds)}"
-
-    @discord.ui.button(label="Önceki", style=discord.ButtonStyle.primary, custom_id="previous_button")
-    async def previous_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if self.current_page > 0:
-            self.current_page -= 1
-            await self.show_page(interaction)
-
-    @discord.ui.button(label=f"1/4", style=discord.ButtonStyle.secondary,
-                       disabled=True)  # Başlangıç değeri 1/4 olarak ayarlandı
-    async def page_info(self, interaction: discord.Interaction, button: discord.ui.Button):
-        pass  # Bu buton sadece bilgi göstermek için var. Herhangi bir işlevi yok.
-
-    @discord.ui.button(label="Sonraki", style=discord.ButtonStyle.primary, custom_id="next_button")
-    async def next_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        try:
-            if self.current_page < self.max_pages:
-                self.current_page += 1
-                await self.show_page(interaction)
-        except Exception as e:
-            print(e)
-
-    async def show_page(self, interaction: discord.Interaction):
-        """Belirtilen sayfayı gösterir ve butonları günceller."""
-        self.refresh_buttons()
-        await interaction.response.edit_message(embed=self.embeds[self.current_page], view=self)
-
-    async def on_timeout(self):
-        """Timeout bittiğinde bu fonksiyon çağrılır."""
-        if self.message:
-            await self.message.edit(view=None)
 
 class Owner(commands.Cog):
     def __init__(self, bot):
@@ -93,7 +42,7 @@ class Owner(commands.Cog):
                 embed.set_footer(text=f"Page: {page + 1}/{pages}")
                 embeds.append(embed)
 
-            view = GuildsView(embeds)
+            view = Paginator(embeds)
             await view.send_initial_message(ctx)
         except Exception as e:
             print(e)

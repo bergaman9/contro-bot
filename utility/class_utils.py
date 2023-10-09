@@ -74,3 +74,4 @@ class DynamicView(discord.ui.View):
             self.add_item(DynamicButton(label=data["label"], custom_id=custom_id, style=style, emoji=data.get("emoji", None), row=data.get("row", None)))
 
 
+
