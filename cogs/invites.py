@@ -3,6 +3,7 @@ from discord.ext import commands
 
 from utils import initialize_mongodb, create_embed
 
+
 class Invites(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -65,7 +66,9 @@ class Invites(commands.Cog):
                         if log_channel_id:
                             log_channel = discord.utils.get(member.guild.channels, id=log_channel_id)
 
-                    await log_channel.send(embed=create_embed(description=f"{member.mention} sunucuya katıldı. {invite.inviter.mention} tarafından davet edildi.", color=discord.Color.green()))
+                    await log_channel.send(embed=create_embed(
+                        description=f"{member.mention} sunucuya katıldı. {invite.inviter.mention} tarafından davet edildi.",
+                        color=discord.Color.green()))
 
                     # Bu davet linki kullanıldı, davet eden kişiyi veritabanına kaydet
 
@@ -112,7 +115,9 @@ class Invites(commands.Cog):
             if inviter_id:
                 inviter = member.guild.get_member(int(inviter_id))
                 print(inviter)
-                await log_channel.send(embed=create_embed(description=f"{member.mention} sunucudan ayrıldı. {inviter.mention} tarafından davet edilmişti.", color=discord.Color.red()))
+                await log_channel.send(embed=create_embed(
+                    description=f"{member.mention} sunucudan ayrıldı. {inviter.mention} tarafından davet edilmişti.",
+                    color=discord.Color.red()))
                 return
 
         self.mongo_db["invites"].update_one(
@@ -123,18 +128,20 @@ class Invites(commands.Cog):
                 }
             })
 
-    @commands.hybrid_command(name="leaderboard", description="Shows the number of invites a user has.")
+    @commands.hybrid_command(name="invites_leaderboard", description="Shows the invite leaderboard of the server.")
     async def leaderboard(self, ctx):
         # Fetch the invites document for the guild
         invites = self.mongo_db["invites"].find_one({"guild_id": ctx.guild.id})
         if not invites:
-            await ctx.send(embed=create_embed(description="No invite data found for this server.", color=discord.Color.red()))
+            await ctx.send(
+                embed=create_embed(description="No invite data found for this server.", color=discord.Color.red()))
             return
 
         invited_members = invites.get("invited_members", {})
 
         if not invited_members:
-            await ctx.send(embed=create_embed(description="No invite leaderboard data available for this server.", color=discord.Color.red()))
+            await ctx.send(embed=create_embed(description="No invite leaderboard data available for this server.",
+                                              color=discord.Color.red()))
             return
 
         # Count the number of times each user invited someone
