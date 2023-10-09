@@ -1,13 +1,11 @@
-import time
-import asyncio
 from typing import List
 
 import discord
 from discord import app_commands
 from discord.ext import commands, tasks
-from discord.ui import Button, View
 
 from utils import async_initialize_mongodb, create_embed
+from utility.class_utils import Paginator
 
 
 class GameStats(commands.Cog):
@@ -37,7 +35,7 @@ class GameStats(commands.Cog):
                         game_name = member.activity.name if member.activity else None
                         if game_name:
                             await self.update_game_in_db(guild.id, game_name, member.id)
-                #print(f"Updated {count} members' game activity in {guild.name}")
+                # print(f"Updated {count} members' game activity in {guild.name}")
         except Exception as e:
             print(f"Error in update_game_activities: {e}")
 
@@ -59,7 +57,7 @@ class GameStats(commands.Cog):
                         await self.remove_game_logs_in_db(guild, member)
                         if guild.name == "Türk Oyuncu Topluluğu":
                             print(f"Removed {member.name}'s game logs")
-                #print(f"Added {added_count} and removed {removed_count} members' game logs in {guild.name}")
+                # print(f"Added {added_count} and removed {removed_count} members' game logs in {guild.name}")
             except Exception as e:
                 print(f"Error in update_game_logs for guild {guild.name}: {e}")
 
@@ -67,7 +65,7 @@ class GameStats(commands.Cog):
     async def clean_up_database_for_guild(self):
         for guild in self.bot.guilds:
             try:
-                #print(f"Cleaning up logs for guild {guild.id}")
+                # print(f"Cleaning up logs for guild {guild.id}")
                 game_logs = self.mongodb["game_logs"]
                 guild_log = await game_logs.find_one({"guild_id": guild.id})
 
@@ -85,7 +83,7 @@ class GameStats(commands.Cog):
 
                 # Veritabanını güncelle
                 await game_logs.update_one({"guild_id": guild.id}, {"$set": {"game_names": guild_log["game_names"]}})
-                #print(f"Cleaned up logs for guild {guild.id}.")
+                # print(f"Cleaned up logs for guild {guild.id}.")
                 if guild.name == "Türk Oyuncu Topluluğu":
                     print(f"Cleaned up logs for guild {guild.id}.")
             except Exception as e:
@@ -114,7 +112,7 @@ class GameStats(commands.Cog):
         if not guild_data:
             game_stats.insert_one({"guild_id": guild_id, "played_games": []})
             guild_data = game_stats.find_one({"guild_id": guild_id})
-            #print(f"Created a new document for guild {guild_id}.")
+            # print(f"Created a new document for guild {guild_id}.")
 
         # Update the played_games list for the game
         played_games = guild_data.get("played_games", [])
@@ -128,7 +126,7 @@ class GameStats(commands.Cog):
                         break
                 else:
                     game["players"].append({"member_id": member_id, "time_played": 1})
-                #print(f"Updated game: {game_name} for user: {member_id}")
+                # print(f"Updated game: {game_name} for user: {member_id}")
                 break
         else:
             played_games.append({
@@ -136,7 +134,7 @@ class GameStats(commands.Cog):
                 "total_time_played": 1,
                 "players": [{"member_id": member_id, "time_played": 1}]
             })
-            #print(f"Added new game: {game_name} for user: {member_id}")
+            # print(f"Added new game: {game_name} for user: {member_id}")
 
         # Update the document in the database
         game_stats.update_one({"guild_id": guild_id}, {"$set": {"played_games": played_games}})
@@ -189,7 +187,8 @@ class GameStats(commands.Cog):
                 view = Paginator(embeds)
                 await view.send_initial_message(ctx)
             else:
-                await ctx.send(embed=create_embed(description="No game statistics available.", color=discord.Color.red()))
+                await ctx.send(
+                    embed=create_embed(description="No game statistics available.", color=discord.Color.red()))
 
     async def get_member_top_games(self, guild_id, member_id):
         game_stats = self.mongodb["game_stats"]
@@ -242,13 +241,16 @@ class GameStats(commands.Cog):
             guild_log = await game_logs.find_one({"guild_id": ctx.guild.id})
 
             if not guild_log:
-                await ctx.send(embed=create_embed(description=f"No one is playing {game_name}", color=discord.Color.red()))
+                await ctx.send(
+                    embed=create_embed(description=f"No one is playing {game_name}", color=discord.Color.red()))
                 return
 
-            game_entry = next((game for game in guild_log.get("game_names", []) if game["game_name"] == game_name), None)
+            game_entry = next((game for game in guild_log.get("game_names", []) if game["game_name"] == game_name),
+                              None)
 
             if not game_entry:
-                await ctx.send(embed=create_embed(description=f"No one is playing {game_name}", color=discord.Color.red()))
+                await ctx.send(
+                    embed=create_embed(description=f"No one is playing {game_name}", color=discord.Color.red()))
                 return
 
             description = ""
@@ -277,21 +279,22 @@ class GameStats(commands.Cog):
                 for player in game["active_players"]:
                     if player["member_id"] == member_id:
                         player["time_played"] += 1
-                        #print(f"-Updated game: {game_name} for user: {member_id}")
+                        # print(f"-Updated game: {game_name} for user: {member_id}")
                         break
                 else:
                     game["active_players"].append({"member_id": member_id, "time_played": 1})
-                    #print(f"-Added new game: {game_name} for user: {member_id}")
+                    # print(f"-Added new game: {game_name} for user: {member_id}")
                 break
         else:
             log["game_names"].append({
                 "game_name": game_name,
                 "active_players": [{"member_id": member_id, "time_played": 1}]
             })
-            #print(f"-Added new game: {game_name} for user: {member_id}")
+            # print(f"-Added new game: {game_name} for user: {member_id}")
 
         # Dökümanı güncelle
         await game_logs.update_one({"guild_id": guild_id}, {"$set": {"game_names": log["game_names"]}})
+
 
 async def setup(bot):
     await bot.add_cog(GameStats(bot))
