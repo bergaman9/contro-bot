@@ -43,65 +43,6 @@ class Utility(commands.Cog):
                     if role in after.roles:
                         await after.remove_roles(role)
 
-    @commands.hybrid_command(name="status_role", description="Gives a role to everyone with a specific status.")
-    @commands.has_permissions(manage_guild=True)
-    async def status_role(self, ctx):
-        # Get the status_roles collection from the database
-        collection = self.mongo_db["status_roles"]
-        # Find the document that matches the guild id
-        document = collection.find_one({"guild_id": ctx.guild.id})
-        if document is not None:
-            # Get the custom status and role name from the document
-            custom_status = document["custom_status"]
-            role_id = document["role_id"]
-            added_members = []
-            removed_members = []
-            for member in ctx.guild.members:
-                activity = member.activity
-                if activity is not None:
-                    activity_type = activity.type
-                    if activity_type == discord.ActivityType.custom:
-                        message = activity.name
-                        if message == custom_status:
-                            # Get the role by name
-                            role = discord.utils.get(ctx.guild.roles, id=role_id)
-                            if role is not None:
-                                added_members.append(member.mention)
-                                await member.add_roles(role)
-                        else:
-                            role = discord.utils.get(ctx.guild.roles, id=role_id)
-                            if role in member.roles:
-                                removed_members.append(member.mention)
-                                await member.remove_roles(role)
-                    else:
-                        role = discord.utils.get(ctx.guild.roles, id=role_id)
-                        if role in member.roles:
-                            removed_members.append(member.mention)
-                            await member.remove_roles(role)
-                else:
-                    role = discord.utils.get(ctx.guild.roles, id=role_id)
-                    if role in member.roles:
-                        removed_members.append(member.mention)
-                        await member.remove_roles(role)
-
-            if len(added_members) > 0 and len(removed_members) > 0:
-                await ctx.send(embed=create_embed(
-                    description=f"'{custom_status}' durumuna sahip olanlara {role.mention} rolü verildi.",
-                    color=discord.Color.green()))
-                await ctx.send(embed=create_embed(
-                    description=f"'{custom_status}' durumuna sahip olmayanlardan {role.mention} rolü alındı.",
-                    color=discord.Color.red()))
-            elif len(added_members) > 0:
-                await ctx.send(embed=create_embed(
-                    description=f"'{custom_status}' durumuna sahip olanlara {role.mention} rolü verildi.",
-                    color=discord.Color.green()))
-            elif len(removed_members) > 0:
-                await ctx.send(embed=create_embed(
-                    description=f"'{custom_status}' durumuna sahip olmayanlardan {role.mention} rolü alındı.",
-                    color=discord.Color.red()))
-            else:
-                await ctx.send(embed=create_embed(description="Bir değişiklik yapılmadı.", color=discord.Color.red()))
-
     @commands.hybrid_command(name="advertisements", description="Prints all custom activities that are discord invites")
     @commands.has_permissions(manage_guild=True)
     async def advertisements(self, ctx):
@@ -121,10 +62,10 @@ class Utility(commands.Cog):
             await ctx.send(
                 embed=create_embed(description="No advertisements found in the server.", color=discord.Color.green()))
 
-    @commands.hybrid_command(name="status_role_set",
+    @commands.hybrid_command(name="set_status_role",
                              description="Sets the custom status and role for the status_role command.")
     @commands.has_permissions(manage_guild=True)
-    async def status_role_set(self, ctx, custom_status: str, role: discord.Role):
+    async def set_status_role(self, ctx, custom_status: str, role: discord.Role):
         # Get the status_roles collection from the database
 
         cleaned_custom_status = [item.strip() for item in custom_status.split(",")]
@@ -161,31 +102,17 @@ class Utility(commands.Cog):
                 await member.add_roles(role)
         await ctx.send(f"{role.mention} role has been given to everyone.")
 
-    @app_commands.command(name="mass_dm", description="DMs everyone in the server.")
-    @commands.has_permissions(manage_guild=True)
-    async def mass_dm(self, interaction, title: str, description: str, color: str = "ff1f1f", image: str = None):
-
-        await interaction.response.defer()
-
-        embed = discord.Embed(title=title, description=description, color=int(color, base=16))
-        if image:
-            embed.set_image(url=image)
-
-        count = 0
-        for member in interaction.guild.members:
-            count += 1
-            if not member.bot:
-                try:
-                    await member.send(embed=embed)
-                    print(f"DM sent to {member.name}")
-                except Exception:
-                    print(f"Could not send DM to {member.name}")
-
-        await interaction.followup.send(f"DM sent to {count} members!", ephemeral=True)
-
     @commands.hybrid_command(name="membersofrole")
     async def members_of_role(self, ctx, role: discord.Role):
-        await ctx.send("deneme")
+        members_with_role = [member for member in ctx.guild.members if role in member.roles]
+
+        if not members_with_role:
+            await ctx.send(f"Hiçbir kullanıcının {role.name} rolü yok.")
+            return
+
+        embeds = generate_members_of_role_embeds(members_with_role, role)
+        paginator = Paginator(embed_list=embeds)
+        await paginator.send_initial_message(ctx)
 
     @commands.command(name="download_emojis", description="Fetch emojis of the server.")
     @commands.has_permissions(manage_messages=True)
