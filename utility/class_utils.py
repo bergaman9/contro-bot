@@ -99,6 +99,7 @@ class ReportModal(discord.ui.Modal, title='Şikayet Et'):
             report_field_value = interaction.data["components"][0]["components"][0]["value"]
             print(report_field_value)
             report_channel_id = await self.get_report_channel_id()
+            print(report_channel_id)
             if report_channel_id:
                 report_channel = interaction.guild.get_channel(report_channel_id)
                 if not report_channel:
