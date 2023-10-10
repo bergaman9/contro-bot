@@ -107,7 +107,8 @@ class ReportModal(discord.ui.Modal, title='Şikayet Et'):
                 report_channel = interaction.channel
             print(report_channel)
 
-            await interaction.response.send_message("Şikayetiniz alındı.", ephemeral=True)
+            #await interaction.response.send_message("Şikayetiniz alındı.", ephemeral=True)
+
             description = f"**Şikayet:** {report_field_value} \n**Şikayet Edilen Mesaj:** [Link]({self.message.jump_url}) \n**Şikayet Eden:** {interaction.user.mention})"
             embed = discord.Embed(description=description, color=discord.Color.red())
             embed.set_author(name=f"{interaction.user.name} Şikayeti", icon_url=interaction.user.avatar.url)
