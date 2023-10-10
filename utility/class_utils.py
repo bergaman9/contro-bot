@@ -1,6 +1,6 @@
 import discord
 
-from .utils import async_initialize_mongodb
+from .utils import async_initialize_mongodb, create_embed
 
 class Paginator(discord.ui.View):
     def __init__(self, embed_list):
@@ -116,6 +116,6 @@ class ReportModal(discord.ui.Modal, title='Şikayet Et'):
             embed.set_footer(text=f"ID: {interaction.user.id}")
             await report_channel.send(embed=embed, view=discord.ui.View().add_item(
                 LinkButton(label="Mesaja Git", url=self.message.jump_url)))
-            await interaction.followup.send("Şikayetiniz alındı.", ephemeral=True)
+            await interaction.followup.send(embed=create_embed("Şikayetiniz alındı.", discord.Color.green()), ephemeral=True)
         except Exception as e:
             print("An error occurred while reporting: ", e)
