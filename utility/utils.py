@@ -213,4 +213,22 @@ def prepare_leaderboard_embeds(mongo_db, guild):
     return embeds
 
 
+def generate_members_of_role_embeds(members, role):
+    # Her embed'de kaç üye gösterilmesini istiyorsanız bu sayıyı değiştirebilirsiniz.
+    members_per_embed = 20
+    embeds = []
+
+    for i in range(0, len(members), members_per_embed):
+        current_members = members[i:i + members_per_embed]
+        embed = discord.Embed(title=f"{role.name} Rolündeki Üyeler", color=role.color)
+
+        # Üyeleri embed'e ekleyin
+        member_string = "\n".join(member.mention for member in current_members)
+        embed.description = member_string
+
+        embeds.append(embed)
+
+    return embeds
+
+
 
