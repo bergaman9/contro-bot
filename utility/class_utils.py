@@ -34,6 +34,7 @@ class Paginator(discord.ui.View):
 
     @discord.ui.button(label="", style=discord.ButtonStyle.secondary, disabled=True)
     async def page_info(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Sayfa bilgisini gösterir."""
         pass
 
     @discord.ui.button(label="Next", style=discord.ButtonStyle.primary, custom_id="next_button")

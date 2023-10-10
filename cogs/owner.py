@@ -20,7 +20,6 @@ class Owner(commands.Cog):
 
     async def cog_unload(self) -> None:
         self.bot.tree.remove_command(self.report_menu.name, type=self.report_menu.type)
-        self.bot.tree.remove_command(self.kick_menu.name, type=self.kick_menu.type)
 
     async def report_message(self, interaction: discord.Interaction, message: discord.Message) -> None:
         await interaction.response.send_modal(ReportModal(message=message))
@@ -46,7 +45,8 @@ class Owner(commands.Cog):
                     try:
                         invites = await guild.invites()  # invites'ı await ile al
                         first_invite = invites[0].url if invites else 'No invite link'  # Eğer varsa ilk daveti al
-                    except:
+                    except Exception as e:
+                        print("An error occurred while fetching invites: ", e)
                         first_invite = 'No invite link'
                     member = await guild.fetch_member(783064615012663326)
                     embed.add_field(
