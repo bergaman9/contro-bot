@@ -74,4 +74,35 @@ class DynamicView(discord.ui.View):
             self.add_item(DynamicButton(label=data["label"], custom_id=custom_id, style=style, emoji=data.get("emoji", None), row=data.get("row", None)))
 
 
+class ReportModal(discord.ui.Modal, title='Şikayet Et'):
+    def __init__(self, message):
+        super().__init__(timeout=None, custom_id="report_modal")
+        self.message = message
+        self.add_item(discord.ui.TextInput(label='Şikayetin nedir?', custom_id="report_field",
+                                           placeholder="Şikayetinizi buraya yazın."))
 
+    async def get_report_channel_id(self):
+        mongo_db = await async_initialize_mongodb()
+        settings = await mongo_db["settings"].find_one({})
+        return settings.get("report_channel_id")
+
+    async def on_submit(self, interaction) -> None:
+        report_field_value = interaction.data["components"][0]["components"][0]["value"]
+
+        report_channel_id = await self.get_report_channel_id()
+        if report_channel_id:
+            report_channel = interaction.guild.get_channel(report_channel_id)
+            if not report_channel:
+                await interaction.response.send_message("Şikayet kanalı bulunamadı.", ephemeral=True)
+                return
+        else:
+            report_channel = interaction.channel
+
+        await interaction.response.send_message("Şikayetiniz alındı.", ephemeral=True)
+        description = f"**Şikayet:** {report_field_value} \n**Şikayet Edilen Mesaj:** [Link]({self.message.jump_url}) \n**Şikayet Eden:** {interaction.user.mention})"
+        embed = discord.Embed(description=description, color=discord.Color.red())
+        embed.set_author(name=f"{interaction.user.name} Şikayeti", icon_url=interaction.user.avatar.url)
+        embed.set_thumbnail(url=interaction.user.avatar.url)
+        embed.set_footer(text=f"ID: {interaction.user.id}")
+        await report_channel.send(embed=embed, view=discord.ui.View().add_item(
+            LinkButton(label="Mesaja Git", url=self.message.jump_url)))

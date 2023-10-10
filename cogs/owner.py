@@ -1,14 +1,29 @@
-import discord
-from discord.ext import commands
 import math
+
+import discord
+from discord import app_commands
+from discord.ext import commands
+
+from utility.class_utils import Paginator, ReportModal
 from utils import initialize_mongodb
-from utility.class_utils import Paginator
 
 
 class Owner(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.db = initialize_mongodb()
+        self.report_menu = app_commands.ContextMenu(
+            name='Şikayet Et',
+            callback=self.report_message,
+        )
+        self.bot.tree.add_command(self.report_menu)
+
+    async def cog_unload(self) -> None:
+        self.bot.tree.remove_command(self.report_menu.name, type=self.report_menu.type)
+        self.bot.tree.remove_command(self.kick_menu.name, type=self.kick_menu.type)
+
+    async def report_message(self, interaction: discord.Interaction, message: discord.Message) -> None:
+        await interaction.response.send_modal(ReportModal(message=message))
 
     @commands.hybrid_command(name="contro_guilds", description="Shows guilds.")
     @commands.is_owner()
