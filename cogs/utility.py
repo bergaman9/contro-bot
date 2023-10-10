@@ -187,7 +187,7 @@ class Utility(commands.Cog):
     async def members_of_role(self, ctx, role: discord.Role):
         await ctx.send("deneme")
 
-    @commands.hybrid_command(name="download_emojis", description="Fetch emojis of the server.")
+    @commands.command(name="download_emojis", description="Fetch emojis of the server.")
     @commands.has_permissions(manage_messages=True)
     async def download_emojis(self, interaction):
 
