@@ -43,10 +43,9 @@ class Owner(commands.Cog):
 
                 for guild in guilds_sorted[start_idx:end_idx]:
                     try:
-                        invites = await guild.invites()  # invites'ı await ile al
-                        first_invite = invites[0].url if invites else 'No invite link'  # Eğer varsa ilk daveti al
-                    except Exception as e:
-                        print("An error occurred while fetching invites: ", e)
+                        invites = await guild.invites()
+                        first_invite = invites[0].url if invites else 'No invite link'
+                    except Exception:  # Tüm exceptionları yakalamak için genel bir Exception kullanın
                         first_invite = 'No invite link'
                     member = await guild.fetch_member(783064615012663326)
                     embed.add_field(
