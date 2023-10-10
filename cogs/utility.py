@@ -1,17 +1,16 @@
-import os
-import math
-import asyncio
 import io
+import os
+import shutil
 from io import BytesIO
 
+import aiohttp
 import discord
-from discord import app_commands
-from discord.ext import commands
 import requests
 from PIL import Image
-import aiohttp
-import shutil
+from discord import app_commands
+from discord.ext import commands
 
+from utility.class_utils import Paginator
 from utils import create_embed, initialize_mongodb
 
 
@@ -179,7 +178,7 @@ class Utility(commands.Cog):
                 try:
                     await member.send(embed=embed)
                     print(f"DM sent to {member.name}")
-                except:
+                except Exception:
                     print(f"Could not send DM to {member.name}")
 
         await interaction.followup.send(f"DM sent to {count} members!", ephemeral=True)
@@ -221,77 +220,34 @@ class Utility(commands.Cog):
         animated_emojis = [f"<a:{emoji.name}:{emoji.id}>" for emoji in emojis if emoji.animated]
 
         # Sayfa başına kaç emoji gösterilecek
-        emojis_per_page = 100
+        emojis_per_page = 50
 
-        # Sayfa sayısı
-        total_static_pages = math.ceil(len(static_emojis) / emojis_per_page)
-        total_animated_pages = math.ceil(len(animated_emojis) / emojis_per_page)
+        # Embed'leri oluşturma
+        def create_embed_pages(emojis_list, title):
+            pages = []
+            for i in range(0, len(emojis_list), emojis_per_page):
+                chunk = emojis_list[i:i + emojis_per_page]
+                embed = discord.Embed(title=title, description=" ".join(chunk), color=discord.Color.blurple())
+                embed.set_thumbnail(url=ctx.guild.icon.url)
+                pages.append(embed)
+            return pages
 
-        # Embed oluşturma
-        def create_embed(emojis_list, page, total_pages, is_animated):
-            start_idx = (page - 1) * emojis_per_page
-            end_idx = page * emojis_per_page
-            emojis_on_page = emojis_list[start_idx:end_idx]
+        static_embeds = create_embed_pages(static_emojis, "Server Static Emojis")
+        animated_embeds = create_embed_pages(animated_emojis, "Server Animated Emojis")
 
-            title = "Server Animated Emojis" if is_animated else "Server Static Emojis"
-            embed = discord.Embed(title=title, color=ctx.author.color)
-            embed.description = " ".join(str(e) for e in emojis_on_page)
-            embed.set_footer(text=f"Page {page}/{total_pages}")
-            return embed
+        # İlk olarak statik emoji listesini gönderelim
+        if len(static_embeds) > 0:
+            static_paginator = Paginator(static_embeds)
+            await static_paginator.send_initial_message(ctx)
+        else:
+            await ctx.send(embed=create_embed(description="No static emojis found.", color=discord.Color.red()))
 
-        current_static_page = 1
-        current_animated_page = 1
-        static_message = await ctx.send(
-            embed=create_embed(static_emojis, current_static_page, total_static_pages, is_animated=False))
-        animated_message = await ctx.send(
-            embed=create_embed(animated_emojis, current_animated_page, total_animated_pages, is_animated=True))
-
-        # Sayfa değiştirme tepkileri
-        await static_message.add_reaction("◀️")
-        await static_message.add_reaction("▶️")
-        await animated_message.add_reaction("◀️")
-        await animated_message.add_reaction("▶️")
-
-        def check(reaction, user):
-            return user == ctx.author and str(reaction.emoji) in ["◀️", "▶️"]
-
-        while True:
-            try:
-                reaction, user = await self.bot.wait_for("reaction_add", timeout=60, check=check)
-
-                if str(reaction.emoji) == "▶️" and current_static_page != total_static_pages:
-                    current_static_page += 1
-                    await static_message.edit(
-                        embed=create_embed(static_emojis, current_static_page, total_static_pages, is_animated=False))
-                    await static_message.remove_reaction(reaction, user)
-
-                elif str(reaction.emoji) == "◀️" and current_static_page > 1:
-                    current_static_page -= 1
-                    await static_message.edit(
-                        embed=create_embed(static_emojis, current_static_page, total_static_pages, is_animated=False))
-                    await static_message.remove_reaction(reaction, user)
-
-                elif str(reaction.emoji) == "▶️" and current_animated_page != total_animated_pages:
-                    current_animated_page += 1
-                    await animated_message.edit(
-                        embed=create_embed(animated_emojis, current_animated_page, total_animated_pages,
-                                           is_animated=True))
-                    await animated_message.remove_reaction(reaction, user)
-
-                elif str(reaction.emoji) == "◀️" and current_animated_page > 1:
-                    current_animated_page -= 1
-                    await animated_message.edit(
-                        embed=create_embed(animated_emojis, current_animated_page, total_animated_pages,
-                                           is_animated=True))
-                    await animated_message.remove_reaction(reaction, user)
-
-                else:
-                    await static_message.remove_reaction(reaction, user)
-                    await animated_message.remove_reaction(reaction, user)
-
-            except asyncio.TimeoutError:
-                await static_message.clear_reactions()
-                await animated_message.clear_reactions()
+        # Sonrasında animasyonlu emoji listesini gönderelim
+        if len(animated_embeds) > 0:
+            animated_paginator = Paginator(animated_embeds)
+            await animated_paginator.send_initial_message(ctx)
+        else:
+            await ctx.send(embed=create_embed(description="No animated emojis found.", color=discord.Color.red()))
 
     @commands.hybrid_command(name="poll", description="Creates a poll.")
     async def poll(self, ctx, question: str, option1: str, option2: str, option3: str = None, option4: str = None,
@@ -397,7 +353,9 @@ class Utility(commands.Cog):
 
         await interaction.channel.send(
             embed=discord.Embed(title=title, description=description, color=int(color, base=16)), view=view)
-        await interaction.response.send_message(embed=create_embed(description="Embed with links is created!", color=discord.Color.green()), ephemeral=True)
+        await interaction.response.send_message(
+            embed=create_embed(description="Embed with links is created!", color=discord.Color.green()), ephemeral=True)
+
     @commands.hybrid_command(name="emote", description="Shows emote info.")
     @commands.has_permissions(manage_messages=True)
     async def emote(self, ctx, emoji: discord.Emoji):
@@ -480,7 +438,8 @@ class Utility(commands.Cog):
 
         await ctx.send(f"{count} kullanıcının ismi düzenlendi.")
 
-    @commands.hybrid_command(name="copy_emoji", description="Copy an emoji from another server if the bot is a member of that server.")
+    @commands.hybrid_command(name="copy_emoji",
+                             description="Copy an emoji from another server if the bot is a member of that server.")
     @commands.has_permissions(manage_emojis=True)
     async def copy_emoji(self, ctx, emoji: discord.Emoji):
         guild = ctx.guild
@@ -495,6 +454,7 @@ class Utility(commands.Cog):
                 await guild.create_custom_emoji(name=emoji_name, image=data.read())
                 await ctx.send(embed=create_embed(description=f"Emoji {emoji} is added to the server.",
                                                   color=discord.Color.green()))
+
 
 async def setup(bot):
     await bot.add_cog(Utility(bot))
