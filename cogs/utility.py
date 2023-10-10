@@ -312,15 +312,7 @@ class Utility(commands.Cog):
         embed.add_field(name="Boosts", value=ctx.guild.premium_subscription_count, inline=True)
         await ctx.send(embed=embed)
 
-    @commands.hybrid_command(name="avatar", description="Shows member avatar.")
-    async def avatar(self, ctx, *, member: discord.Member = None):
-        if not member:
-            member = ctx.author
-        userAvatar = member.display_avatar
-        embed = discord.Embed(title=f"{member.name}'s Avatar", description="", color=0xffff00)
-        embed.set_image(url=userAvatar.url)
-        embed.set_footer(icon_url=ctx.author.display_avatar, text=f"Requested by {ctx.author}")
-        await ctx.send(embed=embed)
+
 
     @app_commands.command(name="embed", description="Creates embed message.")
     @app_commands.describe(color="Color of embed message.")
