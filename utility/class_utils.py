@@ -88,10 +88,12 @@ class ReportModal(discord.ui.Modal, title='Şikayet Et'):
         self.add_item(discord.ui.TextInput(label='Şikayetin nedir?', custom_id="report_field",
                                            placeholder="Şikayetinizi buraya yazın."))
 
-    async def get_report_channel_id(self):
+    async def get_report_channel_id(self, guild_id: int):
         mongo_db = await async_initialize_mongodb()
-        settings = await mongo_db["settings"].find_one({})
-        return settings.get("report_channel_id")
+        settings = await mongo_db["settings"].find_one({"guild_id": guild_id})
+        if settings:
+            return settings.get("report_channel_id")
+        return None
 
     async def on_submit(self, interaction) -> None:
         try:
