@@ -183,7 +183,17 @@ class Utility(commands.Cog):
 
         await interaction.followup.send(f"DM sent to {count} members!", ephemeral=True)
 
+    @commands.hybrid_command(name="membersofrole")
+    async def members_of_role(self, ctx, role: discord.Role):
+        members_with_role = [member for member in ctx.guild.members if role in member.roles]
 
+        if not members_with_role:
+            await ctx.send(f"Hiçbir kullanıcının {role.name} rolü yok.")
+            return
+
+        embeds = generate_members_of_role_embeds(members_with_role, role)
+        paginator = Paginator(embed_list=embeds)
+        await paginator.send_initial_message(ctx)
 
     @app_commands.command(name="download_emojis", description="Fetch emojis of the server.")
     @commands.has_permissions(manage_messages=True)
