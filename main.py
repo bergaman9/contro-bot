@@ -31,19 +31,30 @@ class Bot(commands.Bot):
         super().__init__(command_prefix=">", intents=intents, help_command=None)
 
     async def setup_hook(self) -> None:
-        # Wavelink 2.0 has made connecting Nodes easier... Simply create each Node
-        # and pass it to NodePool.connect with the client/bot.
-        try:
-            sc = spotify.SpotifyClient(
-                client_id='0c7f24e228844860a8a920d2e69ed11d',
-                client_secret='be5c4415a8bc461a83f744822a803edf'
-            )
-            node: wavelink.Node = wavelink.Node(uri="panel.sillydev.co.uk:6039", password="bestfreehosting",
-                                                secure=False)
-            await wavelink.NodePool.connect(client=self, nodes=[node], spotify=sc)
-            print(f"Connected to lavalink {node.uri}")
-        except Exception as e:
-            print(e)
+        # Lavalink sunucularını bir liste içerisinde tanımla
+        lavalink_servers = [
+            {"uri": "wss://narco.buses.rocks:2269", "password": "glasshost1984", "secure": False},
+            {"uri": "wss://lava.horizxon.tech:80", "password": "horizxon.tech", "secure": False},
+            {"uri": "wss://104.167.222.158:11487", "password": "reedrouxmusicisgay", "secure": False},
+            {"uri": "wss://lava1.horizxon.tech:443", "password": "horizxon.tech", "secure": True},
+            {"uri": "wss://lava2.horizxon.tech:443", "password": "horizxon.tech", "secure": True},
+        ]
+
+        # SpotifyClient'ı bir kere oluştur
+        sc = spotify.SpotifyClient(
+            client_id='0c7f24e228844860a8a920d2e69ed11d',
+            client_secret='be5c4415a8bc461a83f744822a803edf'
+        )
+
+        # Her bir sunucuya bağlanmayı dene
+        for server in lavalink_servers:
+            try:
+                node: wavelink.Node = wavelink.Node(uri=server["uri"], password=server["password"], secure=False)
+                await wavelink.NodePool.connect(client=self, nodes=[node], spotify=sc)
+                print(f"Connected to lavalink {node.uri}")
+                break  # Eğer başarılı bir bağlantı kurulduysa döngüyü kır
+            except Exception as e:
+                print(f"Failed to connect to {server['uri']}. Error: {e}")
 
 
 bot = Bot()
