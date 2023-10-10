@@ -105,6 +105,7 @@ class ReportModal(discord.ui.Modal, title='Şikayet Et'):
                     return
             else:
                 report_channel = interaction.channel
+            print(report_channel)
 
             await interaction.response.send_message("Şikayetiniz alındı.", ephemeral=True)
             description = f"**Şikayet:** {report_field_value} \n**Şikayet Edilen Mesaj:** [Link]({self.message.jump_url}) \n**Şikayet Eden:** {interaction.user.mention})"
