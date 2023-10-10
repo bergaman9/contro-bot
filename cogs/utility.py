@@ -187,7 +187,7 @@ class Utility(commands.Cog):
     async def members_of_role(self, ctx, role: discord.Role):
         await ctx.send("deneme")
 
-    @app_commands.command(name="download_emojis", description="Fetch emojis of the server.")
+    @commands.hybrid_command(name="download_emojis", description="Fetch emojis of the server.")
     @commands.has_permissions(manage_messages=True)
     async def download_emojis(self, interaction):
 
@@ -289,6 +289,16 @@ class Utility(commands.Cog):
         embed.add_field(name="Highest Role:", value=member.top_role.mention)
         embed.add_field(name="Voice:", value=member.voice)
         embed.set_thumbnail(url=member.display_avatar)
+        embed.set_footer(icon_url=ctx.author.display_avatar, text=f"Requested by {ctx.author}")
+        await ctx.send(embed=embed)
+
+    @commands.hybrid_command(name="avatar", description="Shows member avatar.")
+    async def avatar(self, ctx, *, member: discord.Member = None):
+        if not member:
+            member = ctx.author
+        userAvatar = member.display_avatar
+        embed = discord.Embed(title=f"{member.name}'s Avatar", description="", color=0xffff00)
+        embed.set_image(url=userAvatar.url)
         embed.set_footer(icon_url=ctx.author.display_avatar, text=f"Requested by {ctx.author}")
         await ctx.send(embed=embed)
 
