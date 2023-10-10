@@ -95,19 +95,19 @@ class ReportModal(discord.ui.Modal, title='Şikayet Et'):
 
     async def on_submit(self, interaction) -> None:
         try:
+            await interaction.response.defer()
             report_field_value = interaction.data["components"][0]["components"][0]["value"]
             print(report_field_value)
             report_channel_id = await self.get_report_channel_id()
             if report_channel_id:
                 report_channel = interaction.guild.get_channel(report_channel_id)
                 if not report_channel:
-                    await interaction.response.send_message("Şikayet kanalı bulunamadı.", ephemeral=True)
+                    await interaction.followup.send("Şikayet kanalı bulunamadı.", ephemeral=True)
                     return
             else:
                 report_channel = interaction.channel
             print(report_channel)
 
-            #await interaction.response.send_message("Şikayetiniz alındı.", ephemeral=True)
 
             description = f"**Şikayet:** {report_field_value} \n**Şikayet Edilen Mesaj:** [Link]({self.message.jump_url}) \n**Şikayet Eden:** {interaction.user.mention})"
             embed = discord.Embed(description=description, color=discord.Color.red())
@@ -116,5 +116,6 @@ class ReportModal(discord.ui.Modal, title='Şikayet Et'):
             embed.set_footer(text=f"ID: {interaction.user.id}")
             await report_channel.send(embed=embed, view=discord.ui.View().add_item(
                 LinkButton(label="Mesaja Git", url=self.message.jump_url)))
+            await interaction.followup.send("Şikayetiniz alındı.", ephemeral=True)
         except Exception as e:
             print("An error occurred while reporting: ", e)
