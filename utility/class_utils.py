@@ -1,5 +1,6 @@
 import discord
 
+from .utils import async_initialize_mongodb
 
 class Paginator(discord.ui.View):
     def __init__(self, embed_list):
@@ -72,6 +73,11 @@ class DynamicView(discord.ui.View):
             style = STYLE_MAPPING.get(style_str,
                                       discord.ButtonStyle.primary)  # Eğer stil bulunamazsa yine varsayılan olarak "primary" kullanılır.
             self.add_item(DynamicButton(label=data["label"], custom_id=custom_id, style=style, emoji=data.get("emoji", None), row=data.get("row", None)))
+
+
+class LinkButton(discord.ui.Button):
+    def __init__(self, label, url, **kwargs):
+        super().__init__(label=label, url=url, **kwargs)
 
 
 class ReportModal(discord.ui.Modal, title='Şikayet Et'):

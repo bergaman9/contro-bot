@@ -12,12 +12,6 @@ import dotenv
 
 from utils import create_embed
 
-intents = discord.Intents.all()
-intents.message_content = True
-intents.members = True
-
-#bot = commands.Bot(command_prefix=">", intents=intents)
-
 dotenv.load_dotenv()
 TOKEN = os.getenv("CONTRO_TOKEN")
 
