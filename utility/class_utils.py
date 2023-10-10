@@ -101,7 +101,7 @@ class ReportModal(discord.ui.Modal, title='Şikayet Et'):
             report_channel_id = await self.get_report_channel_id()
             print(report_channel_id)
             if report_channel_id:
-                report_channel = discord.utils.get(interaction.guild, id=report_channel_id)
+                report_channel = discord.utils.get(interaction.guild.channels, id=report_channel_id)
                 print("report_channel", report_channel)
                 if not report_channel:
                     await interaction.followup.send("Şikayet kanalı bulunamadı.", ephemeral=True)
