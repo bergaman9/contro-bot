@@ -5,9 +5,7 @@ from datetime import timedelta
 
 import discord
 import dotenv
-import wavelink
 from discord.ext import commands
-from wavelink.ext import spotify
 
 from utils import create_embed
 
