@@ -138,7 +138,12 @@ async def reload(ctx, extension):
 async def cogs_load():
     for fn in os.listdir("./cogs"):
         if fn.endswith(".py"):
-            await bot.load_extension(f"cogs.{fn[:-3]}")
+            extension = f"cogs.{fn[:-3]}"
+            if extension not in bot.extensions:
+                try:
+                    await bot.load_extension(extension)
+                except Exception as e:
+                    print(f"Failed to load extension {fn}: {e}")
 
 
 async def main():
