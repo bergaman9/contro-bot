@@ -147,8 +147,9 @@ async def cogs_load():
 
 
 async def main():
-    await cogs_load()
-    await bot.start(TOKEN)
+    async with bot:
+        await cogs_load()
+        await bot.start(TOKEN)
 
 
 asyncio.run(main())
