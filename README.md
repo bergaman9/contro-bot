@@ -153,12 +153,33 @@
    pip install -r requirements.txt
    ```
 
-2. **Environment Configuration**   Create `.env` file with:
+2. **Environment Configuration**
+   ```bash
+   # Copy the example environment file
+   cp .env.example .env
+   ```
+   
+   Edit `.env` file with your actual values:
    ```env
-   BOT_TOKEN=your_discord_bot_token
-   MONGODB_CONNECTION_STRING=mongodb+srv://username:password@cluster0.xxxxx.mongodb.net/?retryWrites=true&w=majority
-   OPENAI_API_KEY=your_openai_key (optional)
-   PERPLEXITY_API_KEY=your_perplexity_key (optional)
+   # Required: Discord Bot Token
+   CONTRO_MAIN_TOKEN=your_discord_bot_token_here
+   
+   # Required: Admin User ID
+   ADMIN_USER_ID=your_discord_user_id
+   
+   # Required: Database Configuration
+   DB=contro-bot-db
+   MONGODB_CONNECTION_STRING=mongodb://localhost:27017/contro-bot-db
+   # OR for MongoDB Atlas:
+   # MONGODB_CONNECTION_STRING=mongodb+srv://username:password@cluster.mongodb.net/database
+   
+   # Optional: Additional Bot Tokens (for dev/premium versions)
+   CONTRO_DEV_TOKEN=your_dev_token_here
+   CONTRO_PREMIUM_TOKEN=your_premium_token_here
+   
+   # Optional: API Keys for Enhanced Features
+   PERPLEXITY_API_KEY=your_perplexity_key_here
+   OPENAI_API_KEY=your_openai_key_here
    ```
 
 3. **Database Setup**

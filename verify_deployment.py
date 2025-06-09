@@ -24,25 +24,42 @@ def check_env_file():
     env_path = ".env"
     if not os.path.exists(env_path):
         print("❌ Environment file: .env file not found")
-        print("   Create .env file with: BOT_TOKEN, MONGODB_CONNECTION_STRING")
+        print("   Create .env file with: CONTRO_MAIN_TOKEN, MONGODB_CONNECTION_STRING")
         return False
     
     with open(env_path, 'r') as f:
         env_content = f.read()
     
-    required_vars = ['BOT_TOKEN', 'MONGODB_CONNECTION_STRING']
-    missing_vars = []
-    
-    for var in required_vars:
-        if var not in env_content:
-            missing_vars.append(var)
-    
-    if missing_vars:
-        print(f"❌ Environment variables missing: {', '.join(missing_vars)}")
-        return False
+    # Check for bot token (supports both BOT_TOKEN and CONTRO_MAIN_TOKEN formats)
+    bot_token_found = False
+    if 'BOT_TOKEN' in env_content or 'CONTRO_MAIN_TOKEN' in env_content:
+        bot_token_found = True
+        print("✅ Bot token: Found")
     else:
-        print("✅ Environment file: All required variables present")
+        print("❌ Bot token: Not found (looking for BOT_TOKEN or CONTRO_MAIN_TOKEN)")
+    
+    # Check for MongoDB connection string
+    mongodb_found = False
+    if 'MONGODB_CONNECTION_STRING' in env_content:
+        mongodb_found = True
+        print("✅ MongoDB connection: Found")
+    else:
+        print("❌ MongoDB connection: MONGODB_CONNECTION_STRING not found")
+    
+    # Check for database name
+    db_found = False
+    if 'DB=' in env_content:
+        db_found = True
+        print("✅ Database name: Found")
+    else:
+        print("❌ Database name: DB variable not found")
+    
+    if bot_token_found and (mongodb_found or db_found):
+        print("✅ Environment file: Essential variables present")
         return True
+    else:
+        print("❌ Environment file: Missing required variables")
+        return False
 
 def check_python_version():
     """Check Python version compatibility."""
@@ -174,8 +191,7 @@ def main():
         print(f"\n🔍 {check_name}:")
         if not check_func():
             all_passed = False
-    
-    # Run file checks
+      # Run file checks
     print(f"\n🔍 Required Files:")
     for filepath, description in file_checks:
         if not check_file_exists(filepath, description):
@@ -186,7 +202,7 @@ def main():
         print("🎉 All checks passed! Bot is ready for deployment.")
         print("\nNext steps:")
         print("1. Set up your MongoDB database")
-        print("2. Configure your .env file with bot token")
+        print("2. Configure your .env file with CONTRO_MAIN_TOKEN")
         print("3. Run: python main.py")
         return 0
     else:
