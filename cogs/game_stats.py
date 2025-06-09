@@ -1,300 +1,503 @@
-from typing import List
+import logging
+from typing import List, Dict, Optional
+import asyncio
+from datetime import datetime, timedelta
 
 import discord
 from discord import app_commands
 from discord.ext import commands, tasks
+import json
 
-from utils import async_initialize_mongodb, create_embed
-from utility.class_utils import Paginator
+from utils.database.connection import initialize_mongodb
+from utils.core.formatting import create_embed
+from utils.core.class_utils import Paginator
+from utils.core.db import get_document, get_documents, update_document
 
+# Set up logging
+logger = logging.getLogger('game_stats')
+logger.setLevel(logging.INFO)
+handler = logging.FileHandler(filename='logs/game_stats.log', encoding='utf-8', mode='a')
+handler.setFormatter(logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s'))
+logger.addHandler(handler)
 
 class GameStats(commands.Cog):
+    """
+    Tracks game activity statistics across the server
+    """
+    
     def __init__(self, bot):
         self.bot = bot
-        self.mongodb = async_initialize_mongodb()
-        self.update_game_activities.start()
-        self.update_game_logs.start()
-        self.clean_up_database_for_guild.start()
+        self.mongodb = None
+        self.game_stats_cache = {}  # Cache for game stats to reduce DB queries
+        self.game_logs_cache = {}   # Cache for game logs
+        self.last_activity_check = {}  # Track when we last checked a user's activity
+        self.init_task = asyncio.create_task(self.initialize())
+        
+        # Increased intervals to reduce load
+        self.update_interval = 300  # seconds (5 minutes)
+        self.cleanup_interval = 60  # minutes (1 hour)
+        self.cache_ttl = 300  # seconds (5 minutes)
+        self.last_cache_cleanup = datetime.now()
+    
+    async def initialize(self):
+        """Initialize the database connection asynchronously"""
+        try:
+            self.mongodb = initialize_mongodb()
+            if self.mongodb is not None:  # Proper way to check MongoDB connection
+                # Start background tasks after database is initialized
+                self.update_game_activities.start()
+                self.update_game_logs.start()
+                self.clean_up_database_for_guild.start()
+                logger.info("GameStats cog initialized successfully")
+            else:
+                logger.error("MongoDB initialization returned None")
+        except Exception as e:
+            logger.error(f"Error initializing GameStats cog: {e}")
+
+    async def get_cached_data(self, cache_dict, key, fetch_func, ttl=None):
+        """Generic function to get data from cache or fetch if not available"""
+        ttl = ttl or self.cache_ttl
+        now = datetime.now()
+        
+        # Clean old cache entries periodically
+        if (now - self.last_cache_cleanup).total_seconds() > 600:  # 10 minutes
+            self._cleanup_cache(cache_dict)
+            self.last_cache_cleanup = now
+        
+        # Check if data is in cache and not expired
+        if key in cache_dict and (now - cache_dict[key]['timestamp']).total_seconds() < ttl:
+            return cache_dict[key]['data']
+            
+        # Otherwise, fetch new data
+        data = await fetch_func()
+        cache_dict[key] = {
+            'data': data,
+            'timestamp': now
+        }
+        return data
+
+    def _cleanup_cache(self, cache_dict):
+        """Remove expired entries from cache"""
+        now = datetime.now()
+        expired_keys = [
+            key for key, value in cache_dict.items() 
+            if (now - value['timestamp']).total_seconds() > self.cache_ttl
+        ]
+        for key in expired_keys:
+            cache_dict.pop(key)
+
+    @commands.hybrid_command(name="topgames", description="Sunucuda en çok oynanan oyunların istatistiklerini gösterir")
+    async def topgames(self, ctx):
+        """
+        Display the top played games on the server with statistics.
+        """
+        try:
+            if self.mongodb is None:
+                await ctx.send(embed=create_embed(
+                    "❌ Veritabanı bağlantısı henüz kurulmadı. Lütfen tekrar deneyin.",
+                    discord.Color.red()
+                ))
+                return
+
+            # Get cached data or fetch from database
+            guild_stats_key = f"guild_stats_{ctx.guild.id}"
+            
+            async def fetch_guild_stats():
+                game_stats = self.mongodb["game_stats"]
+                return await game_stats.find_one({"guild_id": ctx.guild.id})
+
+            guild_data = await self.get_cached_data(self.game_stats_cache, guild_stats_key, fetch_guild_stats)
+            
+            if not guild_data or not guild_data.get("played_games"):
+                await ctx.send(embed=create_embed(
+                    "📊 Henüz oyun istatistiği bulunmuyor. Üyeler oyun oynamaya başladığında istatistikler burada görünecek.",
+                    discord.Color.blue()
+                ))
+                return
+
+            # Sort games by total time played
+            played_games = guild_data.get("played_games", [])
+            sorted_games = sorted(played_games, key=lambda x: x.get("total_time_played", 0), reverse=True)
+            
+            # Take top 10 games
+            top_games = sorted_games[:10]
+            
+            embed = discord.Embed(
+                title="🎮 En Çok Oynanan Oyunlar",
+                description=f"{ctx.guild.name} sunucusunda en çok oynanan oyunların istatistikleri:",
+                color=discord.Color.blue()
+            )
+            
+            if top_games:
+                game_list = []
+                for idx, game in enumerate(top_games, 1):
+                    game_name = game.get("game_name", "Bilinmeyen Oyun")
+                    total_time = game.get("total_time_played", 0)
+                    player_count = len(game.get("players", []))
+                    
+                    # Convert time to hours and minutes
+                    hours = total_time // 60
+                    minutes = total_time % 60
+                    
+                    if hours > 0:
+                        time_str = f"{hours}s {minutes}d" if minutes > 0 else f"{hours}s"
+                    else:
+                        time_str = f"{minutes}d"
+                    
+                    # Add medal emojis for top 3
+                    if idx == 1:
+                        medal = "🥇"
+                    elif idx == 2:
+                        medal = "🥈"
+                    elif idx == 3:
+                        medal = "🥉"
+                    else:
+                        medal = f"{idx}."
+                    
+                    game_list.append(f"{medal} **{game_name}**\n└ ⏱️ {time_str} • 👥 {player_count} oyuncu")
+                
+                embed.add_field(
+                    name="📈 İstatistikler",
+                    value="\n\n".join(game_list),
+                    inline=False
+                )
+            
+            # Add footer with additional info
+            total_games_tracked = len(played_games)
+            embed.set_footer(text=f"Toplam {total_games_tracked} farklı oyun takip ediliyor")
+            
+            await ctx.send(embed=embed)
+            
+        except Exception as e:
+            logger.error(f"Error in topgames command: {e}")
+            await ctx.send(embed=create_embed(
+                f"❌ İstatistikler alınırken bir hata oluştu: {str(e)}",
+                discord.Color.red()
+            ))
 
     @commands.Cog.listener()
     async def on_member_remove(self, member):
-        """Bir üye sunucudan ayrıldığında çağrılır."""
+        """Handler for when a member leaves the server"""
+        if self.mongodb is None:
+            return  # Skip if not initialized
+            
         try:
             await self.remove_game_logs_in_db(member.guild, member)
         except Exception as e:
-            print(f"Error in on_member_remove: {e}")
+            logger.error(f"Error in on_member_remove for {member}: {e}")
 
-    @tasks.loop(seconds=60, reconnect=True)
+    @tasks.loop(seconds=300, reconnect=True)  # Increased to 5 minutes
     async def update_game_activities(self):
+        """Update game activity statistics periodically"""
+        if self.mongodb is None:
+            return  # Skip if not initialized
+            
+        try:
+            current_time = discord.utils.utcnow().timestamp()
+            bulk_operations = []
+            
+            for guild in self.bot.guilds:
+                # Process only a subset of members each run to distribute load
+                for member in guild.members:
+                    # Only check users if enough time has passed since last check
+                    last_check = self.last_activity_check.get(member.id, 0)
+                    if current_time - last_check < self.update_interval/2:
+                        continue
+                        
+                    self.last_activity_check[member.id] = current_time
+                    
+                    # Only process members actually playing games
+                    if (not member.bot and member.activity and 
+                            member.activity.type == discord.ActivityType.playing):
+                        game_name = member.activity.name
+                        if game_name:
+                            # Queue the update for batch processing
+                            bulk_operations.append((guild.id, game_name, member.id))
+            
+            # Process all updates in a single batch if there are any
+            if bulk_operations:
+                await self.batch_update_games_in_db(bulk_operations)
+                
+        except Exception as e:
+            logger.error(f"Error in update_game_activities: {e}")
+
+    @tasks.loop(seconds=300, reconnect=True)  # Increased to 5 minutes
+    async def update_game_logs(self):
+        """Update current game playing logs"""
+        if self.mongodb is None:
+            return  # Skip if not initialized
+            
+        try:
+            # Process in batches to avoid rate limits
+            for guild in self.bot.guilds:
+                players_to_add = []
+                players_to_remove = []
+                
+                # Get current member IDs in guild - do this once to avoid repeated calls
+                current_member_ids = {member.id for member in guild.members if not member.bot}
+                
+                # Check the cached guild log first
+                guild_log_key = f"guild_log_{guild.id}"
+                
+                async def fetch_guild_log():
+                    if not self.mongodb:
+                        return None
+                    game_logs = self.mongodb["game_logs"]
+                    return await game_logs.find_one({"guild_id": guild.id})
+                
+                guild_log = await self.get_cached_data(self.game_logs_cache, guild_log_key, fetch_guild_log)
+                
+                # Track existing active players from DB to identify who needs to be removed
+                existing_active_members = set()
+                if guild_log:
+                    for game in guild_log.get("game_names", []):
+                        for player in game.get("active_players", []):
+                            existing_active_members.add(player.get("member_id"))
+                
+                # Find members who are playing games
+                active_players = {}  # Keep track of currently active players
+                for member in guild.members:
+                    if (not member.bot and member.activity and 
+                            member.activity.type == discord.ActivityType.playing):
+                        game_name = member.activity.name
+                        if game_name:
+                            players_to_add.append({
+                                "guild_id": guild.id,
+                                "game_name": game_name,
+                                "member_id": member.id,
+                                "member_name": member.name,
+                                "member_discriminator": str(member.discriminator)
+                            })
+                            active_players[member.id] = True
+                
+                # Find members who need to be removed (not playing anymore)
+                members_to_remove = existing_active_members - set(active_players.keys())
+                for member_id in members_to_remove:
+                    if member_id in current_member_ids:  # Make sure they're still in the guild
+                        member = guild.get_member(member_id)
+                        if member:
+                            players_to_remove.append((guild, member))
+                
+                # Process additions in one batch (only if there are any)
+                if players_to_add:
+                    await self.batch_update_game_logs_in_db(players_to_add)
+                
+                # Process removals in another batch (only if there are any)
+                if players_to_remove:
+                    await self.batch_remove_game_logs_in_db(players_to_remove)
+                    
+                # Invalidate cache after updates
+                self.game_logs_cache.pop(guild_log_key, None)
+                    
+                # Brief pause to avoid hitting rate limits
+                await asyncio.sleep(1)
+                
+        except Exception as e:
+            logger.error(f"Error in update_game_logs: {e}")
+
+    @tasks.loop(minutes=60, reconnect=True)  # Increased to 1 hour
+    async def clean_up_database_for_guild(self):
+        """Periodically clean up the database to remove stale data"""
+        if self.mongodb is None:
+            return  # Skip if not initialized
+            
         try:
             for guild in self.bot.guilds:
-                count = 0
-                for member in guild.members:
-                    count += 1
-                    if not member.bot and member.activity and member.activity.type == discord.ActivityType.playing:
-                        game_name = member.activity.name if member.activity else None
-                        if game_name:
-                            await self.update_game_in_db(guild.id, game_name, member.id)
-                # print(f"Updated {count} members' game activity in {guild.name}")
-        except Exception as e:
-            print(f"Error in update_game_activities: {e}")
-
-    @tasks.loop(seconds=60, reconnect=True)
-    async def update_game_logs(self):
-        for guild in self.bot.guilds:
-            try:
-                print(f"Checking {guild.name} for game logs")
-                added_count = 0
-                removed_count = 0
-                for member in guild.members:
-                    if not member.bot and member.activity and member.activity.type == discord.ActivityType.playing:
-                        game_name = member.activity.name if member.activity else None
-                        if game_name:
-                            added_count += 1
-                            await self.update_game_logs_in_db(guild.id, game_name, member.id)
-                    else:
-                        removed_count += 1
-                        await self.remove_game_logs_in_db(guild, member)
-                        if guild.name == "Türk Oyuncu Topluluğu":
-                            print(f"Removed {member.name}'s game logs")
-                # print(f"Added {added_count} and removed {removed_count} members' game logs in {guild.name}")
-            except Exception as e:
-                print(f"Error in update_game_logs for guild {guild.name}: {e}")
-
-    @tasks.loop(seconds=60, reconnect=True)
-    async def clean_up_database_for_guild(self):
-        for guild in self.bot.guilds:
-            try:
-                # print(f"Cleaning up logs for guild {guild.id}")
                 game_logs = self.mongodb["game_logs"]
                 guild_log = await game_logs.find_one({"guild_id": guild.id})
 
                 if not guild_log:
-                    print(f"No logs found for guild {guild.id}.")
-                    continue  # 'return' yerine 'continue' kullanarak diğer sunucular için döngüyü devam ettiriyoruz.
+                    continue
 
-                current_member_ids = [member.id for member in guild.members]
-                for game in guild_log["game_names"]:
-                    # Sunucuda olmayan üyeleri active_players listesinden kaldır
-                    players_to_remove = [player for player in game["active_players"] if
-                                         player["member_id"] not in current_member_ids]
-                    for player in players_to_remove:
-                        game["active_players"].remove(player)
+                # Get current member IDs from guild - only do this once
+                current_member_ids = {member.id for member in guild.members}
+                updated_game_names = []
+                
+                for game in guild_log.get("game_names", []):
+                    # Filter out players who are no longer in the guild
+                    active_players = [player for player in game.get("active_players", []) 
+                                      if player["member_id"] in current_member_ids]
+                    
+                    # Only keep games that still have active players
+                    if active_players:
+                        game["active_players"] = active_players
+                        updated_game_names.append(game)
 
-                # Veritabanını güncelle
-                await game_logs.update_one({"guild_id": guild.id}, {"$set": {"game_names": guild_log["game_names"]}})
-                # print(f"Cleaned up logs for guild {guild.id}.")
-                if guild.name == "Türk Oyuncu Topluluğu":
-                    print(f"Cleaned up logs for guild {guild.id}.")
-            except Exception as e:
-                print(f"Error in clean_up_database_for_guild for guild {guild.id}: {e}")
+                # Only update if there are changes
+                if len(updated_game_names) != len(guild_log.get("game_names", [])):
+                    await game_logs.update_one(
+                        {"guild_id": guild.id}, 
+                        {"$set": {"game_names": updated_game_names}}
+                    )
+                    
+                    # Invalidate cache
+                    self.game_logs_cache.pop(f"guild_log_{guild.id}", None)
+                    
+        except Exception as e:
+            logger.error(f"Error in clean_up_database_for_guild: {e}")
 
     async def remove_game_logs_in_db(self, guild, member):
+        """Remove a member from all game logs"""
+        if self.mongodb is None:
+            return  # Skip if not initialized
+            
         try:
-            game_logs = self.mongodb["game_logs"]
-            log = await game_logs.find_one({"guild_id": guild.id})
-            if log:
-                for game in log["game_names"]:
-                    game["active_players"] = [player for player in game["active_players"] if
-                                              player["member_id"] != member.id]
-                    if len(game["active_players"]) == 0:
-                        log["game_names"].remove(game)
-
-                await game_logs.update_one({"guild_id": guild.id}, {"$set": {"game_names": log["game_names"]}})
+            # Check cache first
+            guild_log_key = f"guild_log_{guild.id}"
+            
+            async def fetch_guild_log():
+                game_logs = self.mongodb["game_logs"]
+                return await game_logs.find_one({"guild_id": guild.id})
+                
+            guild_log = await self.get_cached_data(self.game_logs_cache, guild_log_key, fetch_guild_log)
+            
+            if guild_log:
+                updated_game_names = []
+                modified = False
+                
+                for game in guild_log.get("game_names", []):
+                    # Filter out the member from active_players
+                    active_players = [player for player in game.get("active_players", [])
+                                     if player.get("member_id") != member.id]
+                    
+                    # Only keep games that still have active players
+                    if active_players:
+                        if len(active_players) != len(game.get("active_players", [])):
+                            modified = True
+                        game["active_players"] = active_players
+                        updated_game_names.append(game)
+                    else:
+                        modified = True
+                
+                # Only update if there were changes
+                if modified:
+                    # Update the database with the filtered game list
+                    game_logs = self.mongodb["game_logs"]
+                    await game_logs.update_one(
+                        {"guild_id": guild.id}, 
+                        {"$set": {"game_names": updated_game_names}}
+                    )
+                    
+                    # Invalidate cache
+                    self.game_logs_cache.pop(guild_log_key, None)
+                
         except Exception as e:
-            print(f"Error in remove_game_logs_in_db: {e}")
-
-    async def update_game_in_db(self, guild_id, game_name, member_id):
-        game_stats = self.mongodb["game_stats"]
-
-        # Find the guild's document or create it if it doesn't exist
-        guild_data = await game_stats.find_one({"guild_id": guild_id})
-        if not guild_data:
-            game_stats.insert_one({"guild_id": guild_id, "played_games": []})
-            guild_data = game_stats.find_one({"guild_id": guild_id})
-            # print(f"Created a new document for guild {guild_id}.")
-
-        # Update the played_games list for the game
-        played_games = guild_data.get("played_games", [])
-        for game in played_games:
-            if game["game_name"] == game_name:
-                game["total_time_played"] += 1
-                # Member update or insert
-                for player in game["players"]:
-                    if player["member_id"] == member_id:
-                        player["time_played"] += 1
-                        break
-                else:
-                    game["players"].append({"member_id": member_id, "time_played": 1})
-                # print(f"Updated game: {game_name} for user: {member_id}")
-                break
-        else:
-            played_games.append({
-                "game_name": game_name,
-                "total_time_played": 1,
-                "players": [{"member_id": member_id, "time_played": 1}]
-            })
-            # print(f"Added new game: {game_name} for user: {member_id}")
-
-        # Update the document in the database
-        game_stats.update_one({"guild_id": guild_id}, {"$set": {"played_games": played_games}})
-
-    @commands.hybrid_command(name="topgames", description="En çok oynanan oyunları gösterir.")
-    @app_commands.describe(member="Üyenin oynadığı oyunları gösterir.")
-    async def topgames(self, ctx, member: discord.Member = None):
-        if member:
-            # Üyenin oynadığı oyunları al
-            member_games = await self.get_member_top_games(ctx.guild.id, member.id)
-
-            def chunk_list(l, n):
-                """Yield successive n-sized chunks from l."""
-                for i in range(0, len(l), n):
-                    yield l[i:i + n]
-
-            embeds = []  # Embed listesi oluşturuldu
-            for chunk in chunk_list(member_games, 15):  # Oyunları 15'lik gruplara ayırdık
-                description = ""
-                for idx, game in enumerate(chunk, 1 + (15 * embeds.__len__())):  # index ile birlikte enumerate
-                    description += f"{idx}. {game['game_name']}: `{game['time_played']} minutes`\n"
-                embed = discord.Embed(title=f"{member.name}'s Top Played Games", description=description,
-                                      color=discord.Color.pink())
-                embeds.append(embed)  # Oluşturulan embed'i listeye ekledik
-
-            view = Paginator(embeds)
-            await view.send_initial_message(ctx)
-        else:
+            logger.error(f"Error in remove_game_logs_in_db for {member}: {e}")
+            
+    async def batch_update_games_in_db(self, operations):
+        """Update game statistics in batches"""
+        if self.mongodb is None:
+            return
+            
+        try:
             game_stats = self.mongodb["game_stats"]
-            guild_data = await game_stats.find_one({"guild_id": ctx.guild.id})
-
-            if guild_data and "played_games" in guild_data:
-                played_games = guild_data["played_games"]
-                top_games = sorted(played_games, key=lambda game: game["total_time_played"], reverse=True)
-
-                def chunk_list(l, n):
-                    """Yield successive n-sized chunks from l."""
-                    for i in range(0, len(l), n):
-                        yield l[i:i + n]
-
-                embeds = []  # Embed listesi oluşturuldu
-                for chunk in chunk_list(top_games, 15):  # Oyunları 15'lik gruplara ayırdık
-                    description = ""
-                    for idx, game in enumerate(chunk, 1 + (15 * embeds.__len__())):  # index ile birlikte enumerate
-                        description += f"{idx}. {game['game_name']}: `{game['total_time_played']} minutes`\n"
-                    embed = discord.Embed(title="Top Played Games", description=description,
-                                          color=discord.Color.pink())
-                    embeds.append(embed)  # Oluşturulan embed'i listeye ekledik
-
-                view = Paginator(embeds)
-                await view.send_initial_message(ctx)
-            else:
-                await ctx.send(
-                    embed=create_embed(description="No game statistics available.", color=discord.Color.red()))
-
-    async def get_member_top_games(self, guild_id, member_id):
-        game_stats = self.mongodb["game_stats"]
-        guild_data = await game_stats.find_one({"guild_id": guild_id})
-
-        member_games = []
-
-        if guild_data and "played_games" in guild_data:
-            for game in guild_data["played_games"]:
-                for player in game["players"]:
-                    if player["member_id"] == member_id:
-                        member_games.append({
-                            "game_name": game["game_name"],
-                            "time_played": player["time_played"]
+            updates_by_guild = {}
+            
+            # Group operations by guild
+            for guild_id, game_name, member_id in operations:
+                if guild_id not in updates_by_guild:
+                    updates_by_guild[guild_id] = {}
+                    
+                if game_name not in updates_by_guild[guild_id]:
+                    updates_by_guild[guild_id][game_name] = set()
+                    
+                updates_by_guild[guild_id][game_name].add(member_id)
+            
+            # Process each guild's updates
+            for guild_id, games in updates_by_guild.items():
+                # Check cache first
+                guild_stats_key = f"guild_stats_{guild_id}"
+                
+                async def fetch_guild_stats():
+                    guild_data = await game_stats.find_one({"guild_id": guild_id})
+                    if not guild_data:
+                        await game_stats.insert_one({
+                            "guild_id": guild_id, 
+                            "played_games": []
                         })
+                        return await game_stats.find_one({"guild_id": guild_id})
+                    return guild_data
+                
+                guild_data = await self.get_cached_data(self.game_stats_cache, guild_stats_key, fetch_guild_stats)
+                
+                played_games = guild_data.get("played_games", [])
+                modified = False
+                
+                # Update each game
+                for game_name, member_ids in games.items():
+                    game_found = False
+                    
+                    # Look for existing game entry
+                    for game in played_games:
+                        if game["game_name"] == game_name:
+                            game_found = True
+                            game["total_time_played"] += 1
+                            
+                            # Update each member's play time
+                            for member_id in member_ids:
+                                player_found = False
+                                for player in game["players"]:
+                                    if player["member_id"] == member_id:
+                                        player["time_played"] += 1
+                                        player_found = True
+                                        break
+                                        
+                                if not player_found:
+                                    game["players"].append({
+                                        "member_id": member_id, 
+                                        "time_played": 1
+                                    })
+                                    
+                            modified = True
+                            break
+                    
+                    # Create new game entry if not found
+                    if not game_found:
+                        played_games.append({
+                            "game_name": game_name,
+                            "total_time_played": 1,
+                            "players": [
+                                {"member_id": member_id, "time_played": 1} 
+                                for member_id in member_ids
+                            ]
+                        })
+                        modified = True
+                
+                # Update database if changes were made
+                if modified:
+                    await game_stats.update_one(
+                        {"guild_id": guild_id}, 
+                        {"$set": {"played_games": played_games}}
+                    )
+                    
+                    # Invalidate cache
+                    self.game_stats_cache.pop(guild_stats_key, None)
+                    
+        except Exception as e:
+            logger.error(f"Error in batch_update_games_in_db: {e}")
 
-        # Oyunları en çok oynanandan en az oynanana doğru sırala
-        member_games = sorted(member_games, key=lambda game: game["time_played"], reverse=True)
-        return member_games
-
-    async def game_name_autocomplete(self, interaction: discord.Interaction, current: str) -> List[
-        app_commands.Choice[str]]:
-        games = [
-            "Grand Theft Auto V",
-            "Roblox",
-            "Minecraft",
-            "League of Legends",
-            "Fortnite",
-            "Apex Legends",
-            "Counter-Strike: Global Offensive",
-            "VALORANT",
-            "Rocket League",
-            "Call of Duty: Warzone",
-            "Overwatch",
-            "Visual Studio Code",
-        ]
-
-        matching_games = [
-            game for game in games if current.lower() in game.lower()
-        ]
-
-        return [app_commands.Choice(name=game, value=game) for game in matching_games]
-
-    @commands.hybrid_command(name="playing", description="Aktif olarak oyun oynayanları gösterir.")
-    @app_commands.describe(game_name="Oyun adı")
-    @app_commands.autocomplete(game_name=game_name_autocomplete)
-    async def playing(self, ctx, game_name: str):
-        async with ctx.typing():
-            game_logs = self.mongodb["game_logs"]
-            guild_log = await game_logs.find_one({"guild_id": ctx.guild.id})
-
-            if not guild_log:
-                await ctx.send(
-                    embed=create_embed(description=f"No one is playing {game_name}", color=discord.Color.red()))
-                return
-
-            game_entry = next((game for game in guild_log.get("game_names", []) if game["game_name"] == game_name),
-                              None)
-
-            if not game_entry:
-                await ctx.send(
-                    embed=create_embed(description=f"No one is playing {game_name}", color=discord.Color.red()))
-                return
-
-            description = ""
-            for idx, player in enumerate(game_entry["active_players"], 1):
-                member = ctx.guild.get_member(player["member_id"])
-                if member:
-                    description += f"{idx}. {member.mention} - playing for {player['time_played']} minutes\n"
-
-            embed = discord.Embed(title=f"Players currently playing {game_name}", description=description,
-                                  color=discord.Color.pink())
-            await ctx.send(embed=embed)
-
-    async def update_game_logs_in_db(self, guild_id, game_name, member_id):
-        game_logs = self.mongodb["game_logs"]
-
-        # Sunucu için olan dökümanı bul ya da oluştur
-        log = await game_logs.find_one({"guild_id": guild_id})
-        if not log:
-            await game_logs.insert_one({"guild_id": guild_id, "game_names": []})
-            log = await game_logs.find_one({"guild_id": guild_id})
-            print(f"-Created a new document for guild {guild_id}.")
-
-        # Oyunun aktif oyuncular listesinde olup olmadığını kontrol et
-        for game in log["game_names"]:
-            if game["game_name"] == game_name:
-                for player in game["active_players"]:
-                    if player["member_id"] == member_id:
-                        player["time_played"] += 1
-                        # print(f"-Updated game: {game_name} for user: {member_id}")
-                        break
-                else:
-                    game["active_players"].append({"member_id": member_id, "time_played": 1})
-                    # print(f"-Added new game: {game_name} for user: {member_id}")
-                break
-        else:
-            log["game_names"].append({
-                "game_name": game_name,
-                "active_players": [{"member_id": member_id, "time_played": 1}]
-            })
-            # print(f"-Added new game: {game_name} for user: {member_id}")
-
-        # Dökümanı güncelle
-        await game_logs.update_one({"guild_id": guild_id}, {"$set": {"game_names": log["game_names"]}})
-
+    def cog_unload(self):
+        """Cleanup when cog is unloaded"""
+        # Stop background tasks
+        if self.update_game_activities.is_running():
+            self.update_game_activities.cancel()
+            
+        if self.update_game_logs.is_running():
+            self.update_game_logs.cancel()
+            
+        if self.clean_up_database_for_guild.is_running():
+            self.clean_up_database_for_guild.cancel()
+            
+        # Cancel initialization if still pending
+        if hasattr(self, 'init_task') and not self.init_task.done():
+            self.init_task.cancel()
+            
+        # Clear caches
+        self.game_stats_cache.clear()
+        self.game_logs_cache.clear()
+        self.last_activity_check.clear()
+            
+        logger.info("GameStats cog unloaded")
 
 async def setup(bot):
     await bot.add_cog(GameStats(bot))

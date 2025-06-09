@@ -128,5 +128,113 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
+# Security & Environment
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.env
+*.env.*
+config.ini
+secrets.json
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.cer
+*.der
+
+# API Keys & Tokens
+*token*
+*secret*
+*password*
+*credentials*
+api_keys.json
+tokens.json
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+*.db-wal
+database.json
+mongo_config.json
+
+# Discord Bot Specific
+bot_token.txt
+discord_token.txt
+application_id.txt
+guild_id.txt
+
+# Logs & Debug
+*.log
+logs/
+debug/
+crash_reports/
+error_logs/
+
+# Temporary Files
+temp/
+tmp/
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
+# IDE & Editor
+.vscode/
+.idea/
+*.sublime-*
+.DS_Store
+Thumbs.db
+
+# OS Generated
+.DS_Store?
+ehthumbs.db
+Icon?
+Thumbs.db
+
+# Backup Files
+*.bak
+*.backup
+*.old
+*.orig
+
+# Runtime & Cache
+*.pid
+*.sock
+.cache/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Docker
+.dockerignore
+docker-compose.override.yml
+.docker/
+
+# Legacy Files
 legacy/
+.legacy/
+archive/
+deprecated/
+
+# User Generated Content
+uploads/
+user_data/
+avatars/
+images/generated/
+temp_files/
+
+# Development & Testing
+test_data/
+dev_data/
+sandbox/
+playground/
+*.test.json
 

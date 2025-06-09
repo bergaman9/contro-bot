@@ -1,0 +1,39 @@
+{
+    "roles": {
+        "admin": "Yönetici",
+        "sup_mod": "Süper Moderatör",
+        "emektar": "Emektar",
+        "mod": "Moderatör",
+        "trial_mod": "Deneme Moderatör",
+        "organizer": "Organizatör",
+        "support": "Destek",
+        "bot": "Bot",
+        "vip": "VIP",
+        "booster": "Server Booster",
+        "member": "Üye",
+        "unregistered_member": "Kayıtsız Üye",
+        "bronz": "Bronz",
+        "silver": "Gümüş",
+        "gold": "Altın",
+        "tritium": "Trityum",
+        "diamond": "Elmas",
+        "mudavim": "Müdavim",
+        "sleep": "Uykucu",
+        "dj": "DJ"
+    },
+    "channels": {
+        "rules": "📜・kurallar",
+        "roles": "🎭・roller",
+        "support": "🎫・destek",
+        "general": "💬・sohbet",
+        "giveaways": "🎉・çekilişler",
+        "games": "🎮・oyunlar",
+        "commands": "🤖・komutlar",
+        "temporary": "➕ kanal oluştur",
+        "streams": "📺・yayınlar",
+        "announcements": "📢・duyurular",
+        "activity": "🥳 Etkinlik",
+        "forum": "🧠・tartışmalar"
+    },
+    "users": {}
+}

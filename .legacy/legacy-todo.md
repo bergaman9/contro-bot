@@ -1,0 +1,321 @@
+
+
+## Görevler
+
+- **Tamamlananlar**
+    - [x]  Çekiliş Özelliği (**>giveaway create <limit> <prize>, >giveaway shuffle <id>, >giveaway show**)
+    - [x]  Poll özelliği getir.
+    - [x]  Wordnik api ile örnek cümle çek. (/sentence [word])
+    - [x]  ChatGPT komutu ekle.
+    - [x]  Oyun öneri özelliği getir. (CSV dosyamda oynadıklarımdan öneri yapacağım.)
+    - [x]  Teknominatör’de RAWG dokümantasyonuna bak.
+    - [x]  Bir Discord sunucusundaki tüm kullanıcı isimlerini sıfırlamak. (Denedim ancak method çalışmadı.)
+    - [x]  Mass ban (ayrı bir bot olarak)
+    - [x]  Welcome image oluşturacağım.
+    - [x]  Dizi ve Film API’leri kullanarak komutlar yazacağım (.cogs/fun.py) # tmdb için daha detaylı bilgiler ekleyeceğim.
+    - [x]  giveaway slash komutlarına çevir.
+    - [x]  Tüm komutları hybrid ve slash komutlara çevir.
+    - [x]  Komut açıklamalarını düzenle.
+    - [x]  Bot tag’lanınca bilgi versin. (@contro >> “My syntax is >”)
+    - [x]  Pagination Özelliği (botguilds)
+    - [x]  Bot için React ile site hazırla.
+    - [x]  Kelime harflerinin yerini karıştır ve tahmin edilmesini iste.
+    - [x]  Mass Unban
+    - [x]  Çeviri özelliği ekle. **(googletrans library)**
+    - [x]  Bazı bot özelliklerini afiş haline getirerek Bionluk portfolyosuna ekle.
+    - [x]  Sunucudaki tüm emojileri göstermek istiyorum.
+    - [x]  Kripto paralarla ilgili API’lardan bilgi çek.
+    - [x]  Twitter API
+    - [x]  Instagram API
+    - [x]  Steam API göz at.
+    - [x]  Spotify API
+    - [x]  Bot için dokümantasyon hazırla. (***top.gg***)
+    - [x]  args[arg1, arg2] slash komutta dene.
+    - [x]  <help diye mesaj atıyor contro sunucuya eklenince, onu ayarla.
+    - [x]  [discord.py](http://discord.py) dokümantasyonunu oku ve kaynak kodunu incele. (API wrapping)
+    - [x]  Yeni özellikleri ana bota ekle.
+    - [x]  Bot özelliklerini afiş haline getir ve Bionluk’ta paylaş. Bu özelliklerin listesini turkoyto duyuru kanalına yaz.
+    - [x]  Botu sunucusuna ekleyenler arasında çekiliş yapacağım.
+    - [x]  PyCharm üzerinden database bağlanmayı dene.
+    - [x]  Custom prefix eklenebilir. *#slash komutları da geldiğinden pek gerekli değil.*
+    - [x]  [`https://www.youtube.com/watch?v=2eF6jU42HYk`](https://www.youtube.com/watch?v=2eF6jU42HYk) (Python Request)
+    - [x]  python @app.commands araştır
+    - [x]  [top.gg](http://top.gg) dokümantasyonunu düzenle.
+    - [x]  Bir üyeye bir rolü yoksa rol verme komutu.
+    - [x]  Üyelerin custom statüslerini görmek.
+    - [x]  Botun eklendiği sunucuların davet linklerini görmek.
+    - [x]  MongoDB veritabanına Python botun üzerinden bağlan.
+    - [x]  Sunucu listesini tarihe göre azalan yap. Yani yeni tarihler önce belirsin.
+    - [x]  Botumun olduğu sunucuları sayfa başı 15 tane göstereceğim. (pagination)
+    - [x]  Tüm API keyleri gizleyerek botu GitHub’ta public yap ve komutlar için wiki sayfası hazırla.
+    - [x]  Gelişmiş embed (renk seçimi, fotoğraf ekleme opsiyonları) yap.
+    - [x]  Discord.py **butonlar** özelliklerini kullanarak embed oluşturma komutu ekleyeceğim.
+    - [x]  Discord.py **linkler** için komut yaz.
+    - [x]  Tüm emojileri indirme komutu yaz.
+    - [x]  Tüm komutları dene ve çalışmayanları düzelt. (Çalışmayan: **~~serverinfo~~, ~~whois~~**)
+    - [x]  Çoklu **anket** özelliğini entegre et.
+    - [x]  Botumun olduğu sunuculara davet linkiyle gitmeyi istiyorum.
+    - [x]  Duruma yazılan mesajlara göre rol verme özelliği eklemeliyim.
+    - [x]  Durumda reklam var ise bildirsin.
+    - [x]  Emoji list komutuna sayfalama özelliği getir.
+    - [x]  bot.py’da get_invite_link fonksiyonunu utils.py’a kaydedeceğim ve istediğim yerden çağıracağım.
+    - [x]  Botun resmini sunucuya özel düzenlemeyi araştıracağım. Sanırım olmuyor, ayrı bir bot gerekiyor.
+    - [x]  Mass DM’de şu kadar kişiye mesaj gönderildi diye eklesin istiyorum.
+    - [x]  /help komutunu ayarla.
+    - [x]  Bot tokenlerini dotenv ile gizle.
+    - [x]  Çekiliş sistemine odaklan.
+    - [x]  Yeni özellik eklemektense var olan kodu düzenlemeye odaklan.
+    - [x]  Kanala atmanın yanında aynı oyunu oynayanları embed mesaja toplasın, oyundan çıkınca biri mesajı düzenlesin.
+    - [x]  Tüm komutları Notion’a yaz.
+    - [x]  Botun tüm opsiyonlarına açıklama yaz.
+    - [x]  Bir kod dosyasında birden fazla Discord botu nasıl yapılır?
+    - [x]  Oto bump’ı task olarak ayarla.
+    - [x]  Bionluk’ta 100, 250, 400 liralık bot kodlama hizmeti paketleri koy.
+    - [x]  Bionluk’ta rol ikonları hizmetini koy.
+    - [x]  Stable diffusion kullanmayı öğren, özellikle modelleri kullanmayı öğren.
+    - [x]  Contro için daha iyi profil fotoğrafı yaptır.
+    - [x]  Farklı hesaplar açıp Teknominatör’e boost bas.
+    - [x]  owner_bot_guilds komutu için emoji yerine buton sistemine geç.
+    - [x]  Contro bot tanıtım videosu çek.
+    - [x]  Üye rolünü neden siliyor.
+    - [x]  Anket sistemini düzenle.
+    - [x]  Giveaway sonrası reroll butonu ve çıkış butonu ekle.
+    - [x]  giveaway mesaj delete hatası alıyorum.
+    - [x]  Giveaway hatalarını düzelt.
+    - [x]  hosting konusunda bilgi alabilir miyim?
+    - [x]  Bir kanalda sadece video, link, resim paylaşma filtreleri ekle.
+    - [x]  **Resimli giriş çıkış** sistemini genel sunucularda çalışabilecek şekilde düzenle. Database olarak MongoDB kullan.
+    - [x]  Bionluk text’lerini json dosyasına aktaracağım.
+    - [x]  Üyelerin partner kanalı açarak partner mesajı ayarlayıp belirli periyotlarla tüm partner kanallarında reklam yapabileceği bir sistem oluşturacağım. (>partner channel set, >partner kapat, >partner <description>) #cooldown yerine daha efektif yol bul.
+    - [x]  Gelişmiş Logging Sistemi (>logging channel set <channel_id>, >logging kapat) #sunucu hakkında detaylı log’ları tutacağım.
+    - [x]  ctx.send ve ctx.channel.send, eğer / ile kullanılırsa ctx..? interaction.send yerine hangi kodla cevap verilir? ctx.defer / ctx.send
+    - [x]  ping komutunda uptime da gösterebilir. aliases olarak eklerim info ve uptime’ı.
+    - [x]  GitHub için İngilizce banner hazırla.
+    - [x]  GitHub deployments history temizlemem gerekli.
+    - [x]  değiştirilecek komutlar: `~~kayıt_channel => kayıt_channel_show~~` `~~edit_nicknames~~`
+    - [x]  Kayıt başarısız hatasını çöz.
+    - [x]  [Top.gg](http://Top.gg) upvote özelliği ekle.
+    - [x]  İngilizce sunucu kurdurmak isteyen müşterilerimi de düşünüp bazı komutlara dil seçeneği getirmeliyim.
+    - [x]  Astro bottaki gibi bir help komutu ve sunucuya eklendiğinde mesaj göndermesi daha iyi.
+    - **~~Resimli Hoş Geldin & Bye Bye (welcomer.py)~~**
+        - **Tamamlananlar**
+            - [x]  DLRP için hazırladığım **welcomer** olayını Contro bota getirecek ve DB ile özelleştirilebilir olmasını sağlayacağım.
+            - [x]  **/welcome set** komutu ile config.json dosyasına gerekli bilgiler yazdırılarak aktifleştirilsin. **/welcome remove** komutu ile ise komutun kullanıldığı sunucu config.json dosyasından bulunarak kaldırılsın.
+            - [x]  DB olarak .json dosyası kullandım ancak MongoDB kullanarak güncelleyeceğim.
+            - [x]  Ekstra resimli çıkış mesajı da ayarla ve ayrı olarak ayarlanabilsin.
+            - [x]  Color için sadece hex kodunu yazınca olacak şekilde düzenle. # ve 0x işaretlerini koymakla uğraşmayalım.
+    - **~~Web Dashboard [Django](https://www.notion.so/Django-bc795fc5db7a4d389ff9d66984f93fa2?pvs=21)~~**
+        - [ ]  **Django** veya **Flask** kullanarak web dashboard oluştur.
+        - [ ]  Her sunucu için dashboard üzerinden yapılan işlemler database’e bilgi göndersin ve botun ayarlarını güncelleyerek davranışlarını etkilesin.
+    - **~~Masaüstü Uygulaması** *Tkinter*~~
+        - [ ]  **PyQt5** veya **Tkinter** ile bot için program yapabilirim.
+    - **~~Web Scraper (config.py)** *BeautifulSoup*~~
+        - [ ]  BeautifulSoup kütüphanesiyle sitemdeki son içerikleri çekip bir komut oluşturabilirim. Butonlu pagination yaparak en son 5-10 yazıya erişilebilir kılacağım. `*/articles*`
+    - ~~[GTA VI Türkiye](https://www.notion.so/GTA-VI-T-rkiye-b56b8f54e309463ba43438cae38def38?pvs=21)~~
+        - Ticket Sistemi
+            - [x]  Ticket alanlarını ekleyebileceğim komut ekleyeceğim.
+            - [x]  Ticket butonlarını sıralamayı deneyeceğim.
+        - **Tamamlananlar**
+            - [x]  /partner komutu çalışmadı.
+            - [x]  Diğer özellikleri değiştirmeden welcome image ayarlama ayrı ayrı.
+            - [x]  Starboard sistemi oluştur.
+            - [x]  Autorole komutu ayarlanmasını ekle ve GTA 6 Türkiye sunucusunda kullan.
+            - [x]  Ticket sistemini ekle.
+            - [x]  Başvuru sistemi getir.
+            - [x]  teknominatör açılmasını istediğiniz kanallar ve roller için diye kendi ticket sistemimi kuracağım.
+            - [x]  Ticket için ~~opsiyonel alan~~ ve butonlar için ~~emoji~~ opsiyonu sunacağım.
+    - **~~Deneyler** 🧪~~
+        - **Tamamlananlar**
+            - [x]  Sadece bir mesajı [report](https://github.com/Rapptz/discord.py/blob/master/examples/app_commands/basic.py) etme özelliği ekleyeceğim.
+            - [x]  Context menu mesajlar için sorun bildirme komutu ekleyeceğim, mümkünse modal’lı.
+            - [x]  api reference: `ActionRow`
+            - [x]  Select menüyü faydalı bir işlemde kullan.
+            - [x]  Farklı buton türlerini bir arada bulundurmaya çalışacağım. `buton + menü`
+    - **~~Müzik Sistemi (music.py)~~**
+        - [ ]  Her zaman müzik çalmıyor, işin sonunda kendi **lavalink** sunucumu oluşturabilirim.
+        - [ ]  Müzik çalma özelliğini geliştir. Diğer müzik botlarında olan özellikleri getirmeye çalış. @DJ rolü ekle. check_dj fonksiyonu ile gerekli komutların orada bir middleware koyacağım.
+        - **Tamamlananlar**
+            - [x]  Müzik çalma özelliği ekle. (youtube_dl çalışmıyor) (spotify kaynaklarını da kullansın)
+    - **~~Context Menü~~**
+        - [ ]  context menü: `topgames`
+    - **~~Alarm ve Hatırlatıcı Sistemi (reminders.py)~~**
+        - [ ]  Hatırlatıcıyı rol hatırlatıcı ve üye hatırlatıcı olarak düzenleyeceğim. Aynı şekilde alarmı da düzenleyebilirim. Eğer rol parametresi eklenmediyse üyeden bahsetsin, rol parametresi eklenirse rolden bahsedilsin.
+        - **Tamamlananlar**
+            - [x]  Alarm ve hatırlatıcı sistemini düzenleyeceğim.
+            - [x]  Hatırlatıcıları silmek için komut ekleyeceğim.
+    - **~~Settings & Interface (settings.py)~~**
+        - [x]  İngilizce dil seçeneğinin yanında **Türkçe** dil seçeneği de ekleyebilirim.
+        - [x]  Komut kullanmaya yabancı olanlar için butonlarla sunucu ayarlarını yapabileceğimiz sistem ayarlayacağım.
+        - [x]  kayıt setup butonu kayıt için gerekli rolleri oluşturacak.
+        - [x]  Bazı komutların ayarlarını görüntüleyebileceğimiz /settings komutu ekleyeceğim.
+        `filtre` `kayıt`
+        - [x]  Bu komutların yanı sıra interface butonları üzerinden de çağırılabilecek.
+    - **~~Ticket Sistemi~~**
+        - **Tamamlananlar**
+            - [x]  **Modal** özelliğini dene.
+            - [x]  Modal özelliğini kullanarak şikayet sistemi oluşturacağım. Şikayet kayıtları bir kanala düşecek.
+            - [x]  Yetkili başvuru modal’ı kurabilirim.
+            - [x]  Öncelikle custom modal oluşturulabiliyorsa bu birçok farklı amaç için kullanılabilir. Örneğin şikayet ve öneri butonları için ayrı ayrı oluşturulabilir. `/send_modal_embed field1: field2: field3: button_text:` şeklinde 3 girdili custom modal oluşturtabilirim.
+    - **~~Partner Sistemi~~**
+        - [ ]  /bump komutunu bot restart yiyince tekrar atamamaları için database kullanabilirim. tasks.loop ile kontrol edebilirim.
+        - **Tamamlananlar**
+            - [x]  Partner sistemini mongodb’ye taşıyacağım.
+            - [x]  Partner sistemi çalışmıyor, düzelt.
+    - **~~Eğlence Sistemleri (fun.py)~~**
+        - [x]  Crypto asset’in resmini de göstersin.
+        - [x]  GPT4 API kullanarak benzer oyunlar öner gibi bir şey ekleyeceğim.
+        - [x]  Doğruluk ve cesaretlik için Türkçe oyun tasarla.
+        - [x]  **/game** ve **/movie** için çeviri opsiyonu sunacağım.
+        - **Tamamlananlar**
+            - [x]  Dizi komutu ekle.
+            
+            - [x]  Birthday setup komutu ile rolleri otomatik kurdurabilirim.
+            - [x]  **/game** ve **/movie** için opsiyonlar sunacağım.
+            - [x]  Fact komutunda slash komut için opsiyon sunmak isterim.
+            - [x]  Burç sistemi yapacağım, üyeler >birthday 14 11 2001 gibi bir komutla burçlarına ait rolünü alacaklar. Ancak üyede daha önceden herhangi bir burç rolü varsa silmesi gerekiyor.
+            - [x]  Doğum günü sistemi yapacağım. Burç sistemindeki komut girildiğinde aynı zamanda database’e kaydedilecek. Gün ve ay olarak o gün geldiğinde doğum günü kanalı olarak ayarlanan kanala doğum günü kutlama mesajı gönderecek. Sanırım kontrol için task kullanacağım.
+    - ~~Projeyi şimdilik *open source* yapmaya karar verdim.~~
+    - ~~Botun 100 sunucuya eklenmesi benim için önemlidir.~~
+    - ~~Aşağıdaki sayfayı inceleyerek başkalarının yazdığı kodları kendi botuma entegre edebilirim.~~
+        
+        https://github.com/topics/discord-py?o=desc&s=updated
+        
+    - [x]  Bergaman Software Services sunucusunda create-order kanalına ticket sistemini entegre edeceğim. Ticket butonu ekleme komutu eklemeliyim.
+    - [x]  [contro-bot](https://www.notion.so/contro-bot-6088f7e62c174b5b8e9705d8848bf271?pvs=21) ekle: `reminders`
+    - **~~Geçici Ses Kanalları (voice.py)~~**
+        - [ ]  Üyenin ses kanalına katılma verisini takip ederek üye kanala katıldığında yeni kanal oluşturma ve kanaldan çıktığında kanalı silme gibi bir **geçici ses kanalı oluşturma** sistemi kuracağım.
+        - [ ]  Geçici ses kanallarını entegre edeceğim.
+        - [ ]  /generator komutu aynı kategoride yeni bir kanal oluşturacak. Bu kanal database’e bu kanala katıldığında aynı kategoride kanal oluştur diye kaydedilecek.
+        - [ ]  Daha sonra database’de istediğimiz generator kanalı için kategori bilgisini güncelleyebileceğiz.
+        - [ ]  Detay olarak kanalı kilitleme, limit belirleme ve kanaldan üye atma gibi komutlar eklenecektir.
+    - **~~Genel~~**
+        - [x]  Yardımcı fonksiyonlar kullanarak gereksiz kod tekrarlarını azaltabilirim.
+        - [x]  Bir üye ses kanalına katılınca bir kanala davet linki atsın, ekran paylaşımı açınca da bildirim atsın. Üyenin aktivitesi varsa onu bildirsin.
+        - [x]  Filtreler: `only_command_channels`
+        - [x]  DM sinyallerini yakalayabilir.
+        - [x]  Bir kanaldaki mesajlara otomatik reaksiyon ekleme filtresi ekle.
+        - [x]  Reklamları log’lama özelliği olsun. /show_advertisement_logs komutu ile görülebilsin. Anlık olarak yine de kontrol etsin ve yanına `available` desin.
+        - **Tamamlananlar**
+            - [x]  ~~Oyun kontrol paneli oluştur, butonlara basınca üyelerin oyun oynamak istediğine dair mesaj paylaşılsın.~~
+            - [x]  wavelink’e bağlanmama problemini çöz.
+            - [x]  Butonlu ticket sistemi kuracağım. *cogs.ticket*
+            - [x]  Discord botunu onaylattır.
+    - **~~Kayıt Sistemi (register.py)~~**
+        - [x]  Modal’a kayıt ol yanında eğer manual_kayıt özelliği açık ise ekstra Kayıt Et butonu eklenmeli. O şekilde target üyeyi kayıt edebilsin görevliler.
+        - [x]  Modal mesajın açıklaması düzenlenebilir.
+        - **Tamamlananlar**
+            - [x]  Kayıt sistemini embed’e dönüştür. Sadece >kayıt komutu hybrid olmalı.
+            - [x]  Yaş kayıt sisteminin daha özelleştirilebilir olmasını istiyorum.
+            - [x]  Kayıtta alınacak ve verilecek rollerin ayarlanabilmesini istiyorum.
+            - [x]  Kayıta isim düzenleme on/off özelliği getir.
+            - [x]  Modal ile **kayıt özelliği** getir. Modalı karşılama mesajına eklesin.
+            - [x]  Kayıt sonrası hangi rolün verildiğine dair bilgilendirme embed’i gözükmeli.
+            - [x]  Modal interaksiyonları timeout sonrası işlevsiz hale geliyor.
+            - [x]  Kayıta modal karşılama mesajı özelliği gelmeli.
+    - **~~Oyun Komutları~~**
+        - [x]  topgames komutunun yanı sıra bu özellik için ayrı interface ayarlayacağım. 
+        `en çok oynananlar` `oyuncu ara` `oyuncu arayanlar` `üye ara` `kim oynadı?`
+        Yukarıdaki butonlar kanala ephemeral embed mesaj gönderecek. Üyenin parametreleri girmesi için form alanları olacak.
+        - [x]  who_is_played komutu ekle. ***member.mention steam_id last_played***
+    - **Logging Sistemi (logs.py)**
+        - [x]  Logging açıklamalarını ve renklerini düzenleyebilirim.
+    - **~~Moderasyon Sistemleri (moderation.py)~~**
+        - [x]  Eğer üyede bir rol ya da roller varsa diğer rolü silmesi için database kullanarak komut yazacağım. Database ile hangi rolün verildiğinde hangisinin alınması için bilgi depolanacak. bot.event kısmında database’den çağrılacak.
+        - [x]  Türkçe küfür engellemek için makine öğrenmesi kullanabilirim. [Python](https://www.notion.so/Python-05aecd4eac4e4220be90bab3609f7a80?pvs=21)
+        - **Tamamlananlar**
+            - [x]  Banlama yetkisine sahip üyelerin sadece belirli rolleri verebilmesi için database kullanarak komut ekleyeceğim. Bunun için mongodb roles koleksiyonunu kullanacağım. Bir sunucu içinde /give_role user: role_mention: kullanarak banlama yetkisine sahip üyenin bahsedilen üyeye rol vermesini sağlayacak. /give_role_settings given_roles: @üye @asker gibi bir komutla ise banlama yetkisine sahip üyelerin hangi rolleri verebileceği ayarlanacak. Aynı zamanda sunucu bazında olacak bu özellikler.
+            - [x]  ~~Ayarlamalı komutları admin panelinde ayrı olarak gösterebilirim.~~
+            - [x]  Üye sunucuya katıldığında yeni rol ya da roller eklesin. */autorole set role: & /autorole remove*
+            - [x]  Türkçe **küfür engelleme** özelliği ekle. O sunucu için küfür engelleme özelliği açık ise doğrudan silsin. Küfür engelleme özelliğinin açık olup olmadığını database’den kontrol edecek.
+            - [x]  Link engelleme özelliği eklenecek.
+            - [x]  Eklenen filtreler bazı roller ve bazı kanallar bazında kapanabilecek.
+            - [x]  Media ve video only kanallar ayarlanabilir.
+    - **~~Reaksiyon Rolleri (dropdown_roles.py & reaction_roles.py)~~**
+        - [x]  Buton ile reaksiyon rolleri özelliği ekleyeceğim.
+        - [x]  Emoji ile reaksiyon rolleri özelliği ekleyeceğim.
+        - **Tamamlananlar**
+            - [x]  Dropdown menü ile rol seçmeyi ekleyeceğim.
+            - [x]  Dropdown menüde timeout sonrası istediğim rolü vermiyor. on_interaction listener’i ile yapmayı ekleyeceğim.
+            - [x]  Dropdown rolde bazen emoji eklenmiyor.
+    - **~~Çekiliş Sistemi (giveaways.py)~~**
+        - [x]  Kazanan sayısını ayarlayabilirim. `kazanan: 2`
+        - [x]  Güncel bir çekilişin ayarlarını yönetmeyi ekleyeceğim.
+        - **Tamamlananlar**
+            - [x]  pymongo sayesinde daha özelleştirilebilir hale getireceğim. Örneğin çekiliş mesajları ayarlanabilsin.
+            - [x]  Katılabilecek roller ayarlanabilir ve embed’de buna göre gösterebilir.
+            - [x]  Katılabilecek rolleri ayarladım ama birinin emojisini silse bile onu katılımcı olarak gösteriyor.
+            - [x]  /giveaway_shuffle çalışmıyor.
+            - [x]  Çekiliş bitince tüm katılımcıları da listelesin.
+    - **~~Invite Tracking (invites.py)~~**
+        - [x]  Davet edilen biri ayrılınca davet sayısını düşürsün ve ayrıldı diye /invites yazınca göstersin. Davet edilen kişilere bakıp davet edilen kişi hala sunucuda mı diye kontrol edebilir.
+        - [x]  Veriler çoğaldıkça buton pagination getirilecek.
+        - [x]  Invite rolleri özelliğini ekle. Leaderboard’dan verileri çekecek ve ona göre rol verecek.
+        - **Tamamlananlar**
+            - [x]  Invite tracker özelliği getir.
+            - [x]  Yeni invite’ları olması gerektiği gibi takip etmiyor.
+            
+            - **~~Güvenlik Sistemleri (security.py)~~**
+                - [x]  Yetkililerin rol verme, alma; üye banlama, kickleme; kanal oluşturma, silme gibi aktivitelerini takip ederek karantinaya alacak.
+                - [x]  Eğer bir üye give_roles_settings’de izni olmayan rolü eliyle vermeye kalkarsa rolü üyeden kaldırsın.
+    - **~~Debugging, Refactoring & Future Works** 🧑🏻‍💻~~
+        - app_commands.describe düzenlemeleri
+            
+            `~~register~~, /poll, utility, /steal_emoji, /byebye set(img source önerisi), filter`
+            
+        - Log’ları düzenle.
+            - [x]  Eğer farklı log kanalları belirtilmişse log’ları ayır. `member_log, message_log, server_log, moderation_log` default_channel
+            - [x]  Loglarda rolleri , ile ayırma. Hem `voice` loglarında her `left` derken.
+            - [x]  Role updated çok fazla log atıyor, gereksiz şekilde.
+            
+            [Imgur](https://i.imgur.com/TG6a8rK.png)
+            
+            `~~member left, member joined,~~ rol_verildi` `emojis_updated yerine created, name change, deleted.`
+            
+            - [x]  channel deleted silinen kanalı değil de farklı sonuç gösteriyor.
+        - [x]  Burç ikonlarını renklerini de seçebilir.
+        - [x]  Çekiliş katılımcıları için sayfalama olmalı. Aynı zamanda kaç katılımcı olduğuna dair bilgilendirme olmalı.
+        - [x]  YouTube API kullanarak videoları nasıl paylaştırabilirim. API dışında scraper bot ile yeni videoları algılamak mümkün olur mu? Twitter için de aynısı yapılabilir mi?
+        - [x]  set komutlarını settings.py’da toplayacağım.
+        - [x]  Starboard’da embed dışında kanal etiketi ve yıldız sayısını gösterebilirim.
+        - [x]  reminders cog’unu kontrol et ve elden geçir.
+        - [x]  Level leaderboard problemli.
+        - [x]  Kanal ayarlamak için tek bir komut olacak.
+        - [x]  Aktif çekiliş yoksa mesaj göndersin.
+        - [x]  Kazanan kişiyi çekilişte listeden silebilir.
+        - [x]  `default_log_channel` yanında her ayrı log kategorisi için ayrı ayrı log kanalı açılabilecek.
+        - **Tamamlananlar**
+            - [x]  Crypto komutu çalışmıyor. Çalışıyormuş ama asset’i düzgün girmemişim.
+            - [x]  Interaction mesajlarında defer olayını yapamıyorum.
+            - [x]  Idea of member: Üye kayıt olunca mesajı support sunucusuna gelmiş.
+            - [x]  contro_guilds: contro is thinging takılı kalıyor.
+            - [x]  Embed with links is created! embed içine al /link_button
+            - [x]  Yeni Takma Adı :
+            - [x]  Hoş geldin sisteminde yazılar da ayarlanabilmeli.
+            - [x]  Reddit komutunda footer’da reddit /r/… yazsın.
+            - [x]  Sürekli ephemeral embed göndermemek için interaction.response.defer() diyebilirim ve response göndermeden de işlemlerin failed hatası almamasını sağlarım. `dropdown_roles`
+            - [x]  dropdown_roles gözden geçir, db’ye kaydetmeden yapılabilir mi diye bak.
+            - [x]  owner - game_stats View class’ları aynı.
+            - [x]  [Persistent](https://github.com/Rapptz/discord.py/blob/master/examples/views/persistent.py) view’i interaksiyon dışında yapmayı dene.
+            - [x]  Botun onaylı olması için benzersiz özellikler ekleyip göz önünde tutacağım. 100 sunucuya eklendiğinde başvuruyu yapacağım.
+            - [x]  Afiş 1: *Level Sistemi - Ticket Sistemi - Ticket Formu - Sayfalı Oyun İstatistikleri - Butonlu Oto Kayıt Sistemi - Kaynak Kodları - Ticket Kanalı - Dropdown Roller*
+    - **~~İstatistikler (stats.py)~~**
+        - [x]  topgames loop’u içinde playing loop’unu yapmayı deneyeceğim. *chatgpt’ye sor*
+        - [x]  Oyun istatistiklerinde print’leri comment’le.
+        - [x]  Sayfalar çoğaldığı için Sayfaya Git butonu ekleyebilirim.
+        - [x]  İstatistik verim güçlendikçe grafik tabloları oluşturabileceğim kütüphanelerle çalışabilirim.
+        - **Tamamlananlar**
+            - [x]  Üyelerin aktivitelerini takip etsin ve oyuna girenleri oyuna girdi diye bildirerek kanala atsın.
+            - [x]  Oyun aktivitelerinde sunucudan ayrılan üyelerin kayıtları db’de kayıtlı kalıyor.
+            - [x]  Üyelerin yazı ve ses kanallarındaki istatistiklerini mongodb stats koleksiyonuna kaydedeceğim.
+    - **~~Utility (utility.py)~~**
+        - [x]  Anketlerde bir kullanıcının **birden çok reaksiyon vermesini** engelle. Bunun için anketlerin log’unu tutmalı ve bu ayarın açılıp kapanma ayarı eklenmeli. Bu anketlerin her birine eklenen reaksiyonlar ayrı takip edilmeli ve eğer bir kullanıcı tarafından 2. kez emoji bırakılmaya çalışılırsa eski emoji bot tarafından yerinden kaldırılmalı. Tabii ki, eklediğimiz ayar öncelikle database’den kontrol edilmeli.
+        - [x]  Butonlu anket sistemi oluşturup Anket Sonuçları butonuna basınca ephemeral grafik tablosu göndermesini sağlayabilirim ya da üye bir sonuç seçer seçmez anket sonuçlarını göstersin.
+        - [x]  Butonlar ile hesap makinesi yapacağım. `row`
+        - **Tamamlananlar**
+            - [x]  Kendi emoji_steal kodunu yaz. *mümkün değil*
+            - [x]  /poll komutunu düzenle.
+            - [x]  Anket sisteminde greedy kullan.
+            - [x]  Butona basıldığında ephemeral embed mesaj göster.
+            - [x]  /starboard sistemi kurabilirim.
+            - [x]  **/emoji_list** butonlu yapılabilir.
+            - [x]  /membersofrole bir role sahip tüm üyeleri listelesin, pagination için buton kullanacağım.

@@ -1,0 +1,40 @@
+import discord
+from discord.ext import commands
+
+from utility.utils import create_embed, initialize_mongodb, get_category_by_name
+
+class TemporaryChannels(commands.Cog):
+    def __init__(self, bot):
+        self.bot = bot
+        self.mongo_db = initialize_mongodb()
+
+    @commands.Cog.listener()
+    async def on_voice_state_update(self, member, before, after):
+        if member == self.bot.user:
+            return
+
+        if after.channel is not None:
+            if after.channel.name == "Voice Channel":
+                channel = await member.guild.create_voice_channel(after.channel.guild, f'{member.name}-meeting'.lower(),
+                                                     category_name="Voice Channels",
+                                                     user_limit=after.channel.user_limit)
+            if channel is not None:
+                await member.move_to(channel)
+
+        if before.channel is not None:
+            if before.channel.category.id == get_category_by_name(before.channel.guild, category_name="Voice Channels").id:
+                print("User left a temp channel.")
+                if len(before.channel.members) == 0:
+                    print("channel is now empty")
+                    await before.channel.delete()
+
+
+    @commands.command(name="generator", description="Creates a temporary voice generator channel.")
+    async def generator(self, ctx):
+        member = ctx.author
+        channel = await ctx.guild.create_voice_channel(ctx.guild, f'{member} kanalı'.lower(), category=ctx.channel.category)
+        await ctx.send(embed=create_embed(description=f"Voice Channel created.", color=discord.Color.blue()))
+
+
+async def setup(bot):
+    await bot.add_cog(TemporaryChannels(bot))

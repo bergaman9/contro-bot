@@ -1,10 +1,9 @@
 import discord
-from discord import app_commands
 from discord.ext import commands
-import pymongo
-import datetime
+from discord import app_commands
 
-from utils import create_embed, initialize_mongodb
+from utils.database.connection import initialize_mongodb
+from utils.core.formatting import create_embed
 
 class Starboard(commands.Cog):
     def __init__(self, bot):
@@ -97,31 +96,9 @@ class Starboard(commands.Cog):
                 del starboard_data["messages"][str(message.id)]
                 self.mongo_db.starboard.update_one({"guild_id": str(payload.guild_id)}, {"$set": starboard_data})
 
-    @commands.hybrid_command(name="add_starboard", description="Add starboard to your server.")
-    async def add_starboard(self, ctx, channel: discord.TextChannel, emoji: str, count: int):
-        # Starboard ayarını ekleyin veya güncelleyin
-        self.mongo_db.starboard.update_one(
-            {"guild_id": str(ctx.guild.id)},
-            {
-                "$set": {
-                    "channel_id": str(channel.id),
-                    "emoji": emoji,
-                    "count": count
-                }
-            },
-            upsert=True
-        )
-
-        await ctx.send(embed=create_embed(
-            description=f"Starboard set up successfully in {channel.mention} with {emoji} and {count} reactions!",
-            color=discord.Color.green()))
-
-    @commands.hybrid_command(name="remove_starboard", description="Remove starboard from your server.")
-    async def remove_starboard(self, ctx):
-        self.mongo_db.starboard.delete_one({"guild_id": str(ctx.guild.id)})
-        await ctx.send(embed=create_embed(description="Starboard system has been removed from this server.",
-                                          color=discord.Color.green()))
-
+    # Commands moved to settings.py:
+    # - add_starboard
+    # - remove_starboard
 
 async def setup(bot):
     await bot.add_cog(Starboard(bot))

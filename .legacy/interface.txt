@@ -1,0 +1,113 @@
+import discord
+from discord.ext import commands
+from typing import Optional
+from core.db import initialize_mongodb
+from core.discord_helpers import create_embed 
+
+# Modal for updating a specific feature
+class UpdateFeatureModal(discord.ui.Modal):
+    def __init__(self, feature_name: str, db_collection: str, current_value: Optional[str] = None):
+        super().__init__(title=f"Update {feature_name}")
+        self.feature_name = feature_name
+        self.db_collection = db_collection
+        self.add_item(discord.ui.TextInput(
+            label=f"New value for {feature_name}",
+            placeholder="Enter the new value",
+            default=current_value or "",
+            required=True
+        ))
+
+    async def on_submit(self, interaction: discord.Interaction):
+        db = initialize_mongodb()
+        guild_id = str(interaction.guild.id)
+        new_value = self.children[0].value
+
+        # Update the database
+        db[self.db_collection].update_one(
+            {"guild_id": guild_id},
+            {"$set": {self.feature_name: new_value}},
+            upsert=True
+        )
+
+        await interaction.response.send_message(
+            embed=create_embed(f"'{self.feature_name}' updated to '{new_value}' successfully!", discord.Color.green()),
+            ephemeral=True
+        )
+
+# View for selecting a feature to update
+class FeatureUpdateView(discord.ui.View):
+    def __init__(self, bot: commands.Bot):
+        super().__init__(timeout=300)
+        self.bot = bot
+
+    @discord.ui.button(label="Update Welcome Message", style=discord.ButtonStyle.primary)
+    async def update_welcome_message(self, interaction: discord.Interaction, button: discord.ui.Button):
+        db = initialize_mongodb()
+        guild_id = str(interaction.guild.id)
+        current_value = db['welcomer'].find_one({"guild_id": guild_id}, {}).get("description", "Welcome {mention}!")
+        modal = UpdateFeatureModal("description", "welcomer", current_value)
+        await interaction.response.send_modal(modal)
+
+    @discord.ui.button(label="Update Leave Message", style=discord.ButtonStyle.primary)
+    async def update_leave_message(self, interaction: discord.Interaction, button: discord.ui.Button):
+        db = initialize_mongodb()
+        guild_id = str(interaction.guild.id)
+        current_value = db['byebye'].find_one({"guild_id": guild_id}, {}).get("description", "Goodbye {name}!")
+        modal = UpdateFeatureModal("description", "byebye", current_value)
+        await interaction.response.send_modal(modal)
+
+    @discord.ui.button(label="Update Logging Channel", style=discord.ButtonStyle.primary)
+    async def update_logging_channel(self, interaction: discord.Interaction, button: discord.ui.Button):
+        db = initialize_mongodb()
+        guild_id = str(interaction.guild.id)
+        current_value = db['logger'].find_one({"guild_id": guild_id}, {}).get("channel_id", "")
+        modal = UpdateFeatureModal("channel_id", "logger", current_value)
+        await interaction.response.send_modal(modal)
+
+    @discord.ui.button(label="Update Auto-Role", style=discord.ButtonStyle.primary)
+    async def update_auto_role(self, interaction: discord.Interaction, button: discord.ui.Button):
+        db = initialize_mongodb()
+        guild_id = str(interaction.guild.id)
+        current_value = ", ".join(map(str, db['autorole'].find_one({"guild_id": guild_id}, {}).get("roles", [])))
+        modal = UpdateFeatureModal("roles", "autorole", current_value)
+        await interaction.response.send_modal(modal)
+
+    @discord.ui.button(label="Update Starboard Channel", style=discord.ButtonStyle.primary)
+    async def update_starboard_channel(self, interaction: discord.Interaction, button: discord.ui.Button):
+        db = initialize_mongodb()
+        guild_id = str(interaction.guild.id)
+        current_value = db['starboard'].find_one({"guild_id": guild_id}, {}).get("channel_id", "")
+        modal = UpdateFeatureModal("channel_id", "starboard", current_value)
+        await interaction.response.send_modal(modal)
+
+    @discord.ui.button(label="Update Embed Color", style=discord.ButtonStyle.primary)
+    async def update_embed_color(self, interaction: discord.Interaction, button: discord.ui.Button):
+        db = initialize_mongodb()
+        guild_id = str(interaction.guild.id)
+        current_value = db['settings'].find_one({"guild_id": guild_id}, {}).get("embed_color", "FFFFFF")
+        modal = UpdateFeatureModal("embed_color", "settings", current_value)
+        await interaction.response.send_modal(modal)
+
+    @discord.ui.button(label="Update Registration Role", style=discord.ButtonStyle.primary)
+    async def update_registration_role(self, interaction: discord.Interaction, button: discord.ui.Button):
+        db = initialize_mongodb()
+        guild_id = str(interaction.guild.id)
+        current_value = db['register'].find_one({"guild_id": guild_id}, {}).get("role_id", "")
+        modal = UpdateFeatureModal("role_id", "register", current_value)
+        await interaction.response.send_modal(modal)
+
+# Main cog class
+class Interface(commands.Cog):
+    def __init__(self, bot: commands.Bot):
+        self.bot = bot
+
+    @commands.command(name="configure")
+    async def configure(self, ctx: commands.Context):
+        """Command to open the interactive configuration interface."""
+        await ctx.send(
+            "Use the buttons below to update bot features interactively:",
+            view=FeatureUpdateView(self.bot)
+        )
+
+async def setup(bot: commands.Bot):
+    await bot.add_cog(Interface(bot))

@@ -1,15 +1,16 @@
+import discord
+from discord.ext import commands
+from discord import app_commands
+import json
+import os
+import asyncio
+import random
 import io
-import re
 from datetime import datetime
 
-import discord
-from discord import app_commands
-from discord.ext import commands
-
-from utility.class_utils import DynamicView
-from utility.db_utils import fetch_buttons_from_db, fetch_fields_from_db, fetch_application_fields_from_db, fetch_suggest_fields_from_db, insert_buttons_into_db, parse_interaction_data, fetch_fields_by_data_source, fetch_fields_from_db, fetch_buttons_for_guild
-from utility.utils import create_embed, initialize_mongodb, hex_to_int
-
+from utils.core.formatting import create_embed, hex_to_int
+from utils.database.connection import initialize_mongodb
+from utils.core.class_utils import DynamicView, DynamicButton
 
 TEXT_STYLE_MAPPING = {
     "short": discord.TextStyle.short,
@@ -59,8 +60,13 @@ class TicketModal(discord.ui.Modal):
 class TicketCloseButton(discord.ui.Button):
     def __init__(self, **kwargs):
         self.mongo_db = initialize_mongodb()
-        super().__init__(style=discord.ButtonStyle.green, label="Kapat", emoji="<:lock:1147769998866133022>",
-                         custom_id="close_ticket", **kwargs)
+        super().__init__(
+            style=discord.ButtonStyle.green,
+            label="Kapat",
+            emoji="<:lock:1147769998866133022>",
+            custom_id="close_ticket",
+            **kwargs
+        )
 
     async def close_ticket(self, interaction: discord.Interaction):
         support_roles_data = self.mongo_db['settings'].find_one({"guild_id": interaction.guild.id})
@@ -132,175 +138,293 @@ class TicketCloseButtonView(discord.ui.View):
         self.add_item(TicketCloseButton())
 
 
+class TicketButton(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+        self.add_item(discord.ui.Button(label="Create Ticket", style=discord.ButtonStyle.primary, custom_id="create_ticket"))
+
+class TicketClose(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+        self.add_item(discord.ui.Button(label="Close Ticket", style=discord.ButtonStyle.danger, custom_id="close_ticket"))
+
 class Ticket(commands.Cog):
+    """
+    Create and manage support tickets with customizable settings
+    """
+    
     def __init__(self, bot):
         self.bot = bot
-        self.mongo_db = initialize_mongodb()
-
-    @commands.hybrid_command(name="send_ticket_message", description="Sends a ticket message.")
-    async def send_ticket_message(self, ctx, title="DESTEK",
-                                  description="Yetkililerle iletişime geçmek için aşağıdaki butona basarak ticket açabilirsiniz.",
-                                  color="ff1a60"):
-        embed = discord.Embed(title=title, description=description, color=hex_to_int(color))
-        buttons_data = fetch_buttons_for_guild(ctx.guild.id)
-        if not buttons_data:
-            await ctx.send(embed=create_embed(description="Bu sunucu için ticket butonu bulunamadı.",
-                                              color=discord.Color.red()), ephemeral=True)
-            return
-        view = DynamicView(buttons_data)
-        await ctx.channel.send(embed=embed, view=view)
-        await ctx.send(embed=create_embed(description="Ticket mesajınız oluşturulmuştur.",
-                                          color=discord.Color.green()), ephemeral=True)
-
+        self.mongodb = initialize_mongodb()
+        
+    @commands.hybrid_command(
+        name="send_ticket_message",
+        description="Sends a message with a button for users to create support tickets"
+    )
+    @app_commands.describe(
+        title="The title for the ticket message",
+        description="The description text for the ticket message"
+    )
+    @commands.has_permissions(manage_channels=True)
+    async def send_ticket_message(self, ctx, title: str = "Support Tickets", *, description: str = "Click the button below to create a support ticket"):
+        """
+        Sends a message with a button that users can click to create support tickets.
+        
+        You can customize the title and description of the message to fit your server's needs.
+        Users clicking the button will create private support ticket channels.
+        """
+        embed = discord.Embed(title=title, description=description, color=discord.Color.blue())
+        await ctx.send(embed=embed, view=TicketButton())
+        await ctx.send(embed=create_embed("Ticket message sent successfully!", discord.Color.green()), ephemeral=True)
+    
     @commands.Cog.listener()
     async def on_interaction(self, interaction: discord.Interaction):
-        if interaction.data.get("custom_id") == "close_ticket":  # custom_id kontrolü
-            await TicketCloseButton().close_ticket(interaction)
-
-        if interaction.data.get("custom_id") == "ticket_modal":
-            try:
-                user_ticket_count = self.mongo_db["tickets"].count_documents(
-                    {"user_id": interaction.user.id, "guild_id": interaction.guild.id})
-
-                if user_ticket_count >= 1:
-                    query = self.mongo_db["tickets"].find_one(
-                        {"user_id": interaction.user.id, "guild_id": interaction.guild.id})
-                    await interaction.response.send_message(
-                        embed=create_embed(description=f"Zaten bir ticketiniz var: {query['channel']} ",
-                                           color=discord.Color.red()), ephemeral=True)
-                    return
-
-                member = interaction.user
-                guild = interaction.guild
-
-                description = await parse_interaction_data(interaction, "field_00", "field_01", "field_02", "field_03", "field_04")
-
-                overwrites = {
-                    guild.default_role: discord.PermissionOverwrite(read_messages=False),
-                    guild.me: discord.PermissionOverwrite(read_messages=True),
-                    member: discord.PermissionOverwrite(read_messages=True)
-                }
-
-                # Veritabanından support rollerini çekin
-                support_roles_data = self.mongo_db['settings'].find_one({"guild_id": guild.id})
-                if support_roles_data and 'support_roles' in support_roles_data:
-                    pass
-                else:
-                    # Fallback: Eğer veritabanında bu bilgi yoksa varsayılan olarak "Destek" adında bir rol ara, yoksa oluştur.
-                    support_role = discord.utils.get(guild.roles, name='Destek')
-                    if not support_role:
-                        support_role = await guild.create_role(name='Destek', color=discord.Color.green())
-                    overwrites[support_role] = discord.PermissionOverwrite(read_messages=True)
-
-                category_id = self.mongo_db["settings"].find_one({"guild_id": guild.id})["ticket_category_channel"]
-                category = guild.get_channel(category_id)
-                if category is None:
-                    category = await guild.create_category(name="DESTEK")
-
-                channel_name = f"{member.name}-ticket"  # You can customize the channel name here
-                channel = await guild.create_text_channel(name=channel_name, category=category,
-                                                          overwrites=overwrites)
-
-                # Create and send an embed message to the new channel
-                await channel.send(
-                    f"Merhaba {member.mention}! \nYetkililer en kısa sürede size yardımcı olacaktır.")
-                embed = discord.Embed(title="Üyenin Form Yanıtı", description=description,
-                                      color=discord.Color.green())
-                await channel.send(embed=embed, view=TicketCloseButtonView())
-
-                # Create and send an embed to the logs channel
-                logs_channel_id = self.mongo_db["logger"].find_one({"guild_id": guild.id})["channel_id"]
-                logs_channel = self.bot.get_channel(logs_channel_id)
-                if logs_channel:
-                    log_embed = discord.Embed(
-                        title="Yeni Ticket Oluşturuldu",
-                        description=f"{interaction.user.mention} tarafından ticket oluşturulmuştur.",
-                        color=discord.Color.blue()
-                    )
-                    log_embed.add_field(name="Ticket Kanalı", value=channel.mention, inline=True)
-                    log_embed.add_field(name="Üyenin Form Yanıtı", value=description, inline=True)
-                    await logs_channel.send(embed=log_embed)
-
-                # Here, you can insert the new ticket info into your database if you want
-                self.mongo_db["tickets"].insert_one({
-                    "_id": channel.id,
-                    "guild_id": guild.id,
-                    "user_id": member.id,
-                    "text": description,
-                    "channel": channel.mention
-                })
-
-                await interaction.response.send_message(
-                    embed=create_embed(description=f"Ticket başarılı bir şekilde oluşturuldu: {channel.mention}",
-                                       color=discord.Color.green()),
-                    ephemeral=True
+        if interaction.type == discord.InteractionType.component:
+            custom_id = interaction.data.get("custom_id", "")
+            
+            if custom_id == "create_ticket":
+                await self.create_ticket(interaction)
+            elif custom_id == "close_ticket":
+                await self.close_ticket(interaction)
+    
+    async def create_ticket(self, interaction: discord.Interaction):
+        # Get ticket configuration
+        ticket_config = self.mongodb["tickets"].find_one({"guild_id": interaction.guild_id})
+        if not ticket_config:
+            await interaction.response.send_message(
+                embed=create_embed("The ticket system is not set up yet.", discord.Color.red()),
+                ephemeral=True
+            )
+            return
+            
+        # Check if user already has an open ticket
+        existing_ticket = discord.utils.get(
+            interaction.guild.channels,
+            name=f"ticket-{interaction.user.name.lower()}",
+            type=discord.ChannelType.text
+        )
+        
+        if existing_ticket:
+            await interaction.response.send_message(
+                embed=create_embed(f"You already have an open ticket: {existing_ticket.mention}", discord.Color.yellow()),
+                ephemeral=True
+            )
+            return
+            
+        # Get category and support roles
+        category_id = ticket_config.get("category_id")
+        if not category_id:
+            await interaction.response.send_message(
+                embed=create_embed("Ticket category not configured.", discord.Color.red()),
+                ephemeral=True
+            )
+            return
+            
+        category = interaction.guild.get_channel(int(category_id))
+        if not category:
+            await interaction.response.send_message(
+                embed=create_embed("Ticket category not found.", discord.Color.red()),
+                ephemeral=True
+            )
+            return
+            
+        support_role_ids = ticket_config.get("support_roles", [])
+        
+        # Create permissions for the channel
+        overwrites = {
+            interaction.guild.default_role: discord.PermissionOverwrite(read_messages=False),
+            interaction.user: discord.PermissionOverwrite(
+                read_messages=True, 
+                send_messages=True,
+                attach_files=True,
+                embed_links=True
+            )
+        }
+        
+        # Add permissions for support roles
+        for role_id in support_role_ids:
+            role = interaction.guild.get_role(int(role_id))
+            if role:
+                overwrites[role] = discord.PermissionOverwrite(
+                    read_messages=True,
+                    send_messages=True,
+                    attach_files=True,
+                    embed_links=True,
+                    manage_messages=True
                 )
-            except Exception as e:
-                print(f"An error occurred: {e}")
-
+        
+        # Create the ticket channel
+        channel_name = f"ticket-{interaction.user.name.lower()}"
         try:
-            custom_id = interaction.data.get("custom_id")
-
-            match = re.match(r"button_(\d+)", custom_id)
-            if not match:
-                print(f"Invalid custom_id format: {custom_id}")
-                return
-
-            index = int(match.group(1))
-            buttons = fetch_buttons_for_guild(interaction.guild.id)
-
-            if 0 <= index < len(buttons):
-                button_data = buttons[index]
-                data_source = button_data.get("data_source", "default")
-                await interaction.response.send_modal(
-                    TicketModal(data_source=data_source, title=button_data["label"], guild_id=str(interaction.guild.id)))
-            else:
-                print(f"No button matched for custom_id: {custom_id}")
+            channel = await interaction.guild.create_text_channel(
+                name=channel_name,
+                category=category,
+                overwrites=overwrites,
+                topic=f"Support ticket for {interaction.user.name}"
+            )
+            
+            # Send initial ticket message
+            embed = discord.Embed(
+                title=f"Ticket: {interaction.user.name}",
+                description="Thank you for creating a ticket. Support staff will assist you shortly.",
+                color=discord.Color.blue()
+            )
+            embed.add_field(name="User", value=f"{interaction.user.mention}", inline=True)
+            embed.add_field(name="Created", value=discord.utils.format_dt(discord.utils.utcnow()), inline=True)
+            
+            await channel.send(embed=embed, view=TicketClose())
+            
+            # Ping support roles if configured
+            support_pings = []
+            for role_id in support_role_ids:
+                role = interaction.guild.get_role(int(role_id))
+                if role:
+                    support_pings.append(role.mention)
+            
+            if support_pings:
+                await channel.send(", ".join(support_pings))
+            
+            # Confirm ticket creation to user
+            await interaction.response.send_message(
+                embed=create_embed(f"Your ticket has been created: {channel.mention}", discord.Color.green()),
+                ephemeral=True
+            )
+            
+        except discord.Forbidden:
+            await interaction.response.send_message(
+                embed=create_embed("I don't have permission to create ticket channels.", discord.Color.red()),
+                ephemeral=True
+            )
         except Exception as e:
-            print(f"An error occurred: {e}")
-
-    @commands.Cog.listener()
-    async def on_guild_channel_delete(self, channel):
-        # Eğer silinen kanal bir ticket kanalıysa, veritabanından da sil
-        ticket_data = self.mongo_db["tickets"].find_one({"_id": channel.id})
-        if ticket_data:
-            self.mongo_db["tickets"].delete_one({"_id": channel.id})
-
-    @commands.hybrid_command(name="set_ticket_category", description="Sets the support category channel.")
-    @app_commands.describe(channel="Kanal seçin.")
-    @commands.has_permissions(manage_guild=True)
-    async def set_ticket_category(self, ctx, channel: discord.CategoryChannel):
-        await ctx.defer()
-        self.mongo_db['settings'].update_one(
-            {"guild_id": ctx.guild.id},
-            {
-                "$set": {
-                    "ticket_category_channel": channel.id
-                }
-            },
-            upsert=True
+            await interaction.response.send_message(
+                embed=create_embed(f"An error occurred: {str(e)}", discord.Color.red()),
+                ephemeral=True
+            )
+    
+    async def close_ticket(self, interaction: discord.Interaction):
+        # Check if channel is a ticket
+        if not interaction.channel.name.startswith("ticket-"):
+            await interaction.response.send_message(
+                embed=create_embed("This command can only be used in ticket channels.", discord.Color.red()),
+                ephemeral=True
+            )
+            return
+        
+        # Check if user has permission (ticket creator or support role)
+        is_support = False
+        ticket_config = self.mongodb["tickets"].find_one({"guild_id": interaction.guild_id})
+        if ticket_config:
+            support_role_ids = ticket_config.get("support_roles", [])
+            for role_id in support_role_ids:
+                role = interaction.guild.get_role(int(role_id))
+                if role and role in interaction.user.roles:
+                    is_support = True
+                    break
+        
+        is_author = interaction.channel.name.endswith(interaction.user.name.lower())
+        
+        if not (is_support or is_author):
+            await interaction.response.send_message(
+                embed=create_embed("You don't have permission to close this ticket.", discord.Color.red()),
+                ephemeral=True
+            )
+            return
+        
+        # Log ticket content if configured
+        log_channel_id = ticket_config.get("log_channel_id") if ticket_config else None
+        if log_channel_id:
+            log_channel = interaction.guild.get_channel(int(log_channel_id))
+            if log_channel:
+                # Create transcript of ticket
+                messages = []
+                async for message in interaction.channel.history(limit=100, oldest_first=True):
+                    content = message.content if message.content else "No content"
+                    timestamp = message.created_at.strftime("%Y-%m-%d %H:%M:%S")
+                    messages.append(f"[{timestamp}] {message.author.name}: {content}")
+                
+                transcript = "\n".join(messages)
+                
+                # If transcript is too long, truncate it and add to a file
+                if len(transcript) > 2000:
+                    embed = create_embed(f"Ticket {interaction.channel.name} was closed by {interaction.user.mention}. Transcript is too long and attached as file.", discord.Color.red())
+                    transcript_file = discord.File(io.StringIO(transcript), filename=f"transcript-{interaction.channel.name}.txt")
+                    await log_channel.send(embed=embed, file=transcript_file)
+                else:
+                    embed = create_embed(f"Ticket {interaction.channel.name} was closed by {interaction.user.mention}.\n\n```\n{transcript}\n```", discord.Color.red())
+                    await log_channel.send(embed=embed)
+        
+        # Close the ticket channel
+        await interaction.response.send_message(
+            embed=create_embed("This ticket is now being closed...", discord.Color.orange())
         )
-        await ctx.send(
-            embed=create_embed(f"Ticket kategorisi {channel.mention} olarak ayarlandı.", discord.Colour.green()))
-
-    @commands.hybrid_command(name="set_ticket_roles", description="Sets the support roles.")
-    @app_commands.describe(roles="The roles to add to the dropdown.")
-    @commands.has_permissions(manage_guild=True)
-    async def set_ticket_roles(self, ctx: commands.Context, roles: commands.Greedy[discord.Role]):
-        await ctx.defer()
-        self.mongo_db['settings'].update_one(
-            {"guild_id": ctx.guild.id},
-            {
-                "$set": {
-                    "support_roles": [role.id for role in roles]
-                }
-            },
-            upsert=True
-        )
-        await ctx.send(
-            embed=create_embed(f"Ticket rolleri {', '.join([role.mention for role in roles])} olarak ayarlandı.",
-                               discord.Colour.green()))
-
+        
+        # Archive or delete based on configuration
+        delete_tickets = ticket_config.get("delete_tickets", False) if ticket_config else False
+        
+        try:
+            if delete_tickets:
+                await interaction.channel.delete()
+            else:
+                # Archive the ticket by removing permissions
+                await interaction.channel.set_permissions(interaction.guild.default_role, read_messages=False)
+                await interaction.channel.edit(name=f"closed-{interaction.channel.name}")
+        except discord.Forbidden:
+            await interaction.followup.send(embed=create_embed("I don't have permission to close this ticket.", discord.Color.red()))
+        except Exception as e:
+            await interaction.followup.send(embed=create_embed(f"An error occurred while closing the ticket: {str(e)}", discord.Color.red()))
 
 async def setup(bot):
     await bot.add_cog(Ticket(bot))
+
+def fetch_fields_by_data_source(data_source: str, guild_id: str):
+    """Fetch form fields for ticket modal from database"""
+    # Initialize MongoDB connection
+    mongo_db = initialize_mongodb()
+    
+    if not mongo_db:
+        logger.error(f"Failed to connect to MongoDB when fetching ticket fields for guild {guild_id}")
+        return get_default_ticket_fields()
+    
+    try:
+        # Get ticket configuration from database
+        ticket_config = mongo_db.ticket_config.find_one({"guild_id": guild_id})
+        
+        if not ticket_config or "fields" not in ticket_config:
+            logger.info(f"No custom ticket fields found for guild {guild_id}, using defaults")
+            return get_default_ticket_fields()
+        
+        fields = ticket_config["fields"]
+        
+        # Validate fields
+        for field in fields:
+            if "label" not in field or "placeholder" not in field:
+                logger.warning(f"Invalid field configuration in guild {guild_id}: {field}")
+                return get_default_ticket_fields()
+        
+        return fields
+        
+    except Exception as e:
+        logger.error(f"Error fetching ticket fields for guild {guild_id}: {e}")
+        return get_default_ticket_fields()
+
+
+def get_default_ticket_fields():
+    """Return default ticket form fields"""
+    return [
+        {
+            "label": "Konu",
+            "placeholder": "Sorununuzu kısaca açıklayın",
+            "style": "short",
+            "max_length": 100,
+            "required": True,
+            "row": 0
+        },
+        {
+            "label": "Açıklama", 
+            "placeholder": "Sorununuzu detaylı olarak açıklayın",
+            "style": "paragraph",
+            "max_length": 1000,
+            "required": True,
+            "row": 1
+        }
+    ]

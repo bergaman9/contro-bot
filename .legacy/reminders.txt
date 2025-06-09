@@ -1,0 +1,171 @@
+import discord
+from discord import app_commands
+from discord.ext import commands, tasks
+import datetime
+
+from utility.utils import create_embed, initialize_mongodb
+
+class Reminders(commands.Cog):
+    def __init__(self, bot):
+        self.bot = bot
+        self.mongo_db = initialize_mongodb()
+        self.check_reminders.start()
+
+    @tasks.loop(minutes=1)
+    async def check_reminders(self):
+        try:
+            now = datetime.datetime.utcnow()
+            reminders_collection = self.mongo_db["reminders"]
+
+            for reminder in reminders_collection.find({"time": {"$lte": now}}):
+                user_id = reminder["user_id"]
+                message = reminder["message"]
+                channel_id = reminder["channel_id"]
+                guild_id = reminder["guild_id"]
+                role_id = reminder.get("role_id")
+
+                # Eğer hatırlatıcı bir rolü içeriyorsa, rolü etiketle
+                await self.send_reminder(guild_id, channel_id, user_id, message, role_id=role_id)
+
+                # Eğer sürekli tekrar eden bir hatırlatıcıysa, zamanını güncelle
+                if "interval" in reminder:
+                    interval = reminder["interval"]
+                    interval_type = reminder["interval_type"]
+                    next_time = now + datetime.timedelta(**{interval_type: interval})
+                    reminders_collection.update_one({"_id": reminder["_id"]}, {"$set": {"time": next_time}})
+                else:
+                    # Sürekli tekrar eden bir hatırlatıcı değilse, veritabanından sil
+                    reminders_collection.delete_one({"_id": reminder["_id"]})
+
+        except Exception as e:
+            print(f"Error in check_reminders: {e}")
+
+    async def send_reminder(self, guild_id, channel_id, user_id, message, role_id=None):
+        guild = self.bot.get_guild(guild_id)
+        if guild is None:
+            return
+        channel = guild.get_channel(channel_id)
+        if channel is None:
+            return
+
+        # Eğer role_id varsa, rolü etiketle, yoksa kullanıcıyı etiketle
+        if role_id:
+            role = guild.get_role(role_id)
+            mention_target = role.mention if role else None
+        else:
+            user = guild.get_member(user_id)
+            mention_target = user.mention if user else None
+
+        if mention_target:
+            await channel.send(f"### {mention_target}: {message}")
+
+    @commands.hybrid_command(name="alarm", description="Sets a alarm for the given duration.")
+    @app_commands.describe(duration="The duration of the alarm. Example: 1 hour", message="The message to send when the alarm goes off.")
+    async def alarm(self, ctx: commands.Context, duration: str, *, message: str):
+        duration, interval = self.parse_duration(duration)
+        if duration is None or interval is None:
+            await ctx.send(embed=create_embed(description="Geçersiz süre formatı. \n**Örnek:** */alarm interval:1 saat message:Yemek yemek*", color=discord.Color.red()))
+            return
+
+        time = datetime.datetime.utcnow() + datetime.timedelta(**{interval: duration})
+
+        embed = create_embed(description=f"Alarm başarıyla ayarlandı. \n\n**Mesaj:** {message} \n**Süre:** {duration} {interval}", color=discord.Color.green())
+        message = await ctx.send(embed=embed)
+        reminder = {
+            "user_id": ctx.author.id,
+            "message": message,
+            "channel_id": ctx.channel.id,
+            "guild_id": ctx.guild.id,
+            "time": time,
+            "message_id": message.id,
+        }
+        reminders = self.mongo_db["reminders"]
+        reminders.insert_one(reminder)
+        embed.set_footer(text=f"Alarm ID: {message.id}")
+        await message.edit(embed=embed)
+
+    @commands.hybrid_command(name="reminder", description="Sets a reminder for the given interval.")
+    @app_commands.describe(interval="The interval of the reminder. Example: 1 hour", role="The role to mention when the reminder goes off.", reminder_message="The message to send when the reminder goes off.")
+    async def reminder(self, ctx, interval: str, role: discord.Role, *, reminder_message: str):
+        interval_value, interval_type = self.parse_duration(interval)
+        if interval_value is None or interval_type is None:
+            await ctx.send(embed=create_embed(description="Geçersiz süre formatı. \n**Örnek:** */reminder interval:1 saat role:@Çavuş message:Yemek yemek*", color=discord.Color.red()))
+            return
+
+        reminder_time = datetime.datetime.utcnow() + datetime.timedelta(**{interval_type: interval_value})
+
+        # Hatırlatıcının ayarlandığına dair bilgilendirme mesajı
+        embed_msg = create_embed(
+            description=f"Haftalık hatırlatıcı başarıyla ayarlandı. \n\n**Mesaj:** {reminder_message} \n**Rol:** {role.mention}\n**Süre:** {interval_value} {interval_type}",
+            color=discord.Color.green())
+        sent_message = await ctx.send(embed=embed_msg)  # <-- sent_message olarak değişken adını değiştirdik
+        reminder = {
+            "user_id": ctx.author.id,
+            "message_id": sent_message.id,
+            "message": reminder_message,  # <-- reminder_message olarak değiştirdik
+            "channel_id": ctx.channel.id,
+            "guild_id": ctx.guild.id,
+            "interval": interval_value,
+            "interval_type": interval_type,
+            "role_id": role.id,
+            "time": reminder_time
+        }
+        reminders = self.mongo_db["reminders"]
+        reminders.insert_one(reminder)
+        embed_msg.set_footer(text=f"Hatırlatıcı ID: {sent_message.id}")
+        await sent_message.edit(embed=embed_msg)
+
+    def parse_duration(self, duration: str):
+        intervals = {
+            "dakika": "minutes",
+            "saat": "hours",
+            "gün": "days",
+            "ay": "months",
+            "yıl": "years"
+        }
+        parts = duration.split(" ")
+        if len(parts) != 2 or parts[1].lower() not in intervals:
+            return None, None
+        try:
+            duration = int(parts[0])
+        except ValueError:
+            return None, None
+        return duration, intervals[parts[1].lower()]
+
+    @commands.hybrid_command(name="reminder_remove", description="Removes a reminder by its message ID.")
+    @app_commands.describe(message_id="The message ID of the reminder you want to remove.")
+    async def reminder_remove(self, ctx, message_id):
+        reminder = self.mongo_db["reminders"].find_one({"message_id": int(message_id)})
+        if reminder:
+            if reminder["user_id"] != ctx.author.id:
+                await ctx.send(embed=create_embed(description="Bu hatırlatıcıyı kaldırma izniniz yok.", color=discord.Color.red()))
+                return
+
+            self.mongo_db["reminders"].delete_one({"message_id": int(message_id)})
+            await ctx.send(embed=create_embed(description="Hatırlatıcı başarıyla kaldırıldı.", color=discord.Color.green()))
+        else:
+            await ctx.send(embed=create_embed(description="Bu ID'ye sahip bir hatırlatıcı bulunamadı.", color=discord.Color.red()))
+
+    @commands.hybrid_command(name="reminder_list", description="Lists all active reminders for the user.")
+    async def reminder_list(self, ctx):
+        try:
+            user_reminders = list(self.mongo_db["reminders"].find({"user_id": ctx.author.id}))
+
+            if not user_reminders:
+                await ctx.send(
+                    embed=create_embed(description="Aktif bir hatırlatıcınız yok.", color=discord.Color.red()))
+                return
+
+            description = ""
+            for reminder in user_reminders:
+                time_remaining = reminder["time"] - datetime.datetime.utcnow()
+                description += f"**Mesaj:** {reminder['message']} \n**Kalan Süre:** {str(time_remaining)} \n**ID:** {reminder['message_id']} \n\n"
+
+            embed = discord.Embed(title="Aktif Hatırlatıcılarınız", description=description, color=discord.Color.green())
+            await ctx.send(embed=embed)
+        except Exception as e:
+            await ctx.send(f"An error occurred: {e}")
+
+
+async def setup(bot):
+    await bot.add_cog(Reminders(bot))

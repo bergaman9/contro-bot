@@ -1,0 +1,188 @@
+import discord
+from discord.ext import commands
+from discord.ui import Button, View
+
+class HelpView(View):
+    def __init__(self, embed_list):
+        super().__init__(timeout=120)
+        self.embed_list = embed_list
+        self.current_page = 0
+        self.message = None
+        
+        # Add the dashboard link button
+        self.add_item(discord.ui.Button(
+            label="Dashboard",
+            style=discord.ButtonStyle.link,
+            url="https://contro.space",
+            emoji="🔗",
+            custom_id="help_dashboard_link"  # custom_id for link button (won't be used by Discord but included for consistency)
+        ))
+
+    async def send_initial_message(self, ctx):
+        # Set initial page info before sending
+        self.refresh_buttons()
+        self.message = await ctx.send(embed=self.embed_list[self.current_page], view=self)
+
+    def refresh_buttons(self):
+        """Refreshes button states."""
+        # Make sure buttons exist before trying to access them
+        if hasattr(self, 'previous_button'):
+            self.previous_button.disabled = self.current_page == 0
+        if hasattr(self, 'next_button'):
+            self.next_button.disabled = self.current_page == len(self.embed_list) - 1
+        if hasattr(self, 'page_info'):
+            self.page_info.label = f"{self.current_page + 1}/{len(self.embed_list)}"
+
+    @discord.ui.button(label="Previous", style=discord.ButtonStyle.primary, custom_id="help_previous")
+    async def previous_button(self, interaction: discord.Interaction, button: Button):
+        if self.current_page > 0:
+            self.current_page -= 1
+        await self.show_page(interaction)
+
+    @discord.ui.button(label="Page", style=discord.ButtonStyle.secondary, disabled=True, custom_id="help_page_info")
+    async def page_info(self, interaction: discord.Interaction, button: Button):
+        pass  # This button is only for displaying information. No functionality.
+
+    @discord.ui.button(label="Next", style=discord.ButtonStyle.primary, custom_id="help_next")
+    async def next_button(self, interaction: discord.Interaction, button: Button):
+        if self.current_page < len(self.embed_list) - 1:
+            self.current_page += 1
+        await self.show_page(interaction)
+
+    @discord.ui.button(label="Exit", style=discord.ButtonStyle.danger, custom_id="help_exit")
+    async def exit_button(self, interaction: discord.Interaction, button: Button):
+        await interaction.message.delete()
+
+    async def show_page(self, interaction: discord.Interaction):
+        """Shows the specified page and updates the buttons."""
+        self.refresh_buttons()
+        await interaction.response.edit_message(embed=self.embed_list[self.current_page], view=self)
+
+    async def on_timeout(self):
+        """Called when the view times out."""
+        if self.message:
+            try:
+                await self.message.edit(view=None)
+            except discord.errors.NotFound:
+                # Message might have been deleted
+                pass
+            except Exception:
+                # Handle any other exceptions
+                pass
+
+class Help(commands.Cog):
+    def __init__(self, bot):
+        self.bot = bot
+
+    EXCLUDED_COGS = [
+        "Owner",
+        "Help",
+    ]
+
+    @commands.hybrid_command(name="help", description="Get information about commands.")
+    async def help(self, ctx, command: str = None):
+        if not command:
+            embed_list = []
+            
+            # Get cogs excluding specified ones
+            cogs = {cog_name: cog_obj for cog_name, cog_obj in self.bot.cogs.items() 
+                   if cog_name not in self.EXCLUDED_COGS}
+
+            for cog_name, cog_obj in cogs.items():
+                formatted_title = cog_name.replace("_", " ").title()
+                embed = discord.Embed(
+                    title=f"{formatted_title} Commands",
+                    description=f"Contro Bot helps you manage your Discord server with powerful tools and fun commands.\n\nAvailable commands in this category:",
+                    color=discord.Color.pink()
+                )
+
+                # Create optimized command list
+                commands_in_cog = []
+                for cmd in cog_obj.get_commands():
+                    if isinstance(cmd, commands.Group):
+                        commands_in_cog.append(cmd)
+                        for subcmd in cmd.commands:
+                            commands_in_cog.append(subcmd)
+                    elif cmd.parent is None:  # Only add main commands
+                        commands_in_cog.append(cmd)
+
+                # Add commands to embed with inline styling
+                col1, col2 = [], []
+                for i, cmd_obj in enumerate(commands_in_cog):
+                    cmd_info = {
+                        "name": f"`/{cmd_obj.name}`", 
+                        "value": cmd_obj.description or "No description available.", 
+                        "inline": True
+                    }
+                    if i % 2 == 0:
+                        col1.append(cmd_info)
+                    else:
+                        col2.append(cmd_info)
+                
+                # Add fields in alternating order for a two-column layout
+                for i in range(max(len(col1), len(col2))):
+                    if i < len(col1):
+                        embed.add_field(**col1[i])
+                    if i < len(col2):
+                        embed.add_field(**col2[i])
+                        
+                    # Add an empty field for proper formatting if we have an odd number
+                    if i < len(col1) and i >= len(col2):
+                        embed.add_field(name="\u200b", value="\u200b", inline=True)
+
+                    # If we reach Discord's field limit (25), create a new embed
+                    if len(embed.fields) >= 24:  # Use 24 to be safe with formatting
+                        embed_list.append(embed)
+                        embed = discord.Embed(
+                            title=f"{formatted_title} Commands (continued)",
+                            description="Additional commands in this category:",
+                            color=discord.Color.pink()
+                        )
+                        col1, col2 = [], []  # Reset columns
+
+                # Add the embed to the list if it contains fields
+                if len(embed.fields) > 0:
+                    embed_list.append(embed)
+
+            # Show an info message if no commands are found
+            if not embed_list:
+                embed = discord.Embed(
+                    title="No Commands Found",
+                    description="No commands available to display.",
+                    color=discord.Color.red()
+                )
+                embed_list.append(embed)
+                
+            view = HelpView(embed_list)
+            await view.send_initial_message(ctx)
+        else:
+            # If help for a specific command is requested
+            cmd_obj = self.bot.all_commands.get(command.lower())
+            if cmd_obj:
+                embed = discord.Embed(
+                    title=f"`/{command}`", 
+                    description=cmd_obj.description or "No description available.",
+                    color=discord.Color.pink()
+                )
+
+                # Add command aliases if available
+                if cmd_obj.aliases:
+                    aliases = ', '.join([f"`{alias}`" for alias in cmd_obj.aliases])
+                    embed.add_field(name="Aliases", value=aliases, inline=True)
+                    
+                # Add usage example
+                embed.add_field(
+                    name="Usage", 
+                    value=f"`/{cmd_obj.qualified_name} {cmd_obj.signature}`", 
+                    inline=True
+                )
+                
+                # Add footer
+                embed.set_footer(text="contro.space | Discord Bot")
+                
+                await ctx.send(embed=embed)
+            else:
+                await ctx.send(f"Command `{command}` not found.")
+
+async def setup(bot):
+    await bot.add_cog(Help(bot))
