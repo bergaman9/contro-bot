@@ -18,7 +18,7 @@ Before you begin, ensure you have:
 
 ```powershell
 # Clone the repository
-git clone https://github.com/yourusername/contro-bot.git
+git clone https://github.com/bergaman9/contro-bot.git
 cd contro-bot
 
 # Install dependencies
@@ -192,7 +192,7 @@ sudo systemctl start mongod
 sudo systemctl enable mongod
 
 # Clone and setup bot
-git clone https://github.com/yourusername/contro-bot.git
+git clone https://github.com/bergaman9/contro-bot.git
 cd contro-bot
 python3.10 -m pip install -r requirements.txt
 

@@ -1,6 +1,6 @@
 # 🤖 CONTRO - Advanced Discord Bot Management System
 
-[![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)](https://github.com/yourusername/contro-bot)
+[![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)](https://github.com/bergaman9/contro-bot)
 [![Python](https://img.shields.io/badge/python-3.10+-green.svg)](https://python.org)
 [![MongoDB](https://img.shields.io/badge/database-MongoDB-47A248.svg)](https://mongodb.com)
 [![Discord.py](https://img.shields.io/badge/discord.py-2.3.2-7289DA.svg)](https://discordpy.readthedocs.io/)
@@ -9,6 +9,12 @@
 **CONTRO** is an advanced, production-ready Discord bot with comprehensive server management capabilities, featuring modern async MongoDB integration, beautiful UI systems, and robust automated version control.
 
 ## ✨ Core Features Overview
+
+<!-- Bot Features Showcase -->
+<div align="center">
+  <img src="https://raw.githubusercontent.com/bergaman9/contro-bot/main/images/backgrounds/welcome_blue.png" alt="CONTRO Bot Welcome System" width="400">
+  <img src="https://raw.githubusercontent.com/bergaman9/contro-bot/main/images/register_card_d563575f-39ba-45e2-b306-30e1e0af7cb3.png" alt="Registration Card Example" width="400">
+</div>
 
 ### 🎯 **Perfect Registration System** ✅
 - **Advanced Registration Modal** - Comprehensive user registration with game preferences
@@ -142,16 +148,15 @@
 
 1. **Clone & Setup**
    ```bash
-   git clone <your-repo-url>
-   cd contro-project/bot
+   git clone https://github.com/bergaman9/contro-bot.git
+   cd contro-bot
    pip install -r requirements.txt
    ```
 
-2. **Environment Configuration**
-   Create `.env` file with:
+2. **Environment Configuration**   Create `.env` file with:
    ```env
    BOT_TOKEN=your_discord_bot_token
-   MONGODB_CONNECTION_STRING=mongodb://localhost:27017/contro_bot
+   MONGODB_CONNECTION_STRING=mongodb+srv://username:password@cluster0.xxxxx.mongodb.net/?retryWrites=true&w=majority
    OPENAI_API_KEY=your_openai_key (optional)
    PERPLEXITY_API_KEY=your_perplexity_key (optional)
    ```
@@ -443,4 +448,14 @@ This project maintains a clean, modular architecture that makes it easy to:
 
 ## 📝 License
 
-This project is available for use and modification.
+This project is available under the MIT License. See the [LICENSE](LICENSE) file for details.
+
+## 📊 Bot Showcase
+
+![CONTRO Bot](https://raw.githubusercontent.com/bergaman9/contro-bot/main/images/contro_bot_showcase.png)
+
+## 🔗 Links
+
+- [Discord Bot](https://top.gg/tr/bot/783064615012663326)
+- [GitHub Repository](https://github.com/bergaman9/contro-bot)
+- [Documentation](https://github.com/bergaman9/contro-bot/wiki)
