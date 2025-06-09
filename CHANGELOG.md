@@ -53,47 +53,47 @@ Major release with async MongoDB migration and advanced version control
 ## [1.2.0] - 2025-05-25
 
 ### ✨ New Features
-- Gelişmiş Kayıt Sistemi Paneli
-- Bot ve Sunucu Ayarları Ayrımı
-- Tepki Rol Sistemi İyileştirmeleri
-- Özelleştirilebilir Komut Prefixleri
-- Detaylı Kullanıcı Profilleri
+- Advanced Registration System Panel
+- Bot and Server Settings Separation
+- Reaction Role System Improvements
+- Customizable Command Prefixes
+- Detailed User Profiles
 
 ### 🐛 Bug Fixes
-- Yardım komutu hataları düzeltildi
-- Terminal hataları çözüldü
-- Cog yükleme süreci iyileştirildi
+- Help command errors fixed
+- Terminal errors resolved
+- Cog loading process improved
 
 ---
 
 ## [1.1.0] - 2025-04-25
 
 ### ✨ New Features
-- Hoşgeldin Mesajları ve Görsel Ayarları
-- Partner Sistemi
-- Oyun İstatistikleri
-- Dropdown Rol Menüleri
-- Gelişmiş Log Sistemi
-- Yeni Eğlence Komutları
-- Hatırlatıcı Sistemleri
-- Özel Rol Verme Sistemi
+- Welcome Messages and Visual Settings
+- Partner System
+- Game Statistics
+- Dropdown Role Menus
+- Advanced Logging System
+- New Fun Commands
+- Reminder Systems
+- Custom Role Assignment System
 
 ### 🐛 Bug Fixes
-- Komut yetkilendirme sorunu çözüldü
-- Veritabanı bağlantı hataları giderildi
+- Command authorization issue resolved
+- Database connection errors fixed
 
 ---
 
 ## [1.0.0] - 2025-03-15
 
 ### ✨ New Features
-- Bot temel yapısı oluşturuldu
-- Kayıt sistemi eklendi
-- Ticketing sistemi eklendi
-- Moderasyon komutları eklendi
-- Sunucu ayarları paneli eklendi
+- Bot basic structure created
+- Registration system added
+- Ticketing system added
+- Moderation commands added
+- Server settings panel added
 
 ### 🐛 Bug Fixes
-- Performans iyileştirmeleri
+- Performance improvements
 
 ---

@@ -1,0 +1,48 @@
+#!/bin/bash
+
+# CONTRO Bot - Git Post-Commit Hook
+# Automatically updates version tracking information
+
+echo "📊 CONTRO Bot - Post-commit version tracking..."
+
+# Check if we're in the bot directory
+if [ ! -f "main.py" ] || [ ! -d "cogs" ]; then
+    echo "⚠️  Not in bot directory, skipping version tracking"
+    exit 0
+fi
+
+# Get commit information
+COMMIT_HASH=$(git rev-parse HEAD)
+COMMIT_MESSAGE=$(git log -1 --pretty=%B)
+CHANGED_FILES=$(git diff-tree --no-commit-id --name-only -r HEAD)
+
+# Log the commit for potential version creation
+echo "📝 Commit logged: ${COMMIT_HASH:0:12}"
+echo "💬 Message: $COMMIT_MESSAGE"
+
+# Count significant changes
+SIGNIFICANT_COUNT=0
+for file in $CHANGED_FILES; do
+    case $file in
+        cogs/*.py|main.py|utils/*.py|requirements.txt)
+            ((SIGNIFICANT_COUNT++))
+            ;;
+    esac
+done
+
+if [ $SIGNIFICANT_COUNT -gt 0 ]; then
+    echo "🎯 $SIGNIFICANT_COUNT significant files changed"
+    echo "💡 Consider updating the version with the Discord bot commands"
+fi
+
+# Update last commit info in a tracking file
+echo "{
+    \"last_commit\": \"${COMMIT_HASH:0:12}\",
+    \"commit_message\": \"$COMMIT_MESSAGE\",
+    \"timestamp\": \"$(date -Iseconds)\",
+    \"changed_files\": [$(echo "$CHANGED_FILES" | sed 's/.*/"&"/' | paste -sd,)],
+    \"significant_changes\": $SIGNIFICANT_COUNT
+}" > .git/CONTRO_LAST_COMMIT.json
+
+echo "✅ Version tracking updated"
+exit 0
