@@ -654,4 +654,95 @@ class AdvancedTicketSettingsModal(discord.ui.Modal):
             await interaction.response.send_message("✅ Advanced ticket settings updated!", ephemeral=True)
             
         except Exception as e:
-            await interaction.response.send_message(f"❌ Error: {str(e)}", ephemeral=True) 
+            await interaction.response.send_message(f"❌ Error: {str(e)}", ephemeral=True)
+
+class CreateTicketPanelView(discord.ui.View):
+    """View for creating ticket panels in channels"""
+    
+    def __init__(self, bot, language="en"):
+        super().__init__(timeout=300)
+        self.bot = bot
+        self.language = language
+
+    @discord.ui.select(
+        cls=discord.ui.ChannelSelect,
+        channel_types=[discord.ChannelType.text, discord.ChannelType.news],
+        placeholder="Select a channel to create ticket panel...",
+        min_values=1,
+        max_values=1
+    )
+    async def channel_select(self, interaction: discord.Interaction, select: discord.ui.ChannelSelect):
+        channel = select.values[0]
+        
+        try:
+            # Get the actual channel object if it's an AppCommandChannel
+            if hasattr(channel, 'id'):
+                actual_channel = interaction.guild.get_channel(channel.id)
+                if not actual_channel:
+                    await interaction.response.send_message(
+                        "❌ Channel not found!" if self.language == "en" else "❌ Kanal bulunamadı!",
+                        ephemeral=True
+                    )
+                    return
+                channel = actual_channel
+            
+            # Create ticket embed
+            embed = discord.Embed(
+                title="🎫 Support System" if self.language == "en" else "🎫 Destek Sistemi",
+                description=(
+                    "Need help? Create a support ticket and our team will assist you!\n\n"
+                    "**What you can get help with:**\n"
+                    "• Technical issues\n"
+                    "• Account problems\n"
+                    "• General questions\n"
+                    "• Bug reports\n"
+                    "• Feature requests\n\n"
+                    "Click the button below to create a private support ticket."
+                ) if self.language == "en" else (
+                    "Yardıma mı ihtiyacın var? Bir destek bileti oluştur ve ekibimiz sana yardımcı olsun!\n\n"
+                    "**Hangi konularda yardım alabilirsin:**\n"
+                    "• Teknik sorunlar\n"
+                    "• Hesap problemleri\n"
+                    "• Genel sorular\n"
+                    "• Hata raporları\n"
+                    "• Özellik istekleri\n\n"
+                    "Özel bir destek bileti oluşturmak için aşağıdaki butona tıkla."
+                ),
+                color=discord.Color.blue()
+            )
+            
+            # Add footer
+            embed.set_footer(
+                text="Click the button to create a ticket • Support Team" if self.language == "en" else "Bilet oluşturmak için butona tıklayın • Destek Ekibi",
+                icon_url=self.bot.user.display_avatar.url
+            )
+            
+            # Import ticket button from ticket cog
+            try:
+                from cogs.ticket import CreateTicketView
+                view = CreateTicketView()
+            except ImportError:
+                # Fallback: create a simple button
+                view = discord.ui.View(timeout=None)
+                button = discord.ui.Button(
+                    label="🎫 Create Ticket" if self.language == "en" else "🎫 Bilet Oluştur",
+                    style=discord.ButtonStyle.primary,
+                    custom_id="create_ticket_button"
+                )
+                view.add_item(button)
+            
+            # Send the ticket panel
+            await channel.send(embed=embed, view=view)
+            
+            # Confirm success
+            await interaction.response.send_message(
+                f"✅ Ticket panel created in {channel.mention}!" if self.language == "en" else f"✅ Bilet paneli {channel.mention} kanalında oluşturuldu!",
+                ephemeral=True
+            )
+            
+        except Exception as e:
+            logger.error(f"Error creating ticket panel: {e}")
+            await interaction.response.send_message(
+                f"❌ Error creating ticket panel: {str(e)}" if self.language == "en" else f"❌ Bilet paneli oluşturulurken hata: {str(e)}",
+                ephemeral=True
+            ) 

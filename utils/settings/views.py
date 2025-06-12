@@ -1458,8 +1458,15 @@ class TicketSystemView(discord.ui.View):
     @discord.ui.button(label="📝 Create Ticket Panel", style=discord.ButtonStyle.primary, row=1)
     async def create_ticket_panel(self, interaction: discord.Interaction, button: discord.ui.Button):
         from utils.settings.ticket_views import CreateTicketPanelView
-        view = CreateTicketPanelView(self.bot)
-        await view.show_panel_creation(interaction)
+        view = CreateTicketPanelView(self.bot, self.language)
+        
+        embed = discord.Embed(
+            title="📝 Create Ticket Panel" if self.language == "en" else "📝 Bilet Paneli Oluştur",
+            description="Select a channel to create the ticket panel in." if self.language == "en" else "Bilet panelini oluşturmak için bir kanal seçin.",
+            color=discord.Color.blue()
+        )
+        
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
     @discord.ui.button(label="🗑️ Remove Ticket System", style=discord.ButtonStyle.danger, row=1)
     async def remove_ticket_system(self, interaction: discord.Interaction, button: discord.ui.Button):
