@@ -76,7 +76,8 @@ class RegisterButton(discord.ui.View):
                                 user_language = "en"
                         
                         # User is already registered, show update modal instead
-                        await interaction.response.send_modal(RegisterUpdateModal(mongo_db, existing_registration, user_language))
+                        update_modal = RegisterUpdateModal(mongo_db, existing_registration, user_language)
+                        await interaction.response.send_modal(update_modal)
                         return
                 except Exception as db_error:
                     logger.error(f"Database query error in register button: {db_error}")
@@ -88,8 +89,10 @@ class RegisterButton(discord.ui.View):
                 if interaction.guild.preferred_locale and 'en' in str(interaction.guild.preferred_locale):
                     user_language = "en"
             
-            # Show modal to collect registration info for new users
-            await interaction.response.send_modal(RegisterModal(mongo_db, user_language, interaction.guild.id))
+            # Create and prepare modal with custom fields
+            modal = RegisterModal(mongo_db, user_language, interaction.guild.id)
+            await modal.prepare_custom_fields()
+            await interaction.response.send_modal(modal)
             
         except Exception as e:
             # Detailed error logging
@@ -165,12 +168,9 @@ class RegisterModal(discord.ui.Modal):
         # Add basic items to modal
         self.add_item(self.name)
         self.add_item(self.age)
-        
-        # Initialize custom fields asynchronously
-        asyncio.create_task(self._load_custom_fields())
     
-    async def _load_custom_fields(self):
-        """Load and add custom fields to the modal"""
+    async def prepare_custom_fields(self):
+        """Load and add custom fields to the modal before showing it"""
         if not self.guild_id or not is_db_available(self.mongo_db):
             return
         
@@ -209,6 +209,8 @@ class RegisterModal(discord.ui.Modal):
                 setattr(self, f"custom_{field_key}", custom_input)
                 self.add_item(custom_input)
                 field_count += 1
+                
+                logger.info(f"Added custom field '{field_name}' ({field_key}) to registration modal")
                 
         except Exception as e:
             logger.error(f"Error loading custom fields: {e}")
