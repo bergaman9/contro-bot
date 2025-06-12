@@ -35,14 +35,14 @@ class LanguageSelectView(discord.ui.View):
     async def language_select(self, interaction: discord.Interaction, select: discord.ui.Select):
         language = select.values[0]
         # Always use English for settings
-        embed = discord.Embed(
+            embed = discord.Embed(
             title="⚙️ Server Settings Panel",
             description="Manage all your server settings from one place:",
-            color=discord.Color.blue()
-        )
-        embed.add_field(
+                color=discord.Color.blue()
+            )
+            embed.add_field(
             name="📋 Available Categories",
-            value=(
+                value=(
                 "🔧 **Feature Management** - Enable/disable features\n"
                 "🏠 **Server Settings** - Basic server configuration\n"
                 "👋 **Welcome/Goodbye** - Welcome and goodbye system\n"
@@ -55,9 +55,9 @@ class LanguageSelectView(discord.ui.View):
                 "🤖 **AI Settings** - Configure AI chat system\n"
                 "🎂 **Birthday System** - Configure birthday celebrations\n"
                 "👑 **Admin Tools** - Send embeds and admin utilities"
-            ),
-            inline=False
-        )
+                ),
+                inline=False
+            )
         
         # Keep the old Turkish version for reference but commented out
         if False:  # language == "tr":
@@ -369,12 +369,12 @@ class MainSettingsView(discord.ui.View):
 
     @discord.ui.button(label="🤖 AI Settings", style=discord.ButtonStyle.secondary, row=2)
     async def ai_settings(self, interaction: discord.Interaction, button: discord.ui.Button):
-        embed = discord.Embed(
+            embed = discord.Embed(
             title="🤖 AI Settings" if self.language == "en" else "🤖 AI Ayarları",
             description="Configure AI features and chatbot settings." if self.language == "en" else "AI özelliklerini ve chatbot ayarlarını yapılandırın.",
             color=discord.Color.blurple()
-        )
-        embed.add_field(
+            )
+            embed.add_field(
             name="🧠 AI Features" if self.language == "en" else "🧠 AI Özellikleri",
             value=(
                 "• Intelligent chat responses\n"
@@ -391,18 +391,18 @@ class MainSettingsView(discord.ui.View):
                 "• Akıllı moderasyon yardımı\n"
                 "• Öğrenme yetenekleri"
             ),
-            inline=False
-        )
+                inline=False
+            )
         await interaction.response.send_message(embed=embed, view=AISettingsView(self.bot, self.language), ephemeral=True)
 
     @discord.ui.button(label="🎂 Birthday System", style=discord.ButtonStyle.secondary, row=2)
     async def birthday_system(self, interaction: discord.Interaction, button: discord.ui.Button):
-        embed = discord.Embed(
+            embed = discord.Embed(
             title="🎂 Birthday System" if self.language == "en" else "🎂 Doğum Günü Sistemi",
             description="Celebrate member birthdays with automated messages." if self.language == "en" else "Otomatik mesajlarla üye doğum günlerini kutlayın.",
             color=discord.Color.magenta()
-        )
-        embed.add_field(
+            )
+            embed.add_field(
             name="🎉 Features" if self.language == "en" else "🎉 Özellikler",
             value=(
                 "• Automatic birthday reminders\n"
@@ -419,8 +419,8 @@ class MainSettingsView(discord.ui.View):
                 "• Özel doğum günü kanalları\n"
                 "• Kutlama animasyonları"
             ),
-            inline=False
-        )
+                inline=False
+            )
         await interaction.response.send_message(embed=embed, view=BirthdaySettingsView(self.bot, self.language), ephemeral=True)
 
     @discord.ui.button(label="🎮 Temp Channels", style=discord.ButtonStyle.secondary, row=2)
@@ -1618,8 +1618,8 @@ class WelcomeConfigView(discord.ui.View):
         try:
             # Create a comprehensive welcome setup modal
             modal = FullWelcomeSetupModal(self.language)
-            await interaction.response.send_modal(modal)
-        except Exception as e:
+                    await interaction.response.send_modal(modal)
+            except Exception as e:
             logger.error(f"Error opening full setup modal: {e}")
             # Fallback to regular modal
             modal = WelcomeMessageModal(self.language, quick=False)
@@ -1942,15 +1942,15 @@ class GoodbyeConfigView(discord.ui.View):
         super().__init__(timeout=300)
         self.bot = bot
         self.language = language
-        
+
     @discord.ui.button(label="🎨 Full Setup", style=discord.ButtonStyle.primary, row=0)
     async def full_setup(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Open comprehensive goodbye setup modal"""
         try:
             # Create a comprehensive goodbye setup modal
             modal = FullGoodbyeSetupModal(self.language)
-            await interaction.response.send_modal(modal)
-        except Exception as e:
+                    await interaction.response.send_modal(modal)
+            except Exception as e:
             logger.error(f"Error opening full goodbye setup modal: {e}")
             # Fallback to regular modal
             modal = GoodbyeMessageModal(self.language)
@@ -2194,7 +2194,7 @@ class GoodbyeConfigView(discord.ui.View):
                             os.remove(preview_path)
                         except:
                             pass
-                    else:
+        else:
                         await interaction.followup.send(
                             "❌ Could not generate preview image.",
                             ephemeral=True
@@ -3007,8 +3007,8 @@ class WelcomeMessageModal(discord.ui.Modal):
                 embed.add_field(
                     name="Background" if selected_language == "en" else "Arkaplan",
                     value=settings.get("background", "default").replace("images/backgrounds/", "").replace(".png", ""),
-                    inline=True
-                )
+                inline=True
+            )
             
             await interaction.response.send_message(embed=embed, ephemeral=True)
             

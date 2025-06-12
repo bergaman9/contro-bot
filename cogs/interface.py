@@ -704,73 +704,7 @@ class Interface(commands.Cog):
         except Exception as e:
             logger.error(f"Error applying temp channel settings: {e}")
 
-    @app_commands.command(name="support", description="Show support system information")
-    async def support(self, interaction: discord.Interaction):
-        """Show support system card with information"""
-        try:
-            # Import the support card function
-            from utils.community.turkoyto.card_renderer import create_support_system_card
-            
-            # Create the support system card
-            card_path = await create_support_system_card(interaction.guild, self.bot)
-            
-            if card_path and os.path.exists(card_path):
-                # Create embed with the card
-                embed = discord.Embed(
-                    title="🎫 Destek Sistemi",
-                    description="Sunucumuzun destek sistemi hakkında bilgiler:",
-                    color=discord.Color.blue()
-                )
-                
-                # Set the card as image
-                embed.set_image(url="attachment://support_card.png")
-                
-                # Add instructions
-                embed.add_field(
-                    name="📋 Nasıl Kullanılır?",
-                    value=(
-                        "1. Destek kanalında bulunan **Destek Talebi** butonuna tıklayın\n"
-                        "2. Açılan formu doldurun\n"
-                        "3. Ekibimiz en kısa sürede size yardımcı olacaktır"
-                    ),
-                    inline=False
-                )
-                
-                # Send with file
-                file = discord.File(card_path, filename="support_card.png")
-                await interaction.response.send_message(embed=embed, file=file, ephemeral=True)
-                
-                # Clean up the file
-                try:
-                    os.remove(card_path)
-                except Exception as e:
-                    logger.error(f"Error removing support card file: {e}")
-            else:
-                # Fallback if card creation fails
-                embed = discord.Embed(
-                    title="🎫 Destek Sistemi",
-                    description=(
-                        "Sunucumuzda destek sistemi aktif!\n\n"
-                        "**Destek için:**\n"
-                        "• Destek kanalında bulunan butonu kullanın\n"
-                        "• Formunuzu doldurun\n"
-                        "• Ekibimiz size yardımcı olacaktır\n\n"
-                        "**Destek Türleri:**\n"
-                        "🔧 Teknik Sorunlar\n"
-                        "💡 Genel Sorular\n"
-                        "⚙️ Özellik Talepleri\n"
-                        "📋 Hata Raporları"
-                    ),
-                    color=discord.Color.blue()
-                )
-                await interaction.response.send_message(embed=embed, ephemeral=True)
-                
-        except Exception as e:
-            logger.error(f"Error in support command: {e}")
-            await interaction.response.send_message(
-                f"❌ Destek sistemi bilgileri görüntülenirken bir hata oluştu: {str(e)}",
-                ephemeral=True
-            )
+
 
 async def setup(bot):
     await bot.add_cog(Interface(bot))

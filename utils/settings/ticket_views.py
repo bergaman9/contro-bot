@@ -2,6 +2,7 @@
 import discord
 import logging
 import json
+import os
 from utils.database.connection import get_async_db
 from utils.core.formatting import create_embed
 
@@ -215,8 +216,32 @@ class CreateTicketPanelView(discord.ui.View):
             # Create the working ticket button
             view = TicketCreateView(language=language)
             
-            # Send the ticket panel
-            await channel.send(embed=embed, view=view)
+            # Try to create and attach support system card
+            try:
+                from utils.community.turkoyto.card_renderer import create_support_system_card
+                card_path = await create_support_system_card(interaction.guild, self.bot)
+                
+                if card_path and os.path.exists(card_path):
+                    embed.set_image(url="attachment://support_card.png")
+                    file = discord.File(card_path, filename="support_card.png")
+                    
+                    # Send with card
+                    await channel.send(embed=embed, view=view, file=file)
+                    
+                    # Clean up the file
+                    try:
+                        import os
+                        os.remove(card_path)
+                    except Exception:
+                        pass
+                else:
+                    # Send without card if creation failed
+                    await channel.send(embed=embed, view=view)
+                    
+            except Exception as e:
+                logger.error(f"Error creating support card: {e}")
+                # Send without card if there's an error
+                await channel.send(embed=embed, view=view)
             
             # Confirm success
             await interaction.response.send_message(
