@@ -957,9 +957,25 @@ class RegisterUpdateModal(discord.ui.Modal):
                     value=roles_text,
                     inline=False
                 )
+                
+                # Build current info with custom fields
+                current_info = f"**İsim:** {self.name.value}\n**Yaş:** {age}"
+                
+                # Add custom field information if available
+                if custom_field_data:
+                    try:
+                        # Get custom field definitions for display names
+                        custom_fields = settings.get("custom_fields", {})
+                        for field_key, field_value in custom_field_data.items():
+                            field_definition = custom_fields.get(field_key, {})
+                            field_display_name = field_definition.get("name", field_key.replace("_", " ").title())
+                            current_info += f"\n**{field_display_name}:** {field_value}"
+                    except Exception as e:
+                        logger.error(f"Error displaying custom fields in update success: {e}")
+                
                 success_embed.add_field(
                     name="👤 Güncel Bilgiler",
-                    value=f"**İsim:** {self.name.value}\n**Yaş:** {age}",
+                    value=current_info,
                     inline=False
                 )
                 success_embed.set_thumbnail(url=interaction.user.display_avatar.url)
@@ -967,7 +983,21 @@ class RegisterUpdateModal(discord.ui.Modal):
                 await interaction.response.send_message(embed=success_embed, ephemeral=True)
             else:
                 # Plain text format
-                plain_message = f"✅ **Kayıt Güncellendi!**\n\nKayıt bilgileriniz başarıyla güncellendi.\n\n**Rol Değişiklikleri:**\n{roles_text}"
+                current_info_plain = f"İsim: {self.name.value}\nYaş: {age}"
+                
+                # Add custom field information if available
+                if custom_field_data:
+                    try:
+                        # Get custom field definitions for display names
+                        custom_fields = settings.get("custom_fields", {})
+                        for field_key, field_value in custom_field_data.items():
+                            field_definition = custom_fields.get(field_key, {})
+                            field_display_name = field_definition.get("name", field_key.replace("_", " ").title())
+                            current_info_plain += f"\n{field_display_name}: {field_value}"
+                    except Exception as e:
+                        logger.error(f"Error displaying custom fields in plain text update success: {e}")
+                
+                plain_message = f"✅ **Kayıt Güncellendi!**\n\nKayıt bilgileriniz başarıyla güncellendi.\n\n**Rol Değişiklikleri:**\n{roles_text}\n\n**Güncel Bilgiler:**\n{current_info_plain}"
                 await interaction.response.send_message(plain_message, ephemeral=True)
             
             # Log the update
