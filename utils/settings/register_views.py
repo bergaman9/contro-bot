@@ -148,10 +148,21 @@ class RegisterSettingsView(discord.ui.View):
             # Get settings from database
             settings = await self.mongo_db["register"].find_one({"guild_id": interaction.guild.id}) or {}
             
-            # Get button customization
-            button_title = settings.get("button_title", DEFAULT_BUTTON_TITLE)
-            button_description = settings.get("button_description", DEFAULT_BUTTON_DESCRIPTION)
-            button_instructions = settings.get("button_instructions", DEFAULT_BUTTON_INSTRUCTIONS)
+            # Detect language preference
+            user_language = "tr"  # Default to Turkish
+            if hasattr(interaction.guild, 'preferred_locale'):
+                if interaction.guild.preferred_locale and 'en' in str(interaction.guild.preferred_locale):
+                    user_language = "en"
+            
+            # Get button customization with language support
+            if user_language == "en":
+                button_title = settings.get("button_title", DEFAULT_BUTTON_TITLE_EN)
+                button_description = settings.get("button_description", DEFAULT_BUTTON_DESCRIPTION_EN)
+                button_instructions = settings.get("button_instructions", DEFAULT_BUTTON_INSTRUCTIONS_EN)
+            else:
+                button_title = settings.get("button_title", DEFAULT_BUTTON_TITLE_TR)
+                button_description = settings.get("button_description", DEFAULT_BUTTON_DESCRIPTION_TR)
+                button_instructions = settings.get("button_instructions", DEFAULT_BUTTON_INSTRUCTIONS_TR)
             
             # Create registration statistics card
             try:
@@ -167,16 +178,20 @@ class RegisterSettingsView(discord.ui.View):
                 description=button_description,
                 color=discord.Color.blue()
             )
+            
+            # Add instructions field with language support
+            instructions_title = "📋 How to Register?" if user_language == "en" else "📋 Nasıl Kayıt Olursunuz?"
             embed.add_field(
-                name="📋 Nasıl Kayıt Olursunuz?",
+                name=instructions_title,
                 value=button_instructions,
                 inline=False
             )
             
-            # Add bot name and avatar to footer
+            # Add bot name and avatar to footer with language support
             bot_name = self.bot.user.display_name
+            footer_text = f"Click the button to open registration form • {bot_name}" if user_language == "en" else f"Butona tıklayarak kayıt formunu açabilirsiniz • {bot_name}"
             embed.set_footer(
-                text=f"Butona tıklayarak kayıt formunu açabilirsiniz • {bot_name}",
+                text=footer_text,
                 icon_url=self.bot.user.display_avatar.url
             )
             
@@ -186,11 +201,12 @@ class RegisterSettingsView(discord.ui.View):
             
             # Import the registration button view from the register cog
             from cogs.register import RegisterButton
-              # Send the registration button with image if available
+            
+            # Send the registration button with image if available
             if card_path:
                 with open(card_path, 'rb') as f:
                     file = discord.File(f, filename="register_stats.png")
-                    await interaction.channel.send(embed=embed, file=file, view=RegisterButton())
+                    await interaction.channel.send(embed=embed, file=file, view=RegisterButton(language=user_language))
                 # Clean up the temporary file
                 try:
                     import os
@@ -198,24 +214,26 @@ class RegisterSettingsView(discord.ui.View):
                 except Exception:
                     pass
             else:
-                await interaction.channel.send(embed=embed, view=RegisterButton())
+                await interaction.channel.send(embed=embed, view=RegisterButton(language=user_language))
             
             # Update channel_id in database
-            self.mongo_db["register"].update_one(
+            await self.mongo_db["register"].update_one(
                 {"guild_id": interaction.guild.id},
                 {"$set": {"channel_id": interaction.channel.id}},
                 upsert=True
             )
             
+            success_msg = "✅ Registration message created successfully!" if user_language == "en" else "✅ Kayıt mesajı başarıyla oluşturuldu!"
             await interaction.response.send_message(
-                embed=create_embed("✅ Kayıt mesajı başarıyla oluşturuldu!", discord.Color.green()),
+                embed=create_embed(success_msg, discord.Color.green()),
                 ephemeral=True
             )
             
         except Exception as e:
             logger.error(f"Error creating registration button: {e}")
+            error_msg = f"❌ Error creating registration message: {str(e)}" if user_language == "en" else f"❌ Kayıt mesajı oluşturulurken bir hata oluştu: {str(e)}"
             await interaction.response.send_message(
-                embed=create_embed(f"❌ Kayıt mesajı oluşturulurken bir hata oluştu: {str(e)}", discord.Color.red()),
+                embed=create_embed(error_msg, discord.Color.red()),
                 ephemeral=True
             )
 

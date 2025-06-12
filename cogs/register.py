@@ -342,6 +342,9 @@ class RegisterModal(discord.ui.Modal):
                 age=age
             )
             
+            # Update registration statistics
+            await self.update_registration_stats(interaction.guild.id)
+            
             # Send registration success response
             if message_format == "embed":
                 title = "✅ Registration Successful!" if user_language == "en" else "✅ Kayıt Başarılı!"
@@ -528,6 +531,39 @@ class RegisterModal(discord.ui.Modal):
         except Exception as e:
             logger.error(f"Error updating registration message: {e}")
             # Don't re-raise the exception to prevent breaking the registration flow
+
+    async def update_registration_stats(self, guild_id):
+        """Update registration statistics in database"""
+        try:
+            from datetime import datetime
+            today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+            today_str = today.strftime("%Y-%m-%d")
+            
+            # Update daily stats
+            await self.mongo_db["register_stats"].update_one(
+                {"guild_id": guild_id, "date": today_str},
+                {"$inc": {"count": 1}},
+                upsert=True
+            )
+            
+            # Update weekly stats
+            await self.mongo_db["register_stats"].update_one(
+                {"guild_id": guild_id, "type": "weekly"},
+                {"$inc": {"count": 1}},
+                upsert=True
+            )
+            
+            # Update total stats
+            await self.mongo_db["register_stats"].update_one(
+                {"guild_id": guild_id, "type": "total"},
+                {"$inc": {"count": 1}},
+                upsert=True
+            )
+            
+            logger.info(f"Updated registration stats for guild {guild_id}")
+            
+        except Exception as e:
+            logger.error(f"Error updating registration stats: {e}")
 
 class RegisterUpdateModal(discord.ui.Modal):
     """Modal for updating existing registration information"""
@@ -717,19 +753,21 @@ class Register(commands.Cog):
     """
     def __init__(self, bot):
         self.bot = bot
-        # Initialize database connection - get_async_db() returns the database directly
         self.mongo_db = get_async_db()
-        # Explicitly add a fresh instance of RegisterButton when the cog loads
-        self.register_button = RegisterButton()
-        self.bot.add_view(self.register_button)
         
-        # Start the background task for role verification
+        # Start background tasks
         self.check_members_roles.start()
+        self.reset_weekly_stats.start()
+        
+        # Add persistent view
+        self.bot.add_view(RegisterButton())
+        
         logger.info(f"Register cog initialized and button view added")
         
     def cog_unload(self):
         # Stop the background task when the cog is unloaded
         self.check_members_roles.cancel()
+        self.reset_weekly_stats.cancel()
         
     @tasks.loop(hours=6.0)
     async def check_members_roles(self):
@@ -825,8 +863,88 @@ class Register(commands.Cog):
         except Exception as e:
             logger.error(f"Error checking roles for guild {guild.name}: {e}\n{traceback.format_exc()}")
     
+    @tasks.loop(hours=24.0)  # Run daily to check if it's Monday
+    async def reset_weekly_stats(self):
+        """Reset weekly registration statistics every Monday"""
+        try:
+            from datetime import datetime
+            today = datetime.now()
+            
+            # Check if today is Monday (weekday() returns 0 for Monday)
+            if today.weekday() == 0:
+                logger.info("Resetting weekly registration statistics...")
+                
+                # Reset weekly stats for all guilds
+                result = await self.mongo_db["register_stats"].update_many(
+                    {"type": "weekly"},
+                    {"$set": {"count": 0}}
+                )
+                
+                logger.info(f"Reset weekly stats for {result.modified_count} guilds")
+                
+        except Exception as e:
+            logger.error(f"Error resetting weekly stats: {e}")
+    
+    @reset_weekly_stats.before_loop
+    async def before_reset_weekly_stats(self):
+        """Wait until bot is ready before starting the weekly reset task"""
+        await self.bot.wait_until_ready()
 
-
+    @app_commands.command(name="register_test_stats", description="Add test registration statistics (Admin only)")
+    @app_commands.default_permissions(administrator=True)
+    async def register_test_stats(self, interaction: discord.Interaction):
+        """Add test registration statistics for demonstration"""
+        try:
+            from datetime import datetime, timedelta
+            import random
+            
+            today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+            
+            # Add some test data for the past 7 days
+            for i in range(7):
+                day = today - timedelta(days=i)
+                day_str = day.strftime("%Y-%m-%d")
+                count = random.randint(1, 15)  # Random registrations per day
+                
+                await self.mongo_db["register_stats"].update_one(
+                    {"guild_id": interaction.guild.id, "date": day_str},
+                    {"$set": {"count": count}},
+                    upsert=True
+                )
+            
+            # Set weekly and total stats
+            weekly_total = random.randint(30, 80)
+            total_registrations = random.randint(150, 500)
+            
+            await self.mongo_db["register_stats"].update_one(
+                {"guild_id": interaction.guild.id, "type": "weekly"},
+                {"$set": {"count": weekly_total}},
+                upsert=True
+            )
+            
+            await self.mongo_db["register_stats"].update_one(
+                {"guild_id": interaction.guild.id, "type": "total"},
+                {"$set": {"count": total_registrations}},
+                upsert=True
+            )
+            
+            await interaction.response.send_message(
+                embed=create_embed(
+                    "✅ Test kayıt istatistikleri eklendi! Şimdi kayıt mesajını yeniden oluşturabilirsiniz.",
+                    discord.Color.green()
+                ),
+                ephemeral=True
+            )
+            
+        except Exception as e:
+            logger.error(f"Error adding test stats: {e}")
+            await interaction.response.send_message(
+                embed=create_embed(
+                    f"❌ Test istatistikleri eklenirken hata oluştu: {str(e)}",
+                    discord.Color.red()
+                ),
+                ephemeral=True
+            )
 
 async def setup(bot):
     # Import the error_handler at setup time
