@@ -14,22 +14,45 @@ from utils.core.error_handler import handle_interaction_error
 logger = logging.getLogger('register')
 
 # Default values for settings
-DEFAULT_WELCOME_MESSAGE = "Hoş geldin {mention}! Sunucumuza kayıt olduğun için teşekkürler."
-DEFAULT_BUTTON_TITLE = "📝 Sunucu Kayıt Sistemi"
-DEFAULT_BUTTON_DESCRIPTION = "Sunucumuza hoş geldiniz! Aşağıdaki butona tıklayarak kayıt olabilirsiniz."
-DEFAULT_BUTTON_INSTRUCTIONS = "Kaydınızı tamamlamak için isminizi ve yaşınızı doğru bir şekilde girmeniz gerekmektedir."
+DEFAULT_WELCOME_MESSAGE_TR = "Hoş geldin {mention}! Sunucumuza kayıt olduğun için teşekkürler."
+DEFAULT_WELCOME_MESSAGE_EN = "Welcome {mention}! Thank you for registering to our server."
+DEFAULT_BUTTON_TITLE_TR = "📝 Sunucu Kayıt Sistemi"
+DEFAULT_BUTTON_TITLE_EN = "📝 Server Registration System"
+DEFAULT_BUTTON_DESCRIPTION_TR = "Sunucumuza hoş geldiniz! Aşağıdaki butona tıklayarak kayıt olabilirsiniz."
+DEFAULT_BUTTON_DESCRIPTION_EN = "Welcome to our server! You can register by clicking the button below."
+DEFAULT_BUTTON_INSTRUCTIONS_TR = "Kaydınızı tamamlamak için isminizi ve yaşınızı doğru bir şekilde girmeniz gerekmektedir."
+DEFAULT_BUTTON_INSTRUCTIONS_EN = "To complete your registration, you need to enter your name and age correctly."
+
+# Backward compatibility
+DEFAULT_WELCOME_MESSAGE = DEFAULT_WELCOME_MESSAGE_TR
+DEFAULT_BUTTON_TITLE = DEFAULT_BUTTON_TITLE_TR
+DEFAULT_BUTTON_DESCRIPTION = DEFAULT_BUTTON_DESCRIPTION_TR
+DEFAULT_BUTTON_INSTRUCTIONS = DEFAULT_BUTTON_INSTRUCTIONS_TR
 
 class RegisterError(Exception):
     """Custom exception for registration errors"""
     pass
 
 class RegisterButton(discord.ui.View):
-    def __init__(self):
+    def __init__(self, language="tr"):
         super().__init__(timeout=None)
+        self.language = language
         # Database connection handled via get_async_db() when needed
+        
+        # Update button label based on language
+        button_label = "📝 Register" if language == "en" else "📝 Kayıt Ol"
+        
+        # Clear existing items and add new button with correct language
+        self.clear_items()
+        button = discord.ui.Button(
+            label=button_label,
+            style=discord.ButtonStyle.primary,
+            custom_id="register_button"
+        )
+        button.callback = self.register_button_callback
+        self.add_item(button)
     
-    @discord.ui.button(label="Kayıt Ol", style=discord.ButtonStyle.primary, custom_id="register_button")
-    async def register_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def register_button_callback(self, interaction: discord.Interaction):
         try:
             # Debug logging
             logger.info(f"Register button clicked by {interaction.user} (ID: {interaction.user.id}) in {interaction.guild.name if interaction.guild else 'DM'}")            
@@ -46,15 +69,27 @@ class RegisterButton(discord.ui.View):
                     })
                     
                     if existing_registration:
+                        # Detect language preference
+                        user_language = "tr"  # Default to Turkish
+                        if hasattr(interaction.guild, 'preferred_locale'):
+                            if interaction.guild.preferred_locale and 'en' in str(interaction.guild.preferred_locale):
+                                user_language = "en"
+                        
                         # User is already registered, show update modal instead
-                        await interaction.response.send_modal(RegisterUpdateModal(mongo_db, existing_registration))
+                        await interaction.response.send_modal(RegisterUpdateModal(mongo_db, existing_registration, user_language))
                         return
                 except Exception as db_error:
                     logger.error(f"Database query error in register button: {db_error}")
                     # Continue with new registration if DB query fails
             
+            # Detect language preference
+            user_language = "tr"  # Default to Turkish
+            if hasattr(interaction.guild, 'preferred_locale'):
+                if interaction.guild.preferred_locale and 'en' in str(interaction.guild.preferred_locale):
+                    user_language = "en"
+            
             # Show modal to collect registration info for new users
-            await interaction.response.send_modal(RegisterModal(mongo_db))
+            await interaction.response.send_modal(RegisterModal(mongo_db, user_language))
             
         except Exception as e:
             # Detailed error logging
@@ -83,26 +118,51 @@ class RegisterButton(discord.ui.View):
                 logger.error(f"Failed to respond to interaction error: {respond_error}")
 
 
-class RegisterModal(discord.ui.Modal, title="Kayıt Formu"):
+class RegisterModal(discord.ui.Modal):
     """Modal for collecting registration information"""
     
-    name = discord.ui.TextInput(
-        label="İsminiz",
-        placeholder="Gerçek isminizi girin",
-        required=True,
-        max_length=32
-    )
-    
-    age = discord.ui.TextInput(
-        label="Yaşınız",
-        placeholder="Yaşınızı girin (Sadece sayı)",
-        required=True,
-        max_length=3
-    )
-    
-    def __init__(self, mongo_db):
-        super().__init__()
+    def __init__(self, mongo_db, language="tr"):
+        self.language = language
+        
+        # Set title based on language
+        title = "Registration Form" if language == "en" else "Kayıt Formu"
+        super().__init__(title=title)
+        
         self.mongo_db = mongo_db
+        
+        # Create text inputs based on language
+        if language == "en":
+            self.name = discord.ui.TextInput(
+                label="Your Name",
+                placeholder="Enter your real name",
+                required=True,
+                max_length=32
+            )
+            
+            self.age = discord.ui.TextInput(
+                label="Your Age",
+                placeholder="Enter your age (Numbers only)",
+                required=True,
+                max_length=3
+            )
+        else:  # Turkish
+            self.name = discord.ui.TextInput(
+                label="İsminiz",
+                placeholder="Gerçek isminizi girin",
+                required=True,
+                max_length=32
+            )
+            
+            self.age = discord.ui.TextInput(
+                label="Yaşınız",
+                placeholder="Yaşınızı girin (Sadece sayı)",
+                required=True,
+                max_length=3
+            )
+        
+        # Add items to modal
+        self.add_item(self.name)
+        self.add_item(self.age)
     
     async def on_submit(self, interaction: discord.Interaction):
         try:
@@ -110,17 +170,19 @@ class RegisterModal(discord.ui.Modal, title="Kayıt Formu"):
             try:
                 age = int(self.age.value)
                 if age < 10 or age > 100:
+                    error_msg = "❌ Please enter a valid age (between 10-100)." if self.language == "en" else "❌ Lütfen geçerli bir yaş girin (10-100 arası)."
                     return await interaction.response.send_message(
                         embed=create_embed(
-                            description="❌ Lütfen geçerli bir yaş girin (10-100 arası).",
+                            description=error_msg,
                             color=discord.Color.red()
                         ),
                         ephemeral=True
                     )
             except ValueError:
+                error_msg = "❌ Age must contain only numbers." if self.language == "en" else "❌ Yaş sadece rakamlardan oluşmalıdır."
                 return await interaction.response.send_message(
                     embed=create_embed(
-                        description="❌ Yaş sadece rakamlardan oluşmalıdır.",
+                        description=error_msg,
                         color=discord.Color.red()
                     ),
                     ephemeral=True
@@ -132,14 +194,33 @@ class RegisterModal(discord.ui.Modal, title="Kayıt Formu"):
             else:
                 settings = None
                 
-            if not settings or "role_id" not in settings:
-                return await interaction.response.send_message(
-                    embed=create_embed(
-                        description="❌ Kayıt sistemi henüz ayarlanmamış. Lütfen bir yetkiliyle iletişime geçin.",
-                        color=discord.Color.red()
-                    ),
-                    ephemeral=True
-                )
+            # If no settings exist, create default settings
+            if not settings:
+                # Use language-appropriate defaults
+                welcome_msg = DEFAULT_WELCOME_MESSAGE_EN if user_language == "en" else DEFAULT_WELCOME_MESSAGE_TR
+                button_title = DEFAULT_BUTTON_TITLE_EN if user_language == "en" else DEFAULT_BUTTON_TITLE_TR
+                button_desc = DEFAULT_BUTTON_DESCRIPTION_EN if user_language == "en" else DEFAULT_BUTTON_DESCRIPTION_TR
+                button_instr = DEFAULT_BUTTON_INSTRUCTIONS_EN if user_language == "en" else DEFAULT_BUTTON_INSTRUCTIONS_TR
+                
+                settings = {
+                    "guild_id": interaction.guild.id,
+                    "message_format": "embed",
+                    "welcome_message": welcome_msg,
+                    "button_title": button_title,
+                    "button_description": button_desc,
+                    "button_instructions": button_instr,
+                    "language": user_language
+                }
+                # Save default settings to database
+                if is_db_available(self.mongo_db):
+                    await self.mongo_db["register"].insert_one(settings)
+                    logger.info(f"Created default registration settings for guild {interaction.guild.id}")
+            
+            # Check if user's language preference (try to detect from guild locale or use Turkish as default)
+            user_language = "tr"  # Default to Turkish
+            if hasattr(interaction.guild, 'preferred_locale'):
+                if interaction.guild.preferred_locale and 'en' in str(interaction.guild.preferred_locale):
+                    user_language = "en"
             
             # Get roles to assign
             roles_to_add = []
@@ -179,7 +260,8 @@ class RegisterModal(discord.ui.Modal, title="Kayıt Formu"):
             # If no roles to assign, just save to database
             if not roles_to_add:
                 logger.info(f"No roles configured for registration in guild {interaction.guild.id}, saving data only")
-                assigned_roles_info.append("Henüz rol yapılandırılmamış - sadece veritabanına kaydedildi")
+                no_roles_msg = "No roles configured yet - saved to database only" if user_language == "en" else "Henüz rol yapılandırılmamış - sadece veritabanına kaydedildi"
+                assigned_roles_info.append(no_roles_msg)
             
             # Update nickname
             try:
@@ -192,9 +274,10 @@ class RegisterModal(discord.ui.Modal, title="Kayıt Formu"):
                 if roles_to_add:
                     await interaction.user.add_roles(*roles_to_add)
             except discord.Forbidden:
+                error_msg = "❌ I don't have permission to assign roles. Please contact an administrator." if user_language == "en" else "❌ Rolleri vermek için yetkim yok. Lütfen bir yetkiliyle iletişime geçin."
                 return await interaction.response.send_message(
                     embed=create_embed(
-                        description="❌ Rolleri vermek için yetkim yok. Lütfen bir yetkiliyle iletişime geçin.",
+                        description=error_msg,
                         color=discord.Color.red()
                     ),
                     ephemeral=True
@@ -243,7 +326,7 @@ class RegisterModal(discord.ui.Modal, title="Kayıt Formu"):
             if assigned_roles_info:
                 roles_text = "\n".join(assigned_roles_info)
             else:
-                roles_text = "Henüz rol yapılandırılmamış - sadece veritabanına kaydedildi"
+                roles_text = "No roles configured yet - saved to database only" if user_language == "en" else "Henüz rol yapılandırılmamış - sadece veritabanına kaydedildi"
             
             # Get message format preference and welcome message
             message_format = settings.get("message_format", "embed")
@@ -261,19 +344,25 @@ class RegisterModal(discord.ui.Modal, title="Kayıt Formu"):
             
             # Send registration success response
             if message_format == "embed":
+                title = "✅ Registration Successful!" if user_language == "en" else "✅ Kayıt Başarılı!"
+                roles_field_name = "📋 Assigned Roles" if user_language == "en" else "📋 Verilen Roller"
+                info_field_name = "👤 Registration Info" if user_language == "en" else "👤 Kayıt Bilgileri"
+                name_label = "Name" if user_language == "en" else "İsim"
+                age_label = "Age" if user_language == "en" else "Yaş"
+                
                 success_embed = create_embed(
-                    title="✅ Kayıt Başarılı!",
+                    title=title,
                     description=formatted_message,
                     color=discord.Color.green()
                 )
                 success_embed.add_field(
-                    name="📋 Verilen Roller",
+                    name=roles_field_name,
                     value=roles_text,
                     inline=False
                 )
                 success_embed.add_field(
-                    name="👤 Kayıt Bilgileri",
-                    value=f"**İsim:** {self.name.value}\n**Yaş:** {age}",
+                    name=info_field_name,
+                    value=f"**{name_label}:** {self.name.value}\n**{age_label}:** {age}",
                     inline=False
                 )
                 success_embed.set_thumbnail(url=interaction.user.display_avatar.url)
@@ -281,7 +370,9 @@ class RegisterModal(discord.ui.Modal, title="Kayıt Formu"):
                 await interaction.response.send_message(embed=success_embed, ephemeral=True)
             else:
                 # Plain text format
-                plain_message = f"✅ **Kayıt Başarılı!**\n\n{formatted_message}\n\n**Verilen Roller:**\n{roles_text}"
+                success_title = "✅ **Registration Successful!**" if user_language == "en" else "✅ **Kayıt Başarılı!**"
+                roles_label = "**Assigned Roles:**" if user_language == "en" else "**Verilen Roller:**"
+                plain_message = f"{success_title}\n\n{formatted_message}\n\n{roles_label}\n{roles_text}"
                 await interaction.response.send_message(plain_message, ephemeral=True)
             
             # Log the registration
@@ -438,11 +529,16 @@ class RegisterModal(discord.ui.Modal, title="Kayıt Formu"):
             logger.error(f"Error updating registration message: {e}")
             # Don't re-raise the exception to prevent breaking the registration flow
 
-class RegisterUpdateModal(discord.ui.Modal, title="Kayıt Güncelleme"):
+class RegisterUpdateModal(discord.ui.Modal):
     """Modal for updating existing registration information"""
     
-    def __init__(self, mongo_db, existing_registration):
-        super().__init__()
+    def __init__(self, mongo_db, existing_registration, language="tr"):
+        self.language = language
+        
+        # Set title based on language
+        title = "Update Registration" if language == "en" else "Kayıt Güncelleme"
+        super().__init__(title=title)
+        
         self.mongo_db = mongo_db
         self.existing_registration = existing_registration
         

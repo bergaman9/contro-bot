@@ -654,15 +654,11 @@ class ChannelSelectView(discord.ui.View):
                 ),
                 color=discord.Color.blue()
             )
-            view = discord.ui.View()
+            # Import the RegisterButton from the register cog
+            from cogs.register import RegisterButton
             
-            # Add registration button
-            register_button = discord.ui.Button(
-                label="📝 Register" if self.language == "en" else "📝 Kayıt Ol",
-                style=discord.ButtonStyle.primary,
-                custom_id="register_button"
-            )
-            view.add_item(register_button)
+            # Create the registration button view with proper language support
+            view = RegisterButton(language=self.language)
             
             await channel.send(embed=embed, view=view)
             
