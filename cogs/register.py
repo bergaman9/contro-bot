@@ -228,22 +228,46 @@ class RegisterModal(discord.ui.Modal):
             
             # Priority 1: Age-based roles (if configured)
             age_role_assigned = False
-            if age >= 18:
-                adult_role_id = settings.get("adult_role_id")
-                if adult_role_id:
+            
+            # Check for age roles in the new format
+            age_roles = settings.get("age_roles", {})
+            if age_roles:
+                # Check for 18+ role
+                if age >= 18 and "18+" in age_roles:
+                    adult_role_id = age_roles["18+"]
                     adult_role = interaction.guild.get_role(int(adult_role_id))
                     if adult_role:
                         roles_to_add.append(adult_role)
                         assigned_roles_info.append(f"18+ Yaş Rolü: {adult_role.mention}")
                         age_role_assigned = True
-            else:
-                minor_role_id = settings.get("minor_role_id")
-                if minor_role_id:
+                
+                # Check for 13-17 role
+                elif age < 18 and "13-17" in age_roles:
+                    minor_role_id = age_roles["13-17"]
                     minor_role = interaction.guild.get_role(int(minor_role_id))
                     if minor_role:
                         roles_to_add.append(minor_role)
-                        assigned_roles_info.append(f"18- Yaş Rolü: {minor_role.mention}")
+                        assigned_roles_info.append(f"13-17 Yaş Rolü: {minor_role.mention}")
                         age_role_assigned = True
+            
+            # Fallback to old format for backward compatibility
+            if not age_role_assigned:
+                if age >= 18:
+                    adult_role_id = settings.get("adult_role_id")
+                    if adult_role_id:
+                        adult_role = interaction.guild.get_role(int(adult_role_id))
+                        if adult_role:
+                            roles_to_add.append(adult_role)
+                            assigned_roles_info.append(f"18+ Yaş Rolü: {adult_role.mention}")
+                            age_role_assigned = True
+                else:
+                    minor_role_id = settings.get("minor_role_id")
+                    if minor_role_id:
+                        minor_role = interaction.guild.get_role(int(minor_role_id))
+                        if minor_role:
+                            roles_to_add.append(minor_role)
+                            assigned_roles_info.append(f"13-17 Yaş Rolü: {minor_role.mention}")
+                            age_role_assigned = True
             
             # Priority 2: If no age role assigned, assign member role (if configured)
             if not age_role_assigned:
@@ -263,11 +287,32 @@ class RegisterModal(discord.ui.Modal):
                 no_roles_msg = "No roles configured yet - saved to database only" if user_language == "en" else "Henüz rol yapılandırılmamış - sadece veritabanına kaydedildi"
                 assigned_roles_info.append(no_roles_msg)
             
-            # Update nickname
+            # Update nickname based on settings
             try:
-                await interaction.user.edit(nick=f"{self.name.value} | {age}")
+                # Check if auto edit is enabled (default: False)
+                auto_edit_enabled = settings.get("auto_edit_username", False)
+                
+                if auto_edit_enabled:
+                    # Get name format from settings
+                    name_format = settings.get("name_format", "{user_name} | {age}")
+                    
+                    # Format the nickname with available variables
+                    formatted_nickname = name_format.format(
+                        user_name=self.name.value,
+                        age=age,
+                        discord_name=interaction.user.display_name,
+                        member_count=interaction.guild.member_count
+                    )
+                    
+                    await interaction.user.edit(nick=formatted_nickname)
+                    logger.info(f"Updated nickname for {interaction.user} to '{formatted_nickname}'")
+                else:
+                    logger.info(f"Auto nickname editing disabled for guild {interaction.guild.id}")
+                    
             except discord.Forbidden:
                 logger.warning(f"Missing permissions to change nickname for {interaction.user} in {interaction.guild.name}")
+            except Exception as e:
+                logger.error(f"Error updating nickname: {e}")
             
             # Add roles (if any)
             try:

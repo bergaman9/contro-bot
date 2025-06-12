@@ -101,6 +101,20 @@ class RegisterSettingsView(discord.ui.View):
                 ephemeral=True
             )
     
+    @discord.ui.button(label="Kullanıcı Adı Ayarları", style=discord.ButtonStyle.primary, emoji="✏️", row=0)
+    async def username_settings_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Configure username editing settings"""
+        embed = discord.Embed(
+            title="✏️ Kullanıcı Adı Ayarları",
+            description="Kayıt sonrası kullanıcı adı düzenleme ayarlarını yapılandırın.",
+            color=discord.Color.blue()
+        )
+        await interaction.response.send_message(
+            embed=embed,
+            view=UsernameSettingsView(self.bot, interaction.guild.id),
+            ephemeral=True
+        )
+    
     @discord.ui.button(label="Mesaj Ayarları", style=discord.ButtonStyle.primary, emoji="💬", row=1)
     async def message_settings_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Configure registration messages"""
@@ -277,13 +291,27 @@ class RegisterSettingsView(discord.ui.View):
                 reg_channel = "❌ Ayarlanmamış"
             embed.add_field(name="📢 Kayıt Kanalı", value=reg_channel, inline=True)
             
+            # Username editing settings
+            auto_edit = settings.get("auto_edit_username", False)
+            auto_edit_status = "✅ Etkin" if auto_edit else "❌ Devre Dışı"
+            embed.add_field(name="✏️ Otomatik İsim Düzenleme", value=auto_edit_status, inline=True)
+            
             # Age roles
             age_roles = settings.get("age_roles", {})
             if age_roles:
-                age_roles_count = len(age_roles)
-                embed.add_field(name="👤 Yaş Rolleri", value=f"✅ {age_roles_count} yaş rolü", inline=True)
+                age_roles_text = ""
+                for age_range, role_id in age_roles.items():
+                    role = interaction.guild.get_role(role_id)
+                    role_name = role.mention if role else f"Rol bulunamadı (ID: {role_id})"
+                    age_roles_text += f"**{age_range}**: {role_name}\n"
+                embed.add_field(name="👤 Yaş Rolleri", value=age_roles_text, inline=False)
             else:
-                embed.add_field(name="👤 Yaş Rolleri", value="❌ Ayarlanmamış", inline=True)
+                embed.add_field(name="👤 Yaş Rolleri", value="❌ Ayarlanmamış", inline=False)
+            
+            # Name format (if auto edit is enabled)
+            if auto_edit:
+                name_format = settings.get("name_format", "{user_name} | {age}")
+                embed.add_field(name="📝 İsim Formatı", value=f"`{name_format}`", inline=True)
             
             # Welcome message
             welcome_message = settings.get("welcome_message", DEFAULT_WELCOME_MESSAGE)
@@ -304,7 +332,11 @@ class RegisterSettingsView(discord.ui.View):
             
             # Button customization
             button_title = settings.get("button_title", DEFAULT_BUTTON_TITLE)
-            embed.add_field(name="🎨 Buton Başlığı", value=f"```{button_title}```", inline=False)
+            if len(button_title) > 50:
+                button_preview = button_title[:47] + "..."
+            else:
+                button_preview = button_title
+            embed.add_field(name="🎨 Buton Başlığı", value=f"```{button_preview}```", inline=False)
             
             await interaction.response.send_message(embed=embed, ephemeral=True)
             
@@ -387,7 +419,7 @@ class AgeRolesView(discord.ui.View):
         self.guild_id = guild_id
         self.mongo_db = get_async_db()
         
-    @discord.ui.button(label="13-17 Yaş Rolü", style=discord.ButtonStyle.primary, emoji="👶", row=0)
+    @discord.ui.button(label="13-17 Yaş Rolü", style=discord.ButtonStyle.primary, emoji="��", row=0)
     async def young_role_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Set role for 13-17 age group"""
         embed = discord.Embed(
@@ -1068,5 +1100,143 @@ class ButtonTextModal(discord.ui.Modal, title="Buton Metni Düzenle"):
             logger.error(f"Error updating button text: {e}")
             await interaction.response.send_message(
                 embed=create_embed(f"❌ Buton metinleri güncellenirken bir hata oluştu: {str(e)}", discord.Color.red()),
+                ephemeral=True
+            )
+
+class UsernameSettingsView(discord.ui.View):
+    """View for configuring username editing settings"""
+    
+    def __init__(self, bot, guild_id, timeout=300):
+        super().__init__(timeout=timeout)
+        self.bot = bot
+        self.guild_id = guild_id
+        self.mongo_db = get_async_db()
+    
+    @discord.ui.button(label="Otomatik Düzenleme", style=discord.ButtonStyle.primary, emoji="🔄", row=0)
+    async def toggle_auto_edit_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Toggle automatic username editing"""
+        try:
+            settings = await self.mongo_db["register"].find_one({"guild_id": self.guild_id}) or {}
+            current_auto_edit = settings.get("auto_edit_username", False)
+            new_auto_edit = not current_auto_edit
+            
+            await self.mongo_db["register"].update_one(
+                {"guild_id": self.guild_id},
+                {"$set": {"auto_edit_username": new_auto_edit}},
+                upsert=True
+            )
+            
+            status = "etkinleştirildi" if new_auto_edit else "devre dışı bırakıldı"
+            await interaction.response.send_message(
+                embed=create_embed(f"✅ Otomatik kullanıcı adı düzenleme {status}!", discord.Color.green()),
+                ephemeral=True
+            )
+            
+        except Exception as e:
+            logger.error(f"Error toggling auto edit: {e}")
+            await interaction.response.send_message(
+                embed=create_embed(f"❌ Ayar değiştirilirken bir hata oluştu: {str(e)}", discord.Color.red()),
+                ephemeral=True
+            )
+    
+    @discord.ui.button(label="İsim Formatı", style=discord.ButtonStyle.primary, emoji="📝", row=0)
+    async def name_format_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Configure name format"""
+        modal = NameFormatModal(self.bot, self.guild_id)
+        await interaction.response.send_modal(modal)
+    
+    @discord.ui.button(label="Mevcut Ayarları Görüntüle", style=discord.ButtonStyle.secondary, emoji="🔍", row=1)
+    async def view_settings_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """View current username settings"""
+        try:
+            settings = await self.mongo_db["register"].find_one({"guild_id": self.guild_id}) or {}
+            
+            embed = discord.Embed(
+                title="✏️ Kullanıcı Adı Ayarları",
+                description="Mevcut kullanıcı adı düzenleme ayarları:",
+                color=discord.Color.blue()
+            )
+            
+            # Auto edit status
+            auto_edit = settings.get("auto_edit_username", False)
+            auto_edit_status = "✅ Etkin" if auto_edit else "❌ Devre Dışı"
+            embed.add_field(name="🔄 Otomatik Düzenleme", value=auto_edit_status, inline=True)
+            
+            # Name format
+            name_format = settings.get("name_format", "{user_name} | {age}")
+            embed.add_field(name="📝 İsim Formatı", value=f"`{name_format}`", inline=True)
+            
+            # Available variables
+            embed.add_field(
+                name="📋 Kullanılabilir Değişkenler",
+                value=(
+                    "`{user_name}` - Kayıt formundaki isim\n"
+                    "`{age}` - Kayıt formundaki yaş\n"
+                    "`{discord_name}` - Discord kullanıcı adı\n"
+                    "`{member_count}` - Üye numarası"
+                ),
+                inline=False
+            )
+            
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+            
+        except Exception as e:
+            logger.error(f"Error viewing username settings: {e}")
+            await interaction.response.send_message(
+                embed=create_embed(f"❌ Ayarlar görüntülenirken bir hata oluştu: {str(e)}", discord.Color.red()),
+                ephemeral=True
+            )
+
+class NameFormatModal(discord.ui.Modal):
+    """Modal for setting name format"""
+    
+    def __init__(self, bot, guild_id):
+        super().__init__(title="İsim Formatı Ayarla")
+        self.bot = bot
+        self.guild_id = guild_id
+        self.mongo_db = get_async_db()
+        
+        self.name_format_input = discord.ui.TextInput(
+            label="İsim Formatı",
+            placeholder="{user_name} | {age}",
+            default="{user_name} | {age}",
+            max_length=50,
+            required=True,
+            style=discord.TextStyle.short
+        )
+        
+        self.add_item(self.name_format_input)
+    
+    async def on_submit(self, interaction: discord.Interaction):
+        try:
+            # Update name format in database
+            await self.mongo_db["register"].update_one(
+                {"guild_id": self.guild_id},
+                {"$set": {"name_format": self.name_format_input.value}},
+                upsert=True
+            )
+            
+            embed = discord.Embed(
+                title="✅ İsim Formatı Güncellendi",
+                description=f"Yeni format: `{self.name_format_input.value}`",
+                color=discord.Color.green()
+            )
+            embed.add_field(
+                name="📋 Kullanılabilir Değişkenler",
+                value=(
+                    "`{user_name}` - Kayıt formundaki isim\n"
+                    "`{age}` - Kayıt formundaki yaş\n"
+                    "`{discord_name}` - Discord kullanıcı adı\n"
+                    "`{member_count}` - Üye numarası"
+                ),
+                inline=False
+            )
+            
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+            
+        except Exception as e:
+            logger.error(f"Error updating name format: {e}")
+            await interaction.response.send_message(
+                embed=create_embed(f"❌ İsim formatı güncellenirken bir hata oluştu: {str(e)}", discord.Color.red()),
                 ephemeral=True
             )
