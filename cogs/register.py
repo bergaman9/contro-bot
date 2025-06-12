@@ -76,7 +76,8 @@ class RegisterButton(discord.ui.View):
                                 user_language = "en"
                         
                         # User is already registered, show update modal instead
-                        update_modal = RegisterUpdateModal(mongo_db, existing_registration, user_language)
+                        update_modal = RegisterUpdateModal(mongo_db, existing_registration, user_language, interaction.guild.id)
+                        await update_modal.prepare_custom_fields()
                         await interaction.response.send_modal(update_modal)
                         return
                 except Exception as db_error:
@@ -696,8 +697,10 @@ class RegisterModal(discord.ui.Modal):
 class RegisterUpdateModal(discord.ui.Modal):
     """Modal for updating existing registration information"""
     
-    def __init__(self, mongo_db, existing_registration, language="tr"):
+    def __init__(self, mongo_db, existing_registration, language="tr", guild_id=None):
         self.language = language
+        self.guild_id = guild_id
+        self.custom_field_values = {}  # Store custom field values
         
         # Set title based on language
         title = "Update Registration" if language == "en" else "Kayıt Güncelleme"
@@ -725,6 +728,59 @@ class RegisterUpdateModal(discord.ui.Modal):
         
         self.add_item(self.name)
         self.add_item(self.age)
+    
+    async def prepare_custom_fields(self):
+        """Load and add custom fields to the modal before showing it"""
+        if not self.guild_id or not is_db_available(self.mongo_db):
+            return
+        
+        try:
+            # Get guild settings with custom fields
+            settings = await self.mongo_db["register"].find_one({"guild_id": self.guild_id})
+            if not settings:
+                return
+            
+            custom_fields = settings.get("custom_fields", {})
+            if not custom_fields:
+                return
+            
+            # Get existing custom field data from registration
+            existing_custom_data = self.existing_registration.get("custom_fields", {})
+            
+            # Add custom fields to modal (Discord allows max 5 components)
+            field_count = 0
+            max_additional_fields = 3  # We already have name and age
+            
+            for field_key, field_data in custom_fields.items():
+                if field_count >= max_additional_fields:
+                    break
+                
+                field_name = field_data.get("name", field_key)
+                field_placeholder = field_data.get("placeholder", "")
+                field_required = field_data.get("required", False)
+                field_max_length = field_data.get("max_length", 100)
+                
+                # Get existing value for this field
+                existing_value = existing_custom_data.get(field_key, "")
+                
+                # Create text input for custom field
+                custom_input = discord.ui.TextInput(
+                    label=field_name,
+                    placeholder=field_placeholder,
+                    default=existing_value,
+                    required=field_required,
+                    max_length=field_max_length
+                )
+                
+                # Store reference to retrieve value later
+                setattr(self, f"custom_{field_key}", custom_input)
+                self.add_item(custom_input)
+                field_count += 1
+                
+                logger.info(f"Added custom field '{field_name}' ({field_key}) to registration update modal with value: '{existing_value}'")
+                
+        except Exception as e:
+            logger.error(f"Error loading custom fields for update modal: {e}")
     
     async def on_submit(self, interaction: discord.Interaction):
         try:
@@ -795,9 +851,54 @@ class RegisterUpdateModal(discord.ui.Modal):
                 if adult_role and adult_role in interaction.user.roles:
                     roles_to_remove.append(adult_role)
             
-            # Update nickname
+            # Collect custom field values
+            custom_field_data = {}
+            if hasattr(self, 'guild_id') and self.guild_id:
+                try:
+                    # Get custom fields from settings
+                    custom_fields = settings.get("custom_fields", {})
+                    for field_key in custom_fields.keys():
+                        custom_input = getattr(self, f"custom_{field_key}", None)
+                        if custom_input and custom_input.value:
+                            custom_field_data[field_key] = custom_input.value.strip()
+                except Exception as e:
+                    logger.error(f"Error collecting custom field data for update: {e}")
+            
+            # Update nickname based on settings
             try:
-                await interaction.user.edit(nick=f"{self.name.value} | {age}")
+                # Check if auto edit is enabled (default: False)
+                auto_edit_enabled = settings.get("auto_edit_username", False)
+                
+                if auto_edit_enabled:
+                    # Get name format from settings
+                    name_format = settings.get("name_format", "{user_name} | {age}")
+                    
+                    # Prepare format variables
+                    format_vars = {
+                        "user_name": self.name.value,
+                        "age": age,
+                        "discord_name": interaction.user.display_name,
+                        "member_count": interaction.guild.member_count
+                    }
+                    
+                    # Add custom field variables
+                    format_vars.update(custom_field_data)
+                    
+                    # Format the nickname with available variables
+                    try:
+                        formatted_nickname = name_format.format(**format_vars)
+                        await interaction.user.edit(nick=formatted_nickname)
+                        logger.info(f"Updated nickname for {interaction.user} to '{formatted_nickname}'")
+                    except KeyError as ke:
+                        logger.warning(f"Missing format variable {ke} in name format for guild {interaction.guild.id}")
+                        # Fallback to basic format
+                        fallback_nickname = f"{self.name.value} | {age}"
+                        await interaction.user.edit(nick=fallback_nickname)
+                        logger.info(f"Used fallback nickname for {interaction.user}: '{fallback_nickname}'")
+                else:
+                    # Use basic format when auto edit is disabled
+                    await interaction.user.edit(nick=f"{self.name.value} | {age}")
+                    
             except discord.Forbidden:
                 logger.warning(f"Missing permissions to change nickname for {interaction.user} in {interaction.guild.name}")
             
@@ -816,18 +917,25 @@ class RegisterUpdateModal(discord.ui.Modal):
                     ephemeral=True
                 )
             
-            # Update database record
+            # Prepare update data
             today = discord.utils.utcnow().strftime("%Y-%m-%d")
             current_time = discord.utils.utcnow().timestamp()
             
+            update_data = {
+                "name": self.name.value,
+                "age": age,
+                "updated_at": current_time,
+                "last_update_date": today
+            }
+            
+            # Add custom field data to update record
+            if custom_field_data:
+                update_data["custom_fields"] = custom_field_data
+            
+            # Update database record
             await self.mongo_db["register_log"].update_one(
                 {"guild_id": interaction.guild.id, "user_id": interaction.user.id},
-                {"$set": {
-                    "name": self.name.value,
-                    "age": age,
-                    "updated_at": current_time,
-                    "last_update_date": today
-                }}
+                {"$set": update_data}
             )
             
             # Create success message
