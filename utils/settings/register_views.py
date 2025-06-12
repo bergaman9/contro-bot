@@ -115,6 +115,20 @@ class RegisterSettingsView(discord.ui.View):
             ephemeral=True
         )
     
+    @discord.ui.button(label="Özel Alanlar", style=discord.ButtonStyle.primary, emoji="📋", row=0)
+    async def custom_fields_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Configure custom registration fields"""
+        embed = discord.Embed(
+            title="📋 Özel Kayıt Alanları",
+            description="Kayıt formuna özel alanlar ekleyin ve format değişkenleri olarak kullanın.",
+            color=discord.Color.blue()
+        )
+        await interaction.response.send_message(
+            embed=embed,
+            view=CustomFieldsView(self.bot, interaction.guild.id),
+            ephemeral=True
+        )
+    
     @discord.ui.button(label="Mesaj Ayarları", style=discord.ButtonStyle.primary, emoji="💬", row=1)
     async def message_settings_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Configure registration messages"""
@@ -1195,20 +1209,13 @@ class NameFormatModal(discord.ui.Modal):
         self.bot = bot
         self.guild_id = guild_id
         self.mongo_db = get_async_db()
-        
-        self.name_format_input = discord.ui.TextInput(
-            label="İsim Formatı",
-            placeholder="{user_name} | {age}",
-            default="{user_name} | {age}",
-            max_length=50,
-            required=True,
-            style=discord.TextStyle.short
-        )
-        
-        self.add_item(self.name_format_input)
     
     async def on_submit(self, interaction: discord.Interaction):
         try:
+            # Get current settings to show available variables
+            settings = await self.mongo_db["register"].find_one({"guild_id": self.guild_id}) or {}
+            custom_fields = settings.get("custom_fields", {})
+            
             # Update name format in database
             await self.mongo_db["register"].update_one(
                 {"guild_id": self.guild_id},
@@ -1221,14 +1228,23 @@ class NameFormatModal(discord.ui.Modal):
                 description=f"Yeni format: `{self.name_format_input.value}`",
                 color=discord.Color.green()
             )
+            
+            # Build available variables list
+            variables = [
+                "`{user_name}` - Kayıt formundaki isim",
+                "`{age}` - Kayıt formundaki yaş",
+                "`{discord_name}` - Discord kullanıcı adı",
+                "`{member_count}` - Üye numarası"
+            ]
+            
+            # Add custom field variables
+            for field_key, field_data in custom_fields.items():
+                field_name = field_data.get("name", field_key)
+                variables.append(f"`{{{field_key}}}` - {field_name}")
+            
             embed.add_field(
                 name="📋 Kullanılabilir Değişkenler",
-                value=(
-                    "`{user_name}` - Kayıt formundaki isim\n"
-                    "`{age}` - Kayıt formundaki yaş\n"
-                    "`{discord_name}` - Discord kullanıcı adı\n"
-                    "`{member_count}` - Üye numarası"
-                ),
+                value="\n".join(variables),
                 inline=False
             )
             
@@ -1238,5 +1254,275 @@ class NameFormatModal(discord.ui.Modal):
             logger.error(f"Error updating name format: {e}")
             await interaction.response.send_message(
                 embed=create_embed(f"❌ İsim formatı güncellenirken bir hata oluştu: {str(e)}", discord.Color.red()),
+                ephemeral=True
+            )
+    
+    def __init__(self, bot, guild_id):
+        super().__init__(title="İsim Formatı Ayarla")
+        self.bot = bot
+        self.guild_id = guild_id
+        self.mongo_db = get_async_db()
+        
+        self.name_format_input = discord.ui.TextInput(
+            label="İsim Formatı",
+            placeholder="{user_name} | {age}",
+            default="{user_name} | {age}",
+            max_length=50,
+            required=True,
+            style=discord.TextStyle.short
+        )
+        
+        self.add_item(self.name_format_input)
+
+class CustomFieldsView(discord.ui.View):
+    """View for managing custom registration fields"""
+    
+    def __init__(self, bot, guild_id, timeout=300):
+        super().__init__(timeout=timeout)
+        self.bot = bot
+        self.guild_id = guild_id
+        self.mongo_db = get_async_db()
+    
+    @discord.ui.button(label="Alan Ekle", style=discord.ButtonStyle.success, emoji="➕", row=0)
+    async def add_field_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Add a new custom field"""
+        modal = AddCustomFieldModal(self.bot, self.guild_id)
+        await interaction.response.send_modal(modal)
+    
+    @discord.ui.button(label="Alanları Görüntüle", style=discord.ButtonStyle.primary, emoji="📋", row=0)
+    async def view_fields_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """View current custom fields"""
+        try:
+            settings = await self.mongo_db["register"].find_one({"guild_id": self.guild_id}) or {}
+            custom_fields = settings.get("custom_fields", {})
+            
+            embed = discord.Embed(
+                title="📋 Özel Kayıt Alanları",
+                description="Mevcut özel alanlar ve format değişkenleri:",
+                color=discord.Color.blue()
+            )
+            
+            if custom_fields:
+                for field_key, field_data in custom_fields.items():
+                    field_name = field_data.get("name", field_key)
+                    field_type = field_data.get("type", "text")
+                    field_required = "✅ Zorunlu" if field_data.get("required", False) else "❌ İsteğe bağlı"
+                    field_placeholder = field_data.get("placeholder", "Yok")
+                    
+                    embed.add_field(
+                        name=f"🔹 {field_name}",
+                        value=(
+                            f"**Değişken:** `{{{field_key}}}`\n"
+                            f"**Tip:** {field_type}\n"
+                            f"**Zorunlu:** {field_required}\n"
+                            f"**Placeholder:** {field_placeholder}"
+                        ),
+                        inline=True
+                    )
+                
+                embed.add_field(
+                    name="💡 Kullanım",
+                    value="Bu alanları isim formatında `{alan_anahtarı}` şeklinde kullanabilirsiniz.",
+                    inline=False
+                )
+            else:
+                embed.add_field(
+                    name="❌ Özel Alan Yok",
+                    value="Henüz özel alan eklenmemiş. 'Alan Ekle' butonunu kullanarak yeni alanlar ekleyebilirsiniz.",
+                    inline=False
+                )
+            
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+            
+        except Exception as e:
+            logger.error(f"Error viewing custom fields: {e}")
+            await interaction.response.send_message(
+                embed=create_embed(f"❌ Alanlar görüntülenirken bir hata oluştu: {str(e)}", discord.Color.red()),
+                ephemeral=True
+            )
+    
+    @discord.ui.button(label="Alan Sil", style=discord.ButtonStyle.danger, emoji="🗑️", row=0)
+    async def remove_field_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Remove a custom field"""
+        try:
+            settings = await self.mongo_db["register"].find_one({"guild_id": self.guild_id}) or {}
+            custom_fields = settings.get("custom_fields", {})
+            
+            if not custom_fields:
+                await interaction.response.send_message(
+                    embed=create_embed("❌ Silinecek özel alan bulunamadı.", discord.Color.red()),
+                    ephemeral=True
+                )
+                return
+            
+            # Create select menu for field removal
+            options = []
+            for field_key, field_data in custom_fields.items():
+                field_name = field_data.get("name", field_key)
+                options.append(discord.SelectOption(
+                    label=field_name,
+                    value=field_key,
+                    description=f"Değişken: {{{field_key}}}"
+                ))
+            
+            if len(options) > 25:
+                options = options[:25]  # Discord limit
+            
+            select = discord.ui.Select(
+                placeholder="Silinecek alanı seçin...",
+                options=options
+            )
+            
+            async def remove_callback(select_interaction):
+                field_key = select.values[0]
+                field_name = custom_fields[field_key].get("name", field_key)
+                
+                # Remove field from database
+                await self.mongo_db["register"].update_one(
+                    {"guild_id": self.guild_id},
+                    {"$unset": {f"custom_fields.{field_key}": ""}},
+                    upsert=True
+                )
+                
+                await select_interaction.response.send_message(
+                    embed=create_embed(f"✅ '{field_name}' alanı başarıyla silindi!", discord.Color.green()),
+                    ephemeral=True
+                )
+            
+            select.callback = remove_callback
+            view = discord.ui.View()
+            view.add_item(select)
+            
+            await interaction.response.send_message(
+                embed=create_embed("🗑️ Silinecek alanı seçin:", discord.Color.orange()),
+                view=view,
+                ephemeral=True
+            )
+            
+        except Exception as e:
+            logger.error(f"Error removing custom field: {e}")
+            await interaction.response.send_message(
+                embed=create_embed(f"❌ Alan silinirken bir hata oluştu: {str(e)}", discord.Color.red()),
+                ephemeral=True
+            )
+
+class AddCustomFieldModal(discord.ui.Modal):
+    """Modal for adding a custom registration field"""
+    
+    def __init__(self, bot, guild_id):
+        super().__init__(title="Özel Alan Ekle")
+        self.bot = bot
+        self.guild_id = guild_id
+        self.mongo_db = get_async_db()
+        
+        self.field_key = discord.ui.TextInput(
+            label="Alan Anahtarı (değişken adı)",
+            placeholder="steam_id, discord_tag, vs. (sadece harf, rakam, _)",
+            required=True,
+            max_length=30
+        )
+        
+        self.field_name = discord.ui.TextInput(
+            label="Alan Adı (formda görünecek)",
+            placeholder="Steam ID, Discord Tag, vs.",
+            required=True,
+            max_length=50
+        )
+        
+        self.field_placeholder = discord.ui.TextInput(
+            label="Placeholder (ipucu metni)",
+            placeholder="Örn: Steam profilinizin ID'sini girin",
+            required=False,
+            max_length=100
+        )
+        
+        self.field_required = discord.ui.TextInput(
+            label="Zorunlu mu? (evet/hayır)",
+            placeholder="evet veya hayır",
+            required=True,
+            max_length=5
+        )
+        
+        # Add items to modal
+        self.add_item(self.field_key)
+        self.add_item(self.field_name)
+        self.add_item(self.field_placeholder)
+        self.add_item(self.field_required)
+    
+    async def on_submit(self, interaction: discord.Interaction):
+        try:
+            # Validate field key (only alphanumeric and underscore)
+            field_key = self.field_key.value.strip().lower()
+            if not re.match(r'^[a-z0-9_]+$', field_key):
+                await interaction.response.send_message(
+                    embed=create_embed("❌ Alan anahtarı sadece harf, rakam ve alt çizgi içerebilir!", discord.Color.red()),
+                    ephemeral=True
+                )
+                return
+            
+            # Validate required field
+            required_value = self.field_required.value.strip().lower()
+            if required_value not in ["evet", "hayır", "yes", "no"]:
+                await interaction.response.send_message(
+                    embed=create_embed("❌ Zorunlu alanı için 'evet' veya 'hayır' yazın!", discord.Color.red()),
+                    ephemeral=True
+                )
+                return
+            
+            is_required = required_value in ["evet", "yes"]
+            
+            # Check if field key already exists
+            settings = await self.mongo_db["register"].find_one({"guild_id": self.guild_id}) or {}
+            custom_fields = settings.get("custom_fields", {})
+            
+            if field_key in custom_fields:
+                await interaction.response.send_message(
+                    embed=create_embed(f"❌ '{field_key}' anahtarı zaten kullanılıyor!", discord.Color.red()),
+                    ephemeral=True
+                )
+                return
+            
+            # Add the new field
+            new_field = {
+                "name": self.field_name.value.strip(),
+                "type": "text",  # For now, only text fields
+                "placeholder": self.field_placeholder.value.strip() if self.field_placeholder.value else "",
+                "required": is_required,
+                "max_length": 100  # Default max length
+            }
+            
+            await self.mongo_db["register"].update_one(
+                {"guild_id": self.guild_id},
+                {"$set": {f"custom_fields.{field_key}": new_field}},
+                upsert=True
+            )
+            
+            embed = discord.Embed(
+                title="✅ Özel Alan Eklendi",
+                description=f"'{self.field_name.value}' alanı başarıyla eklendi!",
+                color=discord.Color.green()
+            )
+            embed.add_field(
+                name="📋 Alan Bilgileri",
+                value=(
+                    f"**Anahtar:** `{field_key}`\n"
+                    f"**Ad:** {self.field_name.value}\n"
+                    f"**Zorunlu:** {'✅ Evet' if is_required else '❌ Hayır'}\n"
+                    f"**Format Değişkeni:** `{{{field_key}}}`"
+                ),
+                inline=False
+            )
+            embed.add_field(
+                name="💡 Kullanım",
+                value=f"Bu alanı isim formatında `{{{field_key}}}` şeklinde kullanabilirsiniz.",
+                inline=False
+            )
+            
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+            
+        except Exception as e:
+            logger.error(f"Error adding custom field: {e}")
+            await interaction.response.send_message(
+                embed=create_embed(f"❌ Alan eklenirken bir hata oluştu: {str(e)}", discord.Color.red()),
                 ephemeral=True
             )

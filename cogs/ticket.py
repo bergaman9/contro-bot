@@ -376,6 +376,24 @@ class Ticket(commands.Cog):
         self.bot.add_view(TicketButton())
         self.bot.add_view(TicketControlView())
         logger.info("Ticket cog loaded and persistent views added")
+    
+    async def create_ticket_interaction(self, interaction: discord.Interaction):
+        """Handle ticket creation from external views"""
+        try:
+            # Determine language based on guild locale or default to Turkish
+            language = "tr"
+            if hasattr(interaction.guild, 'preferred_locale'):
+                if interaction.guild.preferred_locale and 'en' in str(interaction.guild.preferred_locale):
+                    language = "en"
+            
+            # Create and send the ticket modal
+            modal = TicketModal("default", interaction.guild.id, self.bot, language)
+            await interaction.response.send_modal(modal)
+            
+        except Exception as e:
+            logger.error(f"Error in create_ticket_interaction: {e}")
+            error_msg = f"❌ Ticket oluşturulurken hata: {str(e)}" if language == "tr" else f"❌ Error creating ticket: {str(e)}"
+            await interaction.response.send_message(error_msg, ephemeral=True)
 
 async def setup(bot):
     await bot.add_cog(Ticket(bot))

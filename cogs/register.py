@@ -89,7 +89,7 @@ class RegisterButton(discord.ui.View):
                     user_language = "en"
             
             # Show modal to collect registration info for new users
-            await interaction.response.send_modal(RegisterModal(mongo_db, user_language))
+            await interaction.response.send_modal(RegisterModal(mongo_db, user_language, interaction.guild.id))
             
         except Exception as e:
             # Detailed error logging
@@ -121,8 +121,10 @@ class RegisterButton(discord.ui.View):
 class RegisterModal(discord.ui.Modal):
     """Modal for collecting registration information"""
     
-    def __init__(self, mongo_db, language="tr"):
+    def __init__(self, mongo_db, language="tr", guild_id=None):
         self.language = language
+        self.guild_id = guild_id
+        self.custom_field_values = {}  # Store custom field values
         
         # Set title based on language
         title = "Registration Form" if language == "en" else "Kayıt Formu"
@@ -160,9 +162,56 @@ class RegisterModal(discord.ui.Modal):
                 max_length=3
             )
         
-        # Add items to modal
+        # Add basic items to modal
         self.add_item(self.name)
         self.add_item(self.age)
+        
+        # Initialize custom fields asynchronously
+        asyncio.create_task(self._load_custom_fields())
+    
+    async def _load_custom_fields(self):
+        """Load and add custom fields to the modal"""
+        if not self.guild_id or not is_db_available(self.mongo_db):
+            return
+        
+        try:
+            # Get guild settings with custom fields
+            settings = await self.mongo_db["register"].find_one({"guild_id": self.guild_id})
+            if not settings:
+                return
+            
+            custom_fields = settings.get("custom_fields", {})
+            if not custom_fields:
+                return
+            
+            # Add custom fields to modal (Discord allows max 5 components)
+            field_count = 0
+            max_additional_fields = 3  # We already have name and age
+            
+            for field_key, field_data in custom_fields.items():
+                if field_count >= max_additional_fields:
+                    break
+                
+                field_name = field_data.get("name", field_key)
+                field_placeholder = field_data.get("placeholder", "")
+                field_required = field_data.get("required", False)
+                field_max_length = field_data.get("max_length", 100)
+                
+                # Create text input for custom field
+                custom_input = discord.ui.TextInput(
+                    label=field_name,
+                    placeholder=field_placeholder,
+                    required=field_required,
+                    max_length=field_max_length
+                )
+                
+                # Store reference to retrieve value later
+                setattr(self, f"custom_{field_key}", custom_input)
+                self.add_item(custom_input)
+                field_count += 1
+                
+        except Exception as e:
+            logger.error(f"Error loading custom fields: {e}")
     
     async def on_submit(self, interaction: discord.Interaction):
         try:
@@ -287,6 +336,19 @@ class RegisterModal(discord.ui.Modal):
                 no_roles_msg = "No roles configured yet - saved to database only" if user_language == "en" else "Henüz rol yapılandırılmamış - sadece veritabanına kaydedildi"
                 assigned_roles_info.append(no_roles_msg)
             
+            # Collect custom field values
+            custom_field_data = {}
+            if hasattr(self, 'guild_id') and self.guild_id:
+                try:
+                    # Get custom fields from settings
+                    custom_fields = settings.get("custom_fields", {})
+                    for field_key in custom_fields.keys():
+                        custom_input = getattr(self, f"custom_{field_key}", None)
+                        if custom_input and custom_input.value:
+                            custom_field_data[field_key] = custom_input.value.strip()
+                except Exception as e:
+                    logger.error(f"Error collecting custom field data: {e}")
+            
             # Update nickname based on settings
             try:
                 # Check if auto edit is enabled (default: False)
@@ -296,16 +358,28 @@ class RegisterModal(discord.ui.Modal):
                     # Get name format from settings
                     name_format = settings.get("name_format", "{user_name} | {age}")
                     
-                    # Format the nickname with available variables
-                    formatted_nickname = name_format.format(
-                        user_name=self.name.value,
-                        age=age,
-                        discord_name=interaction.user.display_name,
-                        member_count=interaction.guild.member_count
-                    )
+                    # Prepare format variables
+                    format_vars = {
+                        "user_name": self.name.value,
+                        "age": age,
+                        "discord_name": interaction.user.display_name,
+                        "member_count": interaction.guild.member_count
+                    }
                     
-                    await interaction.user.edit(nick=formatted_nickname)
-                    logger.info(f"Updated nickname for {interaction.user} to '{formatted_nickname}'")
+                    # Add custom field variables
+                    format_vars.update(custom_field_data)
+                    
+                    # Format the nickname with available variables
+                    try:
+                        formatted_nickname = name_format.format(**format_vars)
+                        await interaction.user.edit(nick=formatted_nickname)
+                        logger.info(f"Updated nickname for {interaction.user} to '{formatted_nickname}'")
+                    except KeyError as ke:
+                        logger.warning(f"Missing format variable {ke} in name format for guild {interaction.guild.id}")
+                        # Fallback to basic format
+                        fallback_nickname = f"{self.name.value} | {age}"
+                        await interaction.user.edit(nick=fallback_nickname)
+                        logger.info(f"Used fallback nickname for {interaction.user}: '{fallback_nickname}'")
                 else:
                     logger.info(f"Auto nickname editing disabled for guild {interaction.guild.id}")
                     
@@ -332,15 +406,22 @@ class RegisterModal(discord.ui.Modal):
             today = discord.utils.utcnow().strftime("%Y-%m-%d")
             current_time = discord.utils.utcnow().timestamp()
             
+            # Prepare registration data
+            registration_data = {
+                "name": self.name.value,
+                "age": age,
+                "registered_at": current_time,
+                "registration_date": today
+            }
+            
+            # Add custom field data to registration record
+            if custom_field_data:
+                registration_data["custom_fields"] = custom_field_data
+            
             # Update user registration record
             await self.mongo_db["register_log"].update_one(
                 {"guild_id": interaction.guild.id, "user_id": interaction.user.id},
-                {"$set": {
-                    "name": self.name.value,
-                    "age": age,
-                    "registered_at": current_time,
-                    "registration_date": today
-                }},
+                {"$set": registration_data},
                 upsert=True
             )
             
