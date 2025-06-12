@@ -593,7 +593,7 @@ class AgeRoleSelect(discord.ui.Select):
                 return
             
             # Update age roles in database
-            self.mongo_db["register"].update_one(
+            await self.mongo_db["register"].update_one(
                 {"guild_id": self.guild_id},
                 {"$set": {f"age_roles.{self.age_range}": role_id}},
                 upsert=True
@@ -769,7 +769,7 @@ class RoleSelect(discord.ui.Select):
                 return
             
             # Update role in database
-            self.mongo_db["register"].update_one(
+            await self.mongo_db["register"].update_one(
                 {"guild_id": self.guild_id},
                 {"$set": {self.setting_key: role_id}},
                 upsert=True
@@ -858,7 +858,7 @@ class ChannelSelect(discord.ui.Select):
                 return
             
             # Update channel in database
-            self.mongo_db["register"].update_one(
+            await self.mongo_db["register"].update_one(
                 {"guild_id": self.guild_id},
                 {"$set": {self.setting_key: channel_id}},
                 upsert=True
@@ -898,7 +898,7 @@ class MessageSettingView(discord.ui.View):
     async def default_message_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Reset to default message"""
         try:
-            self.mongo_db["register"].update_one(
+            await self.mongo_db["register"].update_one(
                 {"guild_id": self.guild_id},
                 {"$set": {"welcome_message": DEFAULT_WELCOME_MESSAGE}},
                 upsert=True
@@ -935,7 +935,7 @@ class ButtonCustomizationView(discord.ui.View):
     async def default_button_settings(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Reset button settings to default"""
         try:
-            self.mongo_db["register"].update_one(
+            await self.mongo_db["register"].update_one(
                 {"guild_id": self.guild_id},
                 {"$set": {
                     "button_title": DEFAULT_BUTTON_TITLE,
@@ -985,7 +985,7 @@ class MessageSettingModal(discord.ui.Modal):
     async def on_submit(self, interaction: discord.Interaction):
         try:
             # Update in database
-            self.mongo_db["register"].update_one(
+            await self.mongo_db["register"].update_one(
                 {"guild_id": self.guild_id},
                 {"$set": {self.setting_key: self.text_input.value}},
                 upsert=True
@@ -1049,7 +1049,7 @@ class ButtonTextModal(discord.ui.Modal, title="Buton Metni Düzenle"):
     async def on_submit(self, interaction: discord.Interaction):
         try:
             # Update button settings in database
-            self.mongo_db["register"].update_one(
+            await self.mongo_db["register"].update_one(
                 {"guild_id": self.guild_id},
                 {"$set": {
                     "button_title": self.button_title.value,
