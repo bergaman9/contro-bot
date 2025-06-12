@@ -3,6 +3,7 @@ from discord.ext import commands
 from typing import Optional, Dict, Any, List
 import logging
 import datetime
+import re
 from pathlib import Path
 import os
 
