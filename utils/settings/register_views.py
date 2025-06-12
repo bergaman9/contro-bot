@@ -12,11 +12,21 @@ from utils.core.formatting import create_embed, hex_to_int
 # Set up logging
 logger = logging.getLogger('register_settings')
 
-# Default values for settings
+# Default values for settings - Turkish
 DEFAULT_WELCOME_MESSAGE = "Hoş geldin {mention}! Sunucumuza kayıt olduğun için teşekkürler."
-DEFAULT_BUTTON_TITLE = "📝 Sunucu Kayıt Sistemi"
-DEFAULT_BUTTON_DESCRIPTION = "Sunucumuza hoş geldiniz! Aşağıdaki butona tıklayarak kayıt olabilirsiniz."
-DEFAULT_BUTTON_INSTRUCTIONS = "Kaydınızı tamamlamak için isminizi ve yaşınızı doğru bir şekilde girmeniz gerekmektedir."
+DEFAULT_BUTTON_TITLE_TR = "📝 Sunucu Kayıt Sistemi"
+DEFAULT_BUTTON_DESCRIPTION_TR = "Sunucumuza hoş geldiniz! Aşağıdaki butona tıklayarak kayıt olabilirsiniz."
+DEFAULT_BUTTON_INSTRUCTIONS_TR = "Kaydınızı tamamlamak için isminizi ve yaşınızı doğru bir şekilde girmeniz gerekmektedir."
+
+# Default values for settings - English
+DEFAULT_BUTTON_TITLE_EN = "📝 Server Registration System"
+DEFAULT_BUTTON_DESCRIPTION_EN = "Welcome to our server! You can register by clicking the button below."
+DEFAULT_BUTTON_INSTRUCTIONS_EN = "To complete your registration, you need to enter your name and age correctly."
+
+# Backward compatibility
+DEFAULT_BUTTON_TITLE = DEFAULT_BUTTON_TITLE_TR
+DEFAULT_BUTTON_DESCRIPTION = DEFAULT_BUTTON_DESCRIPTION_TR
+DEFAULT_BUTTON_INSTRUCTIONS = DEFAULT_BUTTON_INSTRUCTIONS_TR
 
 class RegisterSettingsView(discord.ui.View):
     """Main view for register settings"""
