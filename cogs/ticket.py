@@ -13,7 +13,7 @@ from utils.core.formatting import create_embed, hex_to_int
 from utils.database.connection import initialize_mongodb
 from utils.core.class_utils import DynamicView, DynamicButton
 from utils.database import get_async_db
-from utils.community.turkoyto.card_renderer import create_ticket_card, create_level_card_for_ticket
+from utils.community.turkoyto.card_renderer import create_ticket_card, create_support_system_card
 
 logger = logging.getLogger(__name__)
 
@@ -182,20 +182,18 @@ class TicketModal(discord.ui.Modal):
                         inline=False
                     )
             
-            # Generate images if enabled
-            ticket_image_path = None
-            level_card_path = None
+            # Generate support system card
+            support_card_path = None
             
-            enable_level_cards = settings.get("enable_level_cards", True)
+            enable_support_cards = settings.get("enable_support_cards", True)
             
-            if enable_level_cards:
+            if enable_support_cards:
                 try:
-                    level_card_path = await create_level_card_for_ticket(interaction.user, interaction.guild, self.bot)
-                    if level_card_path and os.path.exists(level_card_path):
-                        level_file = discord.File(level_card_path, filename="level_card.png")
-                        embed.set_image(url="attachment://level_card.png")
+                    support_card_path = await create_support_system_card(interaction.guild, self.bot)
+                    if support_card_path and os.path.exists(support_card_path):
+                        embed.set_image(url="attachment://support_card.png")
                 except Exception as e:
-                    logger.error(f"Error creating level card: {e}")
+                    logger.error(f"Error creating support card: {e}")
             
             
             # Create ticket control view
@@ -203,10 +201,8 @@ class TicketModal(discord.ui.Modal):
             
             # Send ticket message
             files = []
-            if ticket_image_path and os.path.exists(ticket_image_path):
-                files.append(discord.File(ticket_image_path, filename="ticket_image.png"))
-            if level_card_path and os.path.exists(level_card_path):
-                files.append(discord.File(level_card_path, filename="level_card.png"))
+            if support_card_path and os.path.exists(support_card_path):
+                files.append(discord.File(support_card_path, filename="support_card.png"))
             
             if files:
                 await ticket_channel.send(embed=embed, view=view, files=files)
@@ -224,12 +220,11 @@ class TicketModal(discord.ui.Modal):
             })
             
             # Clean up image files
-            for path in [ticket_image_path, level_card_path]:
-                if path and os.path.exists(path):
-                    try:
-                        os.remove(path)
-                    except Exception as e:
-                        logger.error(f"Error removing file {path}: {e}")
+            if support_card_path and os.path.exists(support_card_path):
+                try:
+                    os.remove(support_card_path)
+                except Exception as e:
+                    logger.error(f"Error removing file {support_card_path}: {e}")
             
             # Log ticket creation
             log_channel_id = settings.get("log_channel_id")

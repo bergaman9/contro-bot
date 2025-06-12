@@ -911,35 +911,16 @@ async def create_ticket_card(guild, bot=None, max_members=100):
         else:
             members = []
 
-        # XP verisi çek
+        # XP verisi çek - TurkOyto cog kaldırıldığı için basit level sistemi
         member_xp_data = {}
-        if bot and members:
-            try:
-                cog = bot.get_cog("TurkOyto")
-                if cog and hasattr(cog, 'xp_manager'):
-                    member_ids = [m.id for m in members]
-                    guild_id = str(guild.id)
-                    db = cog.xp_manager.mongo_db
-                    try:
-                        results = list(db.turkoyto_users.find({"user_id": {"$in": member_ids}}))
-                        for user_data in results:
-                            user_id = user_data.get('user_id')
-                            guilds_data = user_data.get('guilds', {})
-                            if guild_id in guilds_data:
-                                guild_data = guilds_data[guild_id]
-                                member_xp_data[int(user_id)] = {
-                                    'level': guild_data.get('level', 0),
-                                    'xp': guild_data.get('xp', 0)
-                                }
-                            else:
-                                member_xp_data[int(user_id)] = {
-                                    'level': user_data.get('level', 0),
-                                    'xp': user_data.get('xp', 0)
-                                }
-                    except Exception:
-                        pass
-            except Exception:
-                pass
+        # Basit level sistemi - üye pozisyonuna göre
+        for i, member in enumerate(members):
+            # Üye pozisyonuna göre basit level hesaplama
+            level = min(i // 5, 19)  # Her 5 üyede bir level artır, max 19
+            member_xp_data[member.id] = {
+                'level': level,
+                'xp': level * 1000
+            }
 
         # --- Avatar kontür renkleri için renk paleti ---
         ticket_level_colors = get_ticket_level_colors()
@@ -1538,40 +1519,196 @@ async def create_register_card(bot, guild, mongo_db=None):
         except Exception:
             return None
 
+
+
 # Wrapper function for ticket system compatibility
-async def create_level_card_for_ticket(user, guild, bot):
-    """Wrapper function for create_level_card that matches ticket system expectations"""
+async def create_support_system_card(guild, bot=None):
+    """Create a support system card with guild information and statistics"""
     try:
-        # Create basic userdata for the existing function
-        userdata = {
-            "level": 1,
-            "xp": 0,
-            "next_level_xp": 1000,
-            "rank": "?"
-        }
+        # Card dimensions
+        card_width, card_height = 800, 400
         
-        # Try to get actual user data if available
+        # Create background with gradient
+        card = Image.new('RGBA', (card_width, card_height), (0, 0, 0, 0))
+        
+        # Create gradient background
+        for y in range(card_height):
+            ratio = y / card_height
+            # Dark blue to purple gradient
+            r = int(25 + (45 - 25) * ratio)
+            g = int(25 + (35 - 25) * ratio) 
+            b = int(50 + (80 - 50) * ratio)
+            
+            for x in range(card_width):
+                card.putpixel((x, y), (r, g, b, 255))
+        
+        draw = ImageDraw.Draw(card)
+        
+        # Load fonts
         try:
-            cog = bot.get_cog("TurkOyto")
-            if cog and hasattr(cog, 'xp_manager'):
-                guild_id = str(guild.id)
-                db = cog.xp_manager.mongo_db
-                user_data = db.turkoyto_users.find_one({"user_id": user.id})
-                if user_data:
-                    guilds_data = user_data.get('guilds', {})
-                    if guild_id in guilds_data:
-                        guild_data = guilds_data[guild_id]
-                        userdata.update({
-                            "level": guild_data.get('level', 0),
-                            "xp": guild_data.get('xp', 0),
-                            "next_level_xp": guild_data.get('next_level_xp', 1000)
-                        })
-        except Exception as e:
-            logger.error(f"Error getting user XP data: {e}")
+            font_path = get_font_path()
+            if font_path:
+                title_font = ImageFont.truetype(font_path, 36)
+                subtitle_font = ImageFont.truetype(font_path, 24)
+                text_font = ImageFont.truetype(font_path, 18)
+                small_font = ImageFont.truetype(font_path, 14)
+            else:
+                title_font = subtitle_font = text_font = small_font = ImageFont.load_default()
+        except Exception:
+            title_font = subtitle_font = text_font = small_font = ImageFont.load_default()
         
-        # Call the existing function
-        return await create_level_card(bot, user, userdata, guild)
+        # Main panel with rounded corners
+        panel_margin = 30
+        panel_rect = (panel_margin, panel_margin, card_width - panel_margin, card_height - panel_margin)
+        
+        # Panel background with glow
+        panel_bg = Image.new("RGBA", card.size, (0, 0, 0, 0))
+        panel_draw = ImageDraw.Draw(panel_bg)
+        
+        # Glow effect
+        for i in range(5):
+            glow_rect = (panel_rect[0] - i*3, panel_rect[1] - i*3, 
+                        panel_rect[2] + i*3, panel_rect[3] + i*3)
+            glow_alpha = 30 - i*5
+            panel_draw.rounded_rectangle(glow_rect, radius=20+i*2, 
+                                       fill=(100, 50, 200, glow_alpha))
+        
+        # Main panel
+        panel_draw.rounded_rectangle(panel_rect, radius=20, fill=(40, 40, 60, 220))
+        
+        # Panel border
+        for i in range(3):
+            border_rect = (panel_rect[0] + i, panel_rect[1] + i, 
+                          panel_rect[2] - i, panel_rect[3] - i)
+            border_alpha = 200 - i*50
+            panel_draw.rounded_rectangle(border_rect, radius=20-i, 
+                                       outline=(150, 100, 255, border_alpha), width=2)
+        
+        card = Image.alpha_composite(card, panel_bg)
+        draw = ImageDraw.Draw(card)
+        
+        # Title section
+        title_text = "🎫 Destek Sistemi"
+        title_y = panel_rect[1] + 25
+        
+        # Title background
+        try:
+            title_bbox = title_font.getbbox(title_text)
+            title_width = title_bbox[2] - title_bbox[0]
+        except AttributeError:
+            title_width, _ = title_font.getsize(title_text)
+        
+        title_x = (card_width - title_width) // 2
+        
+        # Title with shadow
+        draw.text((title_x + 2, title_y + 2), title_text, font=title_font, fill=(0, 0, 0, 150))
+        draw.text((title_x, title_y), title_text, font=title_font, fill=(255, 255, 255, 255))
+        
+        # Subtitle
+        subtitle_text = "Destek talebinizi oluşturmak için aşağıdaki butona tıklayın"
+        subtitle_y = title_y + 50
+        
+        try:
+            subtitle_bbox = subtitle_font.getbbox(subtitle_text)
+            subtitle_width = subtitle_bbox[2] - subtitle_bbox[0]
+        except AttributeError:
+            subtitle_width, _ = subtitle_font.getsize(subtitle_text)
+        
+        subtitle_x = (card_width - subtitle_width) // 2
+        draw.text((subtitle_x, subtitle_y), subtitle_text, font=subtitle_font, fill=(200, 200, 255, 255))
+        
+        # Features section
+        features_y = subtitle_y + 60
+        features = [
+            "🔧 Teknik Sorunlar",
+            "💡 Genel Sorular", 
+            "⚙️ Özellik Talepleri",
+            "📋 Hata Raporları"
+        ]
+        
+        # Create two columns for features
+        col1_x = panel_rect[0] + 60
+        col2_x = panel_rect[0] + 400
+        
+        for i, feature in enumerate(features):
+            x = col1_x if i < 2 else col2_x
+            y = features_y + (i % 2) * 35
+            
+            # Feature background
+            feature_bg = Image.new("RGBA", card.size, (0, 0, 0, 0))
+            feature_bg_draw = ImageDraw.Draw(feature_bg)
+            
+            try:
+                feature_bbox = text_font.getbbox(feature)
+                feature_width = feature_bbox[2] - feature_bbox[0]
+            except AttributeError:
+                feature_width, _ = text_font.getsize(feature)
+            
+            feature_rect = (x - 10, y - 5, x + feature_width + 10, y + 25)
+            feature_bg_draw.rounded_rectangle(feature_rect, radius=8, fill=(60, 60, 80, 150))
+            feature_bg_draw.rounded_rectangle(feature_rect, radius=8, outline=(120, 80, 200, 180), width=1)
+            
+            card = Image.alpha_composite(card, feature_bg)
+            draw = ImageDraw.Draw(card)
+            
+            draw.text((x, y), feature, font=text_font, fill=(220, 220, 255, 255))
+        
+        # Bottom section with guild info
+        if guild:
+            guild_info_y = features_y + 100
+            
+            # Guild name
+            guild_text = f"📍 {guild.name}"
+            try:
+                guild_bbox = text_font.getbbox(guild_text)
+                guild_width = guild_bbox[2] - guild_bbox[0]
+            except AttributeError:
+                guild_width, _ = text_font.getsize(guild_text)
+            
+            guild_x = (card_width - guild_width) // 2
+            draw.text((guild_x, guild_info_y), guild_text, font=text_font, fill=(180, 180, 220, 255))
+            
+            # Member count
+            member_text = f"👥 {guild.member_count} Üye"
+            try:
+                member_bbox = small_font.getbbox(member_text)
+                member_width = member_bbox[2] - member_bbox[0]
+            except AttributeError:
+                member_width, _ = small_font.getsize(member_text)
+            
+            member_x = (card_width - member_width) // 2
+            draw.text((member_x, guild_info_y + 25), member_text, font=small_font, fill=(160, 160, 200, 255))
+        
+        # Decorative elements
+        # Add some geometric shapes for visual appeal
+        shapes_overlay = Image.new("RGBA", card.size, (0, 0, 0, 0))
+        shapes_draw = ImageDraw.Draw(shapes_overlay)
+        
+        # Top left decoration
+        shapes_draw.ellipse((20, 20, 80, 80), fill=(100, 50, 200, 50))
+        shapes_draw.ellipse((25, 25, 75, 75), outline=(150, 100, 255, 100), width=2)
+        
+        # Top right decoration  
+        shapes_draw.ellipse((card_width-80, 20, card_width-20, 80), fill=(100, 50, 200, 50))
+        shapes_draw.ellipse((card_width-75, 25, card_width-25, 75), outline=(150, 100, 255, 100), width=2)
+        
+        # Bottom decorations
+        shapes_draw.polygon([(50, card_height-50), (100, card_height-80), (100, card_height-20)], 
+                          fill=(80, 40, 160, 60))
+        shapes_draw.polygon([(card_width-100, card_height-50), (card_width-50, card_height-80), 
+                           (card_width-50, card_height-20)], fill=(80, 40, 160, 60))
+        
+        card = Image.alpha_composite(card, shapes_overlay)
+        
+        # Save the image
+        os.makedirs("images", exist_ok=True)
+        import uuid
+        output_path = f"images/support_system_card_{uuid.uuid4()}.png"
+        card.save(output_path, format="PNG")
+        
+        logger.info(f"Created support system card: {output_path}")
+        return output_path
         
     except Exception as e:
-        logger.error(f"Error creating level card for ticket: {e}")
+        logger.error(f"Error creating support system card: {e}")
         return None
