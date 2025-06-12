@@ -2,6 +2,9 @@ import asyncio
 import csv
 import os
 import random
+import logging
+import math
+import platform
 from datetime import datetime, timedelta, time
 from typing import List
 
@@ -22,6 +25,9 @@ from translate import Translator
 
 from utils.database.connection import initialize_mongodb
 from utils.core.formatting import create_embed
+
+# Set up logging
+logger = logging.getLogger('fun')
 
 tmdb.API_KEY = os.getenv("TMDB_API_KEY")
 openai.api_key = os.getenv("OPENAI_API_KEY")
@@ -125,87 +131,11 @@ class Fun(commands.Cog):
 
                 await ctx.send(embed=create_embed(f"{member.mention}, burcun {role.mention} olarak belirlendi.",
                                                   discord.Colour.green()))
-            else:
-                await ctx.send(embed=create_embed(
+            else:                await ctx.send(embed=create_embed(
                     f"{zodiac_sign} adında bir rol bulunamadı. Lütfen sunucu yöneticisine bu rolü oluşturmasını söyleyin.",
                     discord.Colour.red()))
         else:
             await ctx.send(embed=create_embed("Geçersiz doğum günü veya ay.", discord.Colour.red()))
-
-    @commands.hybrid_command(name="birthday_setup", description="Burç rollerini ve doğum günü kanalını ayarlayın.")
-    @app_commands.describe(channel="Doğum günü mesajlarının paylaşılacağı kanal.")
-    @commands.has_permissions(manage_roles=True)
-    async def birthday_setup(self, ctx, channel: discord.TextChannel = None):
-        # Burç rollerini ayarlayın
-        await ctx.defer()
-        zodiac_roles = ["Akrep", "Yay", "Oğlak", "Kova", "Balık", "Koç", "Boğa", "İkizler", "Yengeç", "Aslan", "Başak",
-                        "Terazi"]
-        for role in zodiac_roles:
-            if not discord.utils.get(ctx.guild.roles, name=role):
-                await ctx.guild.create_role(name=role)
-
-        await ctx.send(embed=create_embed("Burç rolleri oluşturuldu.", discord.Colour.green()))
-
-        if channel:
-            self.mongo_db['birthday'].update_one({"guild_id": ctx.guild.id}, {"$set": {"channel_id": channel.id}},
-                                                 upsert=True)
-            await ctx.send(embed=create_embed(f"{channel.mention} kanalında doğum günü mesajları paylaşılacak.",
-                                              discord.Colour.green()))
-
-    @app_commands.command(name="ask", description="Get an answer to a question.")
-    @app_commands.describe(question="Write your question.")
-    async def ask(self, interaction, question: str):
-        await interaction.response.defer(ephemeral=False, thinking=True)
-        
-        try:
-            # Check for OpenAI API key
-            if not openai.api_key:
-                await interaction.followup.send(
-                    embed=create_embed("OpenAI API key is not set up.", discord.Color.red())
-                )
-                return
-                
-            # Use the current OpenAI client method
-            try:
-                # For newer OpenAI API versions
-                from openai import OpenAI
-                client = OpenAI(api_key=openai.api_key)
-                response = client.chat.completions.create(
-                    model="gpt-3.5-turbo",
-                    messages=[
-                        {"role": "system", "content": "You are a helpful assistant."},
-                        {"role": "user", "content": question}
-                    ],
-                    temperature=0.7,
-                )
-                answer = response.choices[0].message.content
-            except (ImportError, AttributeError):
-                # For older OpenAI API versions
-                completion = openai.ChatCompletion.create(
-                    model="gpt-3.5-turbo",
-                    messages=[
-                        {"role": "system", "content": "You are a helpful assistant."},
-                        {"role": "user", "content": question}
-                    ],
-                    temperature=0.7,
-                )
-                answer = completion.choices[0].message["content"]
-            
-            # Create an embed for the response
-            embed = discord.Embed(
-                title="Response",
-                description=answer,
-                color=discord.Color.blue()
-            )
-            embed.set_footer(text=f"Question: {question}")
-            
-            await interaction.followup.send(embed=embed)
-        except Exception as e:
-            error_message = f"Error: {str(e)}"
-            print(f"Error in ask command: {e}")
-            await interaction.followup.send(
-                embed=create_embed(f"Sorry, I couldn't process your request: {error_message}", discord.Color.red())
-            )
 
     @commands.hybrid_command(name="crypto", description="Gets usd price of the asset.")
     @app_commands.describe(asset="The asset to get the price of.")

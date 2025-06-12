@@ -485,9 +485,38 @@ class XPManager:
     async def get_top_users(self, guild_id, limit=10):
         """Get top users by XP"""
         try:
-            return list(self.mongo_db.turkoyto_users.find(
-                {"guild_id": guild_id}
-            ).sort("xp", -1).limit(limit))
+            # Get async database
+            mongo_db = await self.get_db()
+            if mongo_db is None:
+                logger.error("Failed to get database connection")
+                return []
+            
+            # Convert guild_id to integer for consistency
+            if isinstance(guild_id, str):
+                guild_id = int(guild_id)
+            
+            logger.info(f"Getting top {limit} users for guild {guild_id}")
+            
+            # Try async approach first
+            try:
+                cursor = mongo_db.turkoyto_users.find(
+                    {"guild_id": guild_id}
+                ).sort("xp", -1).limit(limit)
+                users = await cursor.to_list(length=None)
+                logger.info(f"Found {len(users)} users in leaderboard")
+                return users
+            except Exception as e:
+                logger.error(f"Error with async query: {e}")
+                # Fallback to sync approach
+                try:
+                    users = list(mongo_db.turkoyto_users.find(
+                        {"guild_id": guild_id}
+                    ).sort("xp", -1).limit(limit))
+                    logger.info(f"Found {len(users)} users in leaderboard (sync)")
+                    return users
+                except Exception as e2:
+                    logger.error(f"Error with sync query: {e2}")
+                    return []
         except Exception as e:
             logger.error(f"Error getting top users: {e}")
             return []

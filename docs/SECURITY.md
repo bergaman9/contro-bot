@@ -16,7 +16,7 @@ If you discover a security vulnerability in CONTRO Bot, please follow these step
 - This protects users who are running the bot
 
 ### 2. Send a private report
-- Email: [security@yourproject.com] (replace with your contact)
+- Email: bergasoft@pm.me
 - Include:
   - Description of the vulnerability
   - Steps to reproduce
@@ -79,6 +79,6 @@ When a security vulnerability is reported and confirmed:
 
 For security concerns, please contact the maintainers through:
 - GitHub: Create a private security advisory
-- Email: [Your security contact email]
+- Email: bergasoft@pm.me
 
 Thank you for helping keep CONTRO Bot secure!

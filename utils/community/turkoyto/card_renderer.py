@@ -1537,3 +1537,41 @@ async def create_register_card(bot, guild, mongo_db=None):
             return fallback_path
         except Exception:
             return None
+
+# Wrapper function for ticket system compatibility
+async def create_level_card_for_ticket(user, guild, bot):
+    """Wrapper function for create_level_card that matches ticket system expectations"""
+    try:
+        # Create basic userdata for the existing function
+        userdata = {
+            "level": 1,
+            "xp": 0,
+            "next_level_xp": 1000,
+            "rank": "?"
+        }
+        
+        # Try to get actual user data if available
+        try:
+            cog = bot.get_cog("TurkOyto")
+            if cog and hasattr(cog, 'xp_manager'):
+                guild_id = str(guild.id)
+                db = cog.xp_manager.mongo_db
+                user_data = db.turkoyto_users.find_one({"user_id": user.id})
+                if user_data:
+                    guilds_data = user_data.get('guilds', {})
+                    if guild_id in guilds_data:
+                        guild_data = guilds_data[guild_id]
+                        userdata.update({
+                            "level": guild_data.get('level', 0),
+                            "xp": guild_data.get('xp', 0),
+                            "next_level_xp": guild_data.get('next_level_xp', 1000)
+                        })
+        except Exception as e:
+            logger.error(f"Error getting user XP data: {e}")
+        
+        # Call the existing function
+        return await create_level_card(bot, user, userdata, guild)
+        
+    except Exception as e:
+        logger.error(f"Error creating level card for ticket: {e}")
+        return None

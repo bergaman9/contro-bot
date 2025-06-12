@@ -497,110 +497,11 @@ class TempChannels(commands.Cog):
     async def on_voice_state_update(self, member, before, after):
         """Handle voice state updates for temporary channels"""
         await self.manager.on_voice_state_update(member, before, after)
-    
-    @commands.hybrid_command(name="temp_channels", description="Configure temporary voice channels system")
-    @commands.has_permissions(manage_channels=True)
-    async def temp_channels_config(self, ctx):
-        """
-        Configure the temporary voice channels system for your server.
-        
-        This system allows users to create temporary voice channels by joining a designated "creator" channel.
-        The temporary channels are automatically deleted when empty.
-        """
-        try:
-            embed = discord.Embed(
-                title="🎮 Geçici Sesli Kanal Sistemi",
-                description=(
-                    "Sunucunuz için geçici sesli kanal sistemini yapılandırın.\n\n"
-                    "**Nasıl Çalışır:**\n"
-                    "• Kullanıcılar belirli bir kanala katıldığında otomatik olarak kendi özel kanalları oluşturulur\n"
-                    "• Kanal boşaldığında otomatik olarak silinir\n"
-                    "• Oyun adlarına göre özel emojiler eklenebilir\n"
-                    "• Kanal adı formatı özelleştirilebilir"
-                ),
-                color=discord.Color.purple()
-            )
-            
-            embed.add_field(
-                name="⚙️ Ayarla",
-                value="Sistemi yapılandırın ve oluşturucu kanalı ayarlayın",
-                inline=False
-            )
-            
-            embed.add_field(
-                name="📋 Mevcut Ayarları Göster",
-                value="Şu anki ayarları görüntüleyin",
-                inline=False
-            )
-            
-            embed.add_field(
-                name="🗑️ Sistemi Kaldır",
-                value="Geçici kanal sistemini tamamen kaldırın",
-                inline=False
-            )
-            
-            view = TempChannelsView(self.bot, self.manager)
-            await ctx.send(embed=embed, view=view, ephemeral=True)
-            
-        except Exception as e:
-            logger.error(f"Error in temp_channels command: {e}")
-            await ctx.send(
-                embed=create_embed(f"Komut işlenirken bir hata oluştu: {str(e)}", discord.Color.red()),
-                ephemeral=True
-            )
-    
-    @commands.hybrid_command(name="list_temp_channels", description="List all active temporary channels")
-    @commands.has_permissions(manage_channels=True)
-    async def list_temp_channels(self, ctx):
-        """List all active temporary channels in the server"""
-        try:
-            guild_temp_channels = [
-                (ch_id, data) for ch_id, data in self.manager.temp_channels.items() 
-                if data['guild_id'] == ctx.guild.id
-            ]
-            
-            if not guild_temp_channels:
-                embed = create_embed(
-                    title="📋 Aktif Geçici Kanallar",
-                    description="Bu sunucuda aktif geçici kanal bulunmuyor.",
-                    color=discord.Color.blue()
-                )
-            else:
-                embed = create_embed(
-                    title="📋 Aktif Geçici Kanallar",
-                    description=f"Bu sunucuda {len(guild_temp_channels)} aktif geçici kanal var:",
-                    color=discord.Color.green()
-                )
-                
-                for channel_id, data in guild_temp_channels[:10]:  # Limit to 10 for embed space
-                    channel = ctx.guild.get_channel(channel_id)
-                    creator = ctx.guild.get_member(data['creator_id'])
-                    
-                    if channel and creator:
-                        member_count = len(channel.members)
-                        created_time = data.get('created_at', 'Bilinmiyor')
-                        
-                        embed.add_field(
-                            name=f"🎮 {channel.name}",
-                            value=(
-                                f"**Oluşturan:** {creator.mention}\n"
-                                f"**Üye Sayısı:** {member_count}\n"
-                                f"**Oluşturulma:** {discord.utils.format_dt(created_time, style='R') if created_time != 'Bilinmiyor' else 'Bilinmiyor'}"
-                            ),
-                            inline=True
-                        )
-                
-                if len(guild_temp_channels) > 10:
-                    embed.set_footer(text=f"Ve {len(guild_temp_channels) - 10} kanal daha...")
-            
-            await ctx.send(embed=embed, ephemeral=True)
-            
-        except Exception as e:
-            logger.error(f"Error listing temp channels: {e}")
-            await ctx.send(
-                embed=create_embed(f"Kanalları listelerken bir hata oluştu: {str(e)}", discord.Color.red()),
-                ephemeral=True
-            )
+      # Removed hybrid command - now integrated into /server_settings
+    # The temp_channels configuration is now accessible through:
+    # /server_settings -> 🎮 Geçici Kanallar button
+      # Removed hybrid command - functionality moved to /server_settings
+    # List temp channels feature is now part of the temp channels settings panel
 
 async def setup(bot):
     await bot.add_cog(TempChannels(bot))

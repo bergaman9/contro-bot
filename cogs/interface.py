@@ -416,8 +416,7 @@ class UserProfileView(discord.ui.View):
                 if temp_settings.get("default_limit") is not None:
                     temp_info.append(f"Üye Limiti: {temp_settings['default_limit']}")
                 
-                if temp_info:
-                    embed.add_field(
+                if temp_info:                    embed.add_field(
                         name="Geçici Kanal Ayarları",
                         value="\n".join(temp_info),
                         inline=False
@@ -431,6 +430,7 @@ class UserProfileView(discord.ui.View):
         
         return embed
 
+
 class Interface(commands.Cog):
     """
     User interface for managing profiles, game connections and temporary channels
@@ -439,33 +439,87 @@ class Interface(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.db = initialize_mongodb()
-        
-        # Initialize the database schema if needed
+          # Initialize the database schema if needed
         asyncio.create_task(self.setup_database())
-    
+
     async def setup_database(self):
         """Setup the database collections and indexes"""
         try:
             # Set unique index on user_id + guild_id
-            await self.db.user_profiles.create_index(
+            self.db.user_profiles.create_index(
                 [("user_id", 1), ("guild_id", 1)], 
                 unique=True
             )
             logger.info("User profiles database initialized")
         except Exception as e:
             logger.error(f"Error setting up database: {e}")
-    
-    @app_commands.command(name="profile", description="View and manage your user profile")
-    async def profile(self, interaction: discord.Interaction):
-        """View and manage your user profile"""
+
+    @app_commands.command(name="profile", description="View and manage user profile")
+    @app_commands.describe(user="The user whose profile to view (optional)")
+    async def profile(self, interaction: discord.Interaction, user: Optional[discord.User] = None):
+        """View and manage user profile - merged profile and view_profile commands"""
         try:
+            # If no user specified, show own profile
+            target_user = user or interaction.user
+            is_own_profile = target_user.id == interaction.user.id
+            
+            # Get user data from database
+            user_data = await self.db.user_profiles.find_one({
+                "user_id": str(target_user.id),
+                "guild_id": str(interaction.guild_id)
+            })
+            
+            # If viewing someone else's profile and they don't have one
+            if not is_own_profile and not user_data:
+                await interaction.response.send_message(
+                    f"❌ {target_user.display_name} henüz profil oluşturmamış.",
+                    ephemeral=True
+                )
+                return
+            
+            # Check privacy settings for other users' profiles
+            if not is_own_profile and user_data:
+                privacy_level = user_data.get("preferences", {}).get("privacy_level", "public")
+                
+                # If private, only show to the user themselves
+                if privacy_level == "private":
+                    await interaction.response.send_message(
+                        f"❌ {target_user.display_name}'in profili gizli.",
+                        ephemeral=True
+                    )
+                    return
+                
+                # If friends-only, check if they have roles in common
+                if privacy_level == "friends":
+                    member = interaction.guild.get_member(target_user.id)
+                    viewer = interaction.guild.get_member(interaction.user.id)
+                    
+                    if member and viewer:
+                        common_roles = set(role.id for role in member.roles) & set(role.id for role in viewer.roles)
+                        if len(common_roles) <= 1:  # Only @everyone in common
+                            await interaction.response.send_message(
+                                f"❌ {target_user.display_name}'in profili sadece arkadaşlarına açık.",
+                                ephemeral=True
+                            )
+                            return
+            
             # Create the profile view
-            view = UserProfileView(self.bot, interaction.user.id, interaction.guild_id)
+            view = UserProfileView(self.bot, target_user.id, interaction.guild_id)
+            
+            # For own profile, include interactive buttons; for others, view-only
+            if not is_own_profile:
+                view.clear_items()  # Remove interactive buttons for other users
             
             # Create the profile embed
-            embed = await view.create_profile_embed(interaction.user)
+            embed = await view.create_profile_embed(target_user)
             
-            await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+            # Send response
+            await interaction.response.send_message(
+                embed=embed, 
+                view=view if is_own_profile else None, 
+                ephemeral=True
+            )
+            
         except Exception as e:
             logger.error(f"Error in profile command: {e}")
             await interaction.response.send_message(
@@ -549,70 +603,7 @@ class Interface(commands.Cog):
                 f"❌ Kayıt olurken bir hata oluştu: {str(e)}",
                 ephemeral=True
             )
-    
-    @app_commands.command(name="view_profile", description="View profile of another user")
-    async def view_profile(self, interaction: discord.Interaction, user: discord.User):
-        """View the profile of another user"""
-        try:
-            # Get user data from database
-            user_data = await self.db.user_profiles.find_one({
-                "user_id": str(user.id),
-                "guild_id": str(interaction.guild_id)
-            })
-            
-            if not user_data:
-                await interaction.response.send_message(
-                    f"❌ {user.display_name} henüz profil oluşturmamış.",
-                    ephemeral=True
-                )
-                return
-            
-            # Check privacy settings
-            privacy_level = user_data.get("preferences", {}).get("privacy_level", "public")
-            
-            # If private, only show to the user themselves
-            if privacy_level == "private" and interaction.user.id != user.id:
-                await interaction.response.send_message(
-                    f"❌ {user.display_name}'in profili gizli.",
-                    ephemeral=True
-                )
-                return
-            
-            # If friends-only, check if they are friends (for now just check if they have a role in common)
-            if privacy_level == "friends" and interaction.user.id != user.id:
-                # In a real implementation, you might have a friends system
-                # For now, we'll just check if they have any roles in common
-                member = interaction.guild.get_member(user.id)
-                viewer = interaction.guild.get_member(interaction.user.id)
-                
-                if member and viewer:
-                    common_roles = set(role.id for role in member.roles) & set(role.id for role in viewer.roles)
-                    if len(common_roles) <= 1:  # Only @everyone in common
-                        await interaction.response.send_message(
-                            f"❌ {user.display_name}'in profili sadece arkadaşlarına açık.",
-                            ephemeral=True
-                        )
-                        return
-            
-            # Create the profile view (but without interactive buttons)
-            view = UserProfileView(self.bot, user.id, interaction.guild_id)
-            embed = await view.create_profile_embed(user)
-            
-            # Send as ephemeral if viewing own profile or admin
-            is_admin = interaction.user.guild_permissions.administrator
-            is_own = interaction.user.id == user.id
-            
-            await interaction.response.send_message(
-                embed=embed,
-                ephemeral=(is_own or is_admin)
-            )
-            
-        except Exception as e:
-            logger.error(f"Error in view_profile command: {e}")
-            await interaction.response.send_message(
-                f"❌ Profil görüntülenirken bir hata oluştu: {str(e)}",
-                ephemeral=True
-            )
+  
     
     @commands.Cog.listener()
     async def on_voice_state_update(self, member, before, after):

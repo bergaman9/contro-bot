@@ -9,7 +9,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 
-from utils.database.connection import initialize_mongodb
+from utils.database.connection import get_async_db
 from utils.core.formatting import calculate_how_long_ago_member_created, calculate_how_long_ago_member_joined, create_embed
 
 # Set up logging
@@ -93,7 +93,7 @@ class EventLogger(commands.Cog, name="Events"):
     
     def __init__(self, bot):
         self.bot = bot
-        self.mongo_db = initialize_mongodb()
+        # Database connection handled via get_async_db() when needed
         self.webhooks = {}  # Store webhooks by guild_id
         self.sync_manager = CommandSyncManager()
         self.rate_limited_events = set()  # Set to track rate-limited events
@@ -359,21 +359,20 @@ class EventLogger(commands.Cog, name="Events"):
         if not channel:
             return
             
-        # Create the embed
+        # Create the embed with improved design
         embed = discord.Embed(
-            title="Command Used",
             description=f"**Command:** `{ctx.message.content}`",
             color=discord.Color.blue(),
             timestamp=datetime.now()
         )
         
-        # Add user information
-        embed.add_field(name="User", value=f"{ctx.author.mention} (`{ctx.author.id}`)")
-        embed.add_field(name="Channel", value=f"{ctx.channel.mention} (`{ctx.channel.id}`)")
+        # Add channel information
+        embed.add_field(name="Channel", value=f"{ctx.channel.mention}", inline=True)
+        embed.add_field(name="User ID", value=f"`{ctx.author.id}`", inline=True)
         
-        # Set author with user's avatar
+        # Set author to show "xx used a command"
         embed.set_author(
-            name=str(ctx.author),
+            name=f"{ctx.author.display_name} used a command",
             icon_url=ctx.author.avatar.url if ctx.author.avatar else None
         )
         
@@ -452,57 +451,57 @@ class EventLogger(commands.Cog, name="Events"):
         # We need to ensure all webhooks are properly handled during bot shutdown
         asyncio.create_task(self.cleanup_old_webhooks())
         
-    @commands.group(name="loggings", description="Log ayarlarını yapılandırın")
+    @commands.group(name="loggings", description="Configure logging settings")
     @commands.has_permissions(manage_guild=True)
     async def loggings(self, ctx):
-        """Log ayarları için ana komut grubu"""
+        """Main command group for logging settings"""
         if ctx.invoked_subcommand is None:
             embed = discord.Embed(
-                title="📝 Log Ayarları",
-                description="Aşağıdaki alt komutlar ile log ayarlarını yapılandırabilirsiniz:",
+                title="📝 Logging Settings",
+                description="Configure logging settings using the following subcommands:",
                 color=discord.Color.blue()
             )
             
             embed.add_field(
-                name="📊 Alt Komutlar",
+                name="📊 Subcommands",
                 value=(
-                    "`/loggings panel` - Log ayarları panelini gösterir\n"
-                    "`/loggings channel <kanal>` - Ana log kanalını ayarlar\n"
-                    "`/loggings toggle <ayar> <değer>` - Belirli log ayarlarını açar/kapatır\n"
-                    "`/loggings view` - Mevcut log ayarlarını gösterir\n"
-                    "`/loggings reset` - Tüm log ayarlarını sıfırlar"
+                    "`/loggings panel` - Show logging settings panel\n"
+                    "`/loggings channel <channel>` - Set main logging channel\n"
+                    "`/loggings toggle <setting> <value>` - Enable/disable specific logging settings\n"
+                    "`/loggings view` - Show current logging settings\n"
+                    "`/loggings reset` - Reset all logging settings"
                 ),
                 inline=False
             )
             
             embed.add_field(
-                name="ℹ️ İpucu",
-                value="Daha kolay yapılandırma için `/loggings panel` komutunu kullanarak görsel arayüzü açabilirsiniz.",
+                name="ℹ️ Tip",
+                value="For easier configuration, use `/loggings panel` to open the visual interface.",
                 inline=False
             )
             
             await ctx.send(embed=embed)
     
-    @loggings.command(name="panel", description="Log ayarları panelini gösterir")
+    @loggings.command(name="panel", description="Show logging settings panel")
     @commands.has_permissions(manage_guild=True)
     async def loggings_panel(self, ctx):
-        """Log ayarları panelini gösterir"""
-        from utils.settings.logging_views import LoggingSettingsView
+        """Show logging settings panel"""
+        from utils.settings.views import LoggingView
         
         embed = discord.Embed(
-            title="📝 Log Ayarları",
-            description="Sunucunuz için log ayarlarını yapılandırın.",
+            title="📝 Logging Settings",
+            description="Configure logging settings for your server.",
             color=discord.Color.blue()
         )
         
         embed.add_field(
-            name="📋 Mevcut Seçenekler",
+            name="📋 Available Options",
             value=(
-                "• **Ana Log Kanalı** - Tüm logların gönderileceği ana kanal\n"
-                "• **Gelişmiş Loglama** - Farklı olaylar için özel kanallar\n"
-                "• **Denetim Kaydı** - Discord denetim kaydı entegrasyonu\n"
-                "• **Yedekleme** - Log verilerinin yedeklenmesi\n"
-                "• **Loglanan Olaylar** - Hangi olayların loglanacağını seçin\n"
+                "• **Main Log Channel** - Main channel where all logs will be sent\n"
+                "• **Advanced Logging** - Special channels for different events\n"
+                "• **Audit Log** - Discord audit log integration\n"
+                "• **Backup** - Backup log data\n"
+                "• **Logged Events** - Choose which events to log\n"
             ),
             inline=False
         )
@@ -515,25 +514,25 @@ class EventLogger(commands.Cog, name="Events"):
                 channel_id = guild_settings["channel_id"]
                 log_channel = ctx.guild.get_channel(channel_id)
         
-        status = f"Ana Log Kanalı: {log_channel.mention if log_channel else 'Ayarlanmamış'}"
-        embed.add_field(name="🔧 Mevcut Ayarlar", value=status, inline=False)
+        status = f"Main Log Channel: {log_channel.mention if log_channel else 'Not configured'}"
+        embed.add_field(name="🔧 Current Settings", value=status, inline=False)
         
         # Create logging view with buttons
-        view = LoggingSettingsView(self.bot, ctx.guild)
+        view = LoggingView(self.bot, "en")
         
         # Send the embed with the view
         await ctx.send(embed=embed, view=view, ephemeral=True)
     
-    @loggings.command(name="channel", description="Ana log kanalını ayarlar")
+    @loggings.command(name="channel", description="Set main logging channel")
     @commands.has_permissions(manage_guild=True)
-    @app_commands.describe(channel="Log mesajlarının gönderileceği kanal")
+    @app_commands.describe(channel="Channel where log messages will be sent")
     async def loggings_channel(self, ctx, channel: discord.TextChannel):
-        """Ana log kanalını ayarlar"""
+        """Set main logging channel"""
         try:
             # Check if the bot has permissions to send messages in the channel
             if not channel.permissions_for(ctx.guild.me).send_messages:
                 return await ctx.send(
-                    embed=create_embed(f"❌ {channel.mention} kanalına mesaj gönderme iznim yok.", discord.Color.red()),
+                    embed=create_embed(f"❌ I don't have permission to send messages in {channel.mention}.", discord.Color.red()),
                     ephemeral=True
                 )
             
@@ -546,38 +545,38 @@ class EventLogger(commands.Cog, name="Events"):
                 )
                 
                 await ctx.send(
-                    embed=create_embed(f"✅ Ana log kanalı {channel.mention} olarak ayarlandı.", discord.Color.green()),
+                    embed=create_embed(f"✅ Main logging channel set to {channel.mention}.", discord.Color.green()),
                     ephemeral=True
                 )
             else:
                 await ctx.send(
-                    embed=create_embed("❌ Veritabanı bağlantısı kurulamadı.", discord.Color.red()),
+                    embed=create_embed("❌ Database connection could not be established.", discord.Color.red()),
                     ephemeral=True
                 )
         except Exception as e:
             logger.error(f"Error setting log channel: {e}")
             await ctx.send(
-                embed=create_embed(f"❌ Log kanalı ayarlanırken bir hata oluştu: {str(e)}", discord.Color.red()),
+                embed=create_embed(f"❌ An error occurred while setting the log channel: {str(e)}", discord.Color.red()),
                 ephemeral=True
             )
     
-    @loggings.command(name="toggle", description="Belirli log ayarlarını açar/kapatır")
+    @loggings.command(name="toggle", description="Enable/disable specific logging settings")
     @commands.has_permissions(manage_guild=True)
     @app_commands.describe(
-        setting="Değiştirilecek ayar",
-        value="Ayarın yeni değeri (true/false)"
+        setting="Setting to change",
+        value="New value for the setting (true/false)"
     )
     @app_commands.choices(setting=[
-        app_commands.Choice(name="Üye Olayları", value="member_events_enabled"),
-        app_commands.Choice(name="Mesaj Olayları", value="message_events_enabled"),
-        app_commands.Choice(name="Sunucu Olayları", value="server_events_enabled"),
-        app_commands.Choice(name="Ses Olayları", value="voice_events_enabled"),
-        app_commands.Choice(name="Komut Olayları", value="command_events_enabled"),
-        app_commands.Choice(name="Thread Olayları", value="thread_events_enabled"),
-        app_commands.Choice(name="Etkinlik Olayları", value="event_events_enabled")
+        app_commands.Choice(name="Member Events", value="member_events_enabled"),
+        app_commands.Choice(name="Message Events", value="message_events_enabled"),
+        app_commands.Choice(name="Server Events", value="server_events_enabled"),
+        app_commands.Choice(name="Voice Events", value="voice_events_enabled"),
+        app_commands.Choice(name="Command Events", value="command_events_enabled"),
+        app_commands.Choice(name="Thread Events", value="thread_events_enabled"),
+        app_commands.Choice(name="Activity Events", value="event_events_enabled")
     ])
     async def loggings_toggle(self, ctx, setting: str, value: bool):
-        """Belirli log ayarlarını açar/kapatır"""
+        """Enable/disable specific logging settings"""
         try:
             # Save to database
             if self.mongo_db is not None:
@@ -589,7 +588,7 @@ class EventLogger(commands.Cog, name="Events"):
                 
                 # Get readable setting name
                 setting_name = next((choice.name for choice in self.loggings_toggle.app_command.choices["setting"] if choice.value == setting), setting)
-                status = "etkinleştirildi" if value else "devre dışı bırakıldı"
+                status = "enabled" if value else "disabled"
                 
                 await ctx.send(
                     embed=create_embed(f"✅ {setting_name} {status}.", discord.Color.green()),
@@ -597,24 +596,24 @@ class EventLogger(commands.Cog, name="Events"):
                 )
             else:
                 await ctx.send(
-                    embed=create_embed("❌ Veritabanı bağlantısı kurulamadı.", discord.Color.red()),
+                    embed=create_embed("❌ Database connection could not be established.", discord.Color.red()),
                     ephemeral=True
                 )
         except Exception as e:
             logger.error(f"Error toggling log setting: {e}")
             await ctx.send(
-                embed=create_embed(f"❌ Log ayarı değiştirilirken bir hata oluştu: {str(e)}", discord.Color.red()),
+                embed=create_embed(f"❌ An error occurred while changing the setting: {str(e)}", discord.Color.red()),
                 ephemeral=True
             )
     
-    @loggings.command(name="view", description="Mevcut log ayarlarını gösterir")
+    @loggings.command(name="view", description="Show current logging settings")
     @commands.has_permissions(manage_guild=True)
     async def loggings_view(self, ctx):
-        """Mevcut log ayarlarını gösterir"""
+        """Show current logging settings"""
         try:
             if self.mongo_db is None:
                 return await ctx.send(
-                    embed=create_embed("❌ Veritabanı bağlantısı kurulamadı.", discord.Color.red()),
+                    embed=create_embed("❌ Database connection could not be established.", discord.Color.red()),
                     ephemeral=True
                 )
             
@@ -623,8 +622,8 @@ class EventLogger(commands.Cog, name="Events"):
             
             # Create embed with current settings
             embed = discord.Embed(
-                title="📊 Mevcut Log Ayarları",
-                description=f"**{ctx.guild.name}** sunucusu için log ayarları:",
+                title="📊 Current Logging Settings",
+                description=f"Logging settings for **{ctx.guild.name}**:",
                 color=discord.Color.blue()
             )
             
@@ -632,30 +631,30 @@ class EventLogger(commands.Cog, name="Events"):
             channel_id = settings.get("channel_id")
             channel = ctx.guild.get_channel(channel_id) if channel_id else None
             embed.add_field(
-                name="📝 Ana Log Kanalı",
-                value=channel.mention if channel else "Ayarlanmamış",
+                name="📝 Main Log Channel",
+                value=channel.mention if channel else "Not configured",
                 inline=False
             )
             
             # Event toggles
             event_settings = [
-                ("Üye Olayları", "member_events_enabled"),
-                ("Mesaj Olayları", "message_events_enabled"),
-                ("Sunucu Olayları", "server_events_enabled"),
-                ("Ses Olayları", "voice_events_enabled"),
-                ("Komut Olayları", "command_events_enabled"),
-                ("Thread Olayları", "thread_events_enabled"),
-                ("Etkinlik Olayları", "event_events_enabled")
+                ("Member Events", "member_events_enabled"),
+                ("Message Events", "message_events_enabled"),
+                ("Server Events", "server_events_enabled"),
+                ("Voice Events", "voice_events_enabled"),
+                ("Command Events", "command_events_enabled"),
+                ("Thread Events", "thread_events_enabled"),
+                ("Activity Events", "event_events_enabled")
             ]
             
             event_statuses = []
             for name, key in event_settings:
                 status = settings.get(key, True)  # Default to True if not set
                 emoji = "✅" if status else "❌"
-                event_statuses.append(f"{emoji} {name}: **{'Aktif' if status else 'Devre dışı'}**")
+                event_statuses.append(f"{emoji} {name}: **{'Active' if status else 'Disabled'}**")
             
             embed.add_field(
-                name="⚙️ Olay Ayarları",
+                name="⚙️ Event Settings",
                 value="\n".join(event_statuses),
                 inline=False
             )
@@ -663,13 +662,13 @@ class EventLogger(commands.Cog, name="Events"):
             # Advanced channels
             advanced_channels = []
             for name, key in [
-                ("Üye Olayları", "member_channel_id"),
-                ("Mesaj Olayları", "message_channel_id"),
-                ("Sunucu Olayları", "server_channel_id"),
-                ("Ses Olayları", "voice_channel_id"),
-                ("Komut Olayları", "command_channel_id"),
-                ("Thread Olayları", "thread_channel_id"),
-                ("Etkinlik Olayları", "event_channel_id")
+                ("Member Events", "member_channel_id"),
+                ("Message Events", "message_channel_id"),
+                ("Server Events", "server_channel_id"),
+                ("Voice Events", "voice_channel_id"),
+                ("Command Events", "command_channel_id"),
+                ("Thread Events", "thread_channel_id"),
+                ("Activity Events", "event_channel_id")
             ]:
                 channel_id = settings.get(key)
                 if channel_id:
@@ -679,14 +678,14 @@ class EventLogger(commands.Cog, name="Events"):
             
             if advanced_channels:
                 embed.add_field(
-                    name="🔧 Gelişmiş Kanal Ayarları",
+                    name="🔧 Advanced Channel Settings",
                     value="\n".join(advanced_channels),
                     inline=False
                 )
             else:
                 embed.add_field(
-                    name="🔧 Gelişmiş Kanal Ayarları",
-                    value="Henüz özel kanal ayarlanmamış.",
+                    name="🔧 Advanced Channel Settings",
+                    value="No special channels configured yet.",
                     inline=False
                 )
             
@@ -695,21 +694,21 @@ class EventLogger(commands.Cog, name="Events"):
         except Exception as e:
             logger.error(f"Error viewing log settings: {e}")
             await ctx.send(
-                embed=create_embed(f"❌ Log ayarları görüntülenirken bir hata oluştu: {str(e)}", discord.Color.red()),
+                embed=create_embed(f"❌ An error occurred while displaying log settings: {str(e)}", discord.Color.red()),
                 ephemeral=True
             )
     
-    @loggings.command(name="reset", description="Tüm log ayarlarını sıfırlar")
+    @loggings.command(name="reset", description="Reset all logging settings")
     @commands.has_permissions(manage_guild=True)
     async def loggings_reset(self, ctx):
-        """Tüm log ayarlarını sıfırlar"""
+        """Reset all logging settings"""
         try:
             # Create confirmation view
             from utils.settings.logging_views import LoggingConfirmationView
             
             embed = discord.Embed(
-                title="⚠️ Log Ayarlarını Sıfırla",
-                description="Tüm log ayarlarını sıfırlamak istediğinizden emin misiniz? Bu işlem geri alınamaz.",
+                title="⚠️ Reset Logging Settings",
+                description="Are you sure you want to reset all logging settings? This action cannot be undone.",
                 color=discord.Color.yellow()
             )
             
@@ -719,7 +718,7 @@ class EventLogger(commands.Cog, name="Events"):
         except Exception as e:
             logger.error(f"Error in reset confirmation: {e}")
             await ctx.send(
-                embed=create_embed(f"❌ Onay görünümü oluşturulurken bir hata oluştu: {str(e)}", discord.Color.red()),
+                embed=create_embed(f"❌ An error occurred while creating confirmation view: {str(e)}", discord.Color.red()),
                 ephemeral=True
             )
 

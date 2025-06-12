@@ -1,4 +1,4 @@
-"""
+﻿"""
 CONTRO Bot - Automated Version Control System
 Advanced version tracking and management for Discord bot
 """
@@ -14,6 +14,24 @@ import asyncio
 import logging
 
 logger = logging.getLogger(__name__)
+
+# Git and YAML imports with fallback handling
+try:
+    import git
+    GIT_AVAILABLE = True
+    logger.info("GitPython available - Git integration enabled")
+except ImportError:
+    GIT_AVAILABLE = False
+    logger.warning("GitPython not available. Git integration disabled.")
+
+try:
+    import yaml
+    YAML_AVAILABLE = True
+    logger.info("PyYAML available - YAML export enabled")
+except ImportError:
+    YAML_AVAILABLE = False
+    logger.warning("PyYAML not available. YAML export disabled.")
+
 
 class VersionManager:
     """Advanced version control manager for CONTRO bot"""
@@ -35,52 +53,38 @@ class VersionManager:
         """Initialize version control configuration"""
         default_config = {
             "auto_increment": True,
-            "version_format": "semantic",  # semantic, date, or custom
-            "track_git_commits": True,
-            "auto_changelog": True,
-            "notification_webhook": None,
-            "backup_versions": True,
-            "features_tracking": {
-                "registration_system": True,
-                "level_system": True,
-                "ticket_system": True,
-                "welcome_system": True,
-                "moderation_system": True,
-                "giveaway_system": True,
-                "game_stats": True,
-                "fun_commands": True
-            }
+            "backup_count": 10,
+            "changelog_enabled": True,
+            "git_integration": GIT_AVAILABLE,
+            "yaml_export": YAML_AVAILABLE,
+            "version_format": "semantic",
+            "notification_channels": []
         }
         
         if not self.config_file.exists():
             with open(self.config_file, 'w', encoding='utf-8') as f:
-                json.dump(default_config, f, indent=2, ensure_ascii=False)
+                json.dump(default_config, f, indent=2)
     
     def get_current_version(self) -> str:
-        """Get current bot version from versions.json"""
+        """Get the current version from versions.json"""
         try:
             if self.versions_file.exists():
                 with open(self.versions_file, 'r', encoding='utf-8') as f:
                     data = json.load(f)
-                    return data.get('current_version', '2.0.0')
-            return '2.0.0'
+                    return data.get("current_version", "2.0.0")
+            return "2.0.0"
         except Exception as e:
             logger.error(f"Error reading current version: {e}")
-            return '2.0.0'
+            return "2.0.0"
     
     def increment_version(self, version_type: str = 'patch') -> str:
-        """
-        Increment version number
-        Args:
-            version_type: 'major', 'minor', or 'patch'
-        """
+        """Increment version based on type (major, minor, patch)"""
         current = self.get_current_version()
-        parts = current.split('.')
         
-        if len(parts) != 3:
-            parts = ['2', '0', '0']
-        
-        major, minor, patch = map(int, parts)
+        try:
+            major, minor, patch = map(int, current.split('.'))
+        except ValueError:
+            major, minor, patch = 2, 0, 0
         
         if version_type == 'major':
             major += 1
@@ -89,7 +93,7 @@ class VersionManager:
         elif version_type == 'minor':
             minor += 1
             patch = 0
-        else:  # patch
+        else:
             patch += 1
         
         return f"{major}.{minor}.{patch}"
@@ -113,6 +117,9 @@ class VersionManager:
     
     def _get_git_commit(self) -> Optional[str]:
         """Get current git commit hash"""
+        if not GIT_AVAILABLE:
+            return None
+            
         try:
             result = subprocess.run(
                 ['git', 'rev-parse', 'HEAD'],
@@ -122,13 +129,16 @@ class VersionManager:
                 timeout=10
             )
             if result.returncode == 0:
-                return result.stdout.strip()[:12]  # Short hash
+                return result.stdout.strip()[:12]
         except Exception as e:
             logger.warning(f"Could not get git commit: {e}")
         return None
     
     def _get_changed_files(self) -> List[str]:
         """Get list of recently changed files"""
+        if not GIT_AVAILABLE:
+            return []
+            
         try:
             result = subprocess.run(
                 ['git', 'diff', '--name-only', 'HEAD~1', 'HEAD'],
@@ -156,168 +166,175 @@ class VersionManager:
                    description: str = None) -> str:
         """Add a new version to the tracking system"""
         try:
-            # Load existing versions
             versions_data = {"versions": [], "current_version": "2.0.0"}
             if self.versions_file.exists():
                 with open(self.versions_file, 'r', encoding='utf-8') as f:
                     versions_data = json.load(f)
             
-            # Generate new version
             new_version = self.increment_version(version_type)
             
-            # Create version entry
             version_entry = self.create_version_entry(
                 new_version, features, fixes, upcoming, description
             )
             
-            # Add to versions list
             versions_data["versions"].append(version_entry)
             versions_data["current_version"] = new_version
             
-            # Save to file
             with open(self.versions_file, 'w', encoding='utf-8') as f:
                 json.dump(versions_data, f, indent=2, ensure_ascii=False)
             
-            # Update changelog
-            self._update_changelog(version_entry)
+            self.create_git_tag(new_version)
+            self.update_changelog(version_entry)
             
-            logger.info(f"Version {new_version} added successfully")
+            logger.info(f"Created version {new_version}")
             return new_version
             
         except Exception as e:
             logger.error(f"Error adding version: {e}")
             raise
     
-    def _update_changelog(self, version_entry: Dict):
-        """Update CHANGELOG.md file"""
+    def create_git_tag(self, version: str) -> bool:
+        """Create a git tag for the version"""
+        if not GIT_AVAILABLE:
+            return False
+            
         try:
-            changelog_content = f"""
-## [{version_entry['version']}] - {version_entry['date']}
-
-### Description
-{version_entry.get('description', f"Version {version_entry['version']} release")}
-
-### ✨ New Features
-"""
-            
-            for feature in version_entry.get('features', []):
-                changelog_content += f"- {feature}\n"
-            
-            if version_entry.get('fixes'):
-                changelog_content += "\n### 🐛 Bug Fixes\n"
-                for fix in version_entry['fixes']:
-                    changelog_content += f"- {fix}\n"
-            
-            if version_entry.get('upcoming'):
-                changelog_content += "\n### 🔮 Upcoming Features\n"
-                for upcoming in version_entry['upcoming']:
-                    changelog_content += f"- {upcoming}\n"
-            
-            if version_entry.get('git_commit'):
-                changelog_content += f"\n**Git Commit:** `{version_entry['git_commit']}`\n"
-            
-            changelog_content += "\n---\n"
-            
-            # Prepend to existing changelog
-            existing_content = ""
-            if self.changelog_file.exists():
-                with open(self.changelog_file, 'r', encoding='utf-8') as f:
-                    existing_content = f.read()
-            
-            # Write updated changelog
-            with open(self.changelog_file, 'w', encoding='utf-8') as f:
-                if not existing_content.startswith("# CHANGELOG"):
-                    f.write("# CHANGELOG\n\nAll notable changes to CONTRO Bot will be documented in this file.\n\n")
-                f.write(changelog_content)
-                f.write(existing_content)
-                
-        except Exception as e:
-            logger.error(f"Error updating changelog: {e}")
-    
-    def get_version_history(self, limit: int = 10) -> List[Dict]:
-        """Get version history"""
-        try:
-            if self.versions_file.exists():
-                with open(self.versions_file, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                    versions = data.get('versions', [])
-                    return versions[-limit:] if limit > 0 else versions
-        except Exception as e:
-            logger.error(f"Error reading version history: {e}")
-        return []
-    
-    def auto_version_check(self) -> Optional[str]:
-        """Automatically detect if a new version should be created based on git changes"""
-        try:
-            # Check if there are uncommitted changes
             result = subprocess.run(
-                ['git', 'status', '--porcelain'],
+                ['git', 'tag', '-a', f'v{version}', '-m', f'Version {version}'],
                 cwd=self.bot_dir,
                 capture_output=True,
                 text=True,
                 timeout=10
             )
-            
-            if result.returncode == 0 and result.stdout.strip():
-                return "Changes detected - consider creating new version"
-            
-            # Check if there are new commits since last version
-            last_version = self.get_version_history(1)
-            if last_version:
-                last_commit = last_version[0].get('git_commit')
-                current_commit = self._get_git_commit()
-                
-                if last_commit != current_commit:
-                    return "New commits detected - version update recommended"
-            
+            if result.returncode == 0:
+                logger.info(f"Created git tag v{version}")
+                return True
         except Exception as e:
-            logger.warning(f"Auto version check failed: {e}")
-        
-        return None
+            logger.warning(f"Could not create git tag: {e}")
+        return False
     
-    def create_git_tag(self, version: str) -> bool:
-        """Create git tag for version"""
+    def update_changelog(self, version_entry: Dict):
+        """Update CHANGELOG.md with new version"""
         try:
-            # Create tag
-            subprocess.run(
-                ['git', 'tag', '-a', f'v{version}', '-m', f'Version {version}'],
-                cwd=self.bot_dir,
-                check=True,
-                timeout=10
-            )
+            changelog_content = f"# Changelog\n\n"
             
-            # Push tag
-            subprocess.run(
-                ['git', 'push', 'origin', f'v{version}'],
-                cwd=self.bot_dir,
-                check=True,
-                timeout=30
-            )
+            if self.changelog_file.exists():
+                with open(self.changelog_file, 'r', encoding='utf-8') as f:
+                    existing = f.read()
+                    if not existing.startswith("# Changelog"):
+                        changelog_content = existing
+                    else:
+                        changelog_content = existing
             
-            logger.info(f"Git tag v{version} created and pushed")
+            new_entry = f"## [{version_entry['version']}] - {version_entry['date']}\n\n"
+            
+            if version_entry['description']:
+                new_entry += f"{version_entry['description']}\n\n"
+            
+            if version_entry['features']:
+                new_entry += "### Added\n"
+                for feature in version_entry['features']:
+                    new_entry += f"- {feature}\n"
+                new_entry += "\n"
+            
+            if version_entry['fixes']:
+                new_entry += "### Fixed\n"
+                for fix in version_entry['fixes']:
+                    new_entry += f"- {fix}\n"
+                new_entry += "\n"
+            
+            lines = changelog_content.split('\n')
+            if len(lines) > 1:
+                lines.insert(2, new_entry)
+                changelog_content = '\n'.join(lines)
+            else:
+                changelog_content = f"# Changelog\n\n{new_entry}"
+            
+            with open(self.changelog_file, 'w', encoding='utf-8') as f:
+                f.write(changelog_content)
+                
+        except Exception as e:
+            logger.error(f"Error updating changelog: {e}")
+    
+    def get_version_history(self, limit: int = 10) -> List[Dict]:
+        """Get version history with optional limit"""
+        try:
+            if not self.versions_file.exists():
+                return []
+            
+            with open(self.versions_file, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                versions = data.get("versions", [])
+                return versions[-limit:] if limit else versions
+                
+        except Exception as e:
+            logger.error(f"Error getting version history: {e}")
+            return []
+    
+    def export_to_yaml(self, output_path: str = None) -> bool:
+        """Export version data to YAML format"""
+        if not YAML_AVAILABLE:
+            logger.warning("YAML export unavailable - PyYAML not installed")
+            return False
+            
+        try:
+            if not self.versions_file.exists():
+                return False
+            
+            with open(self.versions_file, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            
+            output_file = output_path or str(self.bot_dir / "data" / "versions.yaml")
+            
+            with open(output_file, 'w', encoding='utf-8') as f:
+                yaml.dump(data, f, default_flow_style=False, allow_unicode=True)
+            
+            logger.info(f"Exported version data to {output_file}")
             return True
             
         except Exception as e:
-            logger.error(f"Error creating git tag: {e}")
+            logger.error(f"Error exporting to YAML: {e}")
             return False
     
-    async def schedule_auto_version(self, interval_hours: int = 24):
-        """Schedule automatic version checking"""
-        while True:
-            try:
-                check_result = self.auto_version_check()
-                if check_result:
-                    logger.info(f"Auto version check: {check_result}")
+    def auto_version_check(self) -> Optional[str]:
+        """Check if a version should be automatically created based on changes"""
+        if not GIT_AVAILABLE:
+            return None
+            
+        try:
+            changed_files = self._get_changed_files()
+            
+            if not changed_files:
+                return None
+            
+            has_major_changes = any(
+                'main.py' in f or 'requirements.txt' in f 
+                for f in changed_files
+            )
+            
+            has_minor_changes = any(
+                f.startswith('cogs/') or f.startswith('utils/')
+                for f in changed_files
+            )
+            
+            if has_major_changes:
+                return 'major'
+            elif has_minor_changes:
+                return 'minor'
+            else:
+                return 'patch'
                 
-                await asyncio.sleep(interval_hours * 3600)
-                
-            except Exception as e:
-                logger.error(f"Error in scheduled version check: {e}")
-                await asyncio.sleep(3600)  # Retry in 1 hour
+        except Exception as e:
+            logger.error(f"Error in auto version check: {e}")
+            return None
 
-# Global version manager instance
-version_manager = VersionManager()
+
+_version_manager = None
+
 
 def get_version_manager() -> VersionManager:
     """Get the global version manager instance"""
-    return version_manager
+    global _version_manager
+    if _version_manager is None:
+        _version_manager = VersionManager()
+    return _version_manager

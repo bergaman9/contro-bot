@@ -8,7 +8,7 @@ import os
 import datetime
 
 from utils.core.formatting import create_embed
-from utils.database.connection import initialize_mongodb, is_db_available
+from utils.database.connection import get_async_db, is_db_available
 
 # Set up logging
 logger = logging.getLogger('bot_settings')
@@ -179,10 +179,10 @@ class ChangelogChannelSelect(discord.ui.ChannelSelect):
     async def callback(self, interaction: discord.Interaction):
         # Seçilen kanalı DB'ye kaydet
         channel = self.values[0]
-        mongo_db = initialize_mongodb()
+        mongo_db = get_async_db()
         
         # Ayarı güncelle
-        mongo_db.settings.update_one(
+        await mongo_db.settings.update_one(
             {"guild_id": str(interaction.guild.id)},
             {"$set": {"changelog_channel": channel.id}},
             upsert=True
@@ -198,22 +198,22 @@ class ChangelogChannelSelect(discord.ui.ChannelSelect):
 class BotSettings(commands.Cog):
     @commands.group(name='settings')
     async def settings(self, ctx):
-        """Bot ayar komutları grubu"""
+        """Bot settings command group"""
         if ctx.invoked_subcommand is None:
             await ctx.send_help(ctx.command)
-    """🤖 Bot Ayarları Sistemi
+    """🤖 Bot Settings System
     
-    Bot'un genel davranışını ve ayarlarını yapılandırmak için kapsamlı bir sistem:
-    • 🔧 Prefix ayarları
-    • 🎭 Bot görünümü
-    • 📊 Performans seçenekleri
-    • 👑 Gizli geliştirici seçenekleri
-    • 📝 Sürüm bilgileri ve güncellemeler
+    Comprehensive system for configuring bot's general behavior and settings:
+    • 🔧 Prefix settings
+    • 🎭 Bot appearance
+    • 📊 Performance options
+    • 👑 Secret developer options
+    • 📝 Version information and updates
     """
     
     def __init__(self, bot):
         self.bot = bot
-        self.mongo_db = initialize_mongodb()
+        # Database connection handled via get_async_db() when needed
         self.versions_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'versions.json')
 
     # Changelog için yardımcı fonksiyon
@@ -510,88 +510,13 @@ class BotSettings(commands.Cog):
                 ephemeral=True
             )
     
-    @commands.hybrid_command(name="botconfig", aliases=["bs", "botset"], description="Bot ayarlarını yapılandırma paneli")
-    @commands.has_permissions(administrator=True)
-    async def botconfig_panel(self, ctx):
-        """
-        Bot ayarlarını yapılandırma paneli.
-        
-        Bu komut, bot'un genel davranışını ve ayarlarını yapılandırmak için
-        bir panel sunar. Sunucu ayarlarından farklı olarak, bu ayarlar botun
-        kendisiyle ilgilidir.
-        
-        Özellikler:
-        - Bot Prefix Ayarları
-        - Bot Görünümü (isim, avatar)
-        - Performans Seçenekleri
-        - Geliştirici Seçenekleri (sadece bot sahibi)
-        """
-        try:
-            embed = discord.Embed(
-                title="🤖 Bot Ayarları Paneli",
-                description="Bot'un genel ayarlarını buradan yapılandırabilirsiniz. Bu ayarlar, sunucuya özel ayarlardan farklıdır ve bot'un genel davranışını etkiler.",
-                color=discord.Color.blue()
-            )
-            
-            embed.add_field(
-                name="📝 Prefix Ayarları", 
-                value="Bot'un komut önekini (prefix) değiştirin.",
-                inline=False
-            )
-            
-            embed.add_field(
-                name="🖼️ Bot Görünümü", 
-                value="Bot'un ismini ve avatarını özelleştirin (sadece bot sahibi).",
-                inline=False
-            )
-            
-            embed.add_field(
-                name="⚙️ Performans Ayarları", 
-                value="Bot'un performansını etkileyen ayarları yapılandırın.",
-                inline=False
-            )
-            
-            embed.add_field(
-                name="👑 Geliştirici Seçenekleri", 
-                value="Gelişmiş ayarlar ve debug seçenekleri (sadece bot sahibi).",
-                inline=False
-            )
-            
-            embed.set_footer(text="Not: Sunucu ayarları için /server_settings komutunu kullanın.")
-            
-            # Bot ayarları için view eklenecek
-            view = BotSettingsView(self.bot, ctx)
-            await ctx.send(embed=embed, view=view, ephemeral=True)
-            
-        except Exception as e:
-            logger.error(f"Error opening bot settings panel: {e}")
-            await ctx.send(embed=create_embed(f"Bot ayarları açılırken bir hata oluştu: {str(e)}", discord.Color.red()), ephemeral=True)
+    # Removed hybrid command - now integrated into /server_settings
+    # Bot configuration is now accessible through:
+    # /server_settings -> 🤖 Bot Ayarları button
 
-    @commands.hybrid_command(name="set_prefix", description="Bot için yeni bir prefix ayarla")
-    @commands.has_permissions(administrator=True)
-    async def set_prefix(self, ctx, prefix: str):
-        """
-        Bot için yeni bir prefix (komut öneki) ayarla.
-        
-        Args:
-            prefix: Yeni komut öneki (prefix)
-        """
-        try:
-            if len(prefix) > 5:
-                return await ctx.send(embed=create_embed("❌ Prefix 5 karakterden uzun olamaz.", discord.Color.red()))
-            
-            # Veritabanında prefix'i güncelle
-            self.mongo_db["bot_settings"].update_one(
-                {"_id": "prefix"},
-                {"$set": {"value": prefix}},
-                upsert=True
-            )
-            
-            await ctx.send(embed=create_embed(f"✅ Bot prefix'i `{prefix}` olarak ayarlandı.", discord.Color.green()))
-            
-        except Exception as e:
-            logger.error(f"Error setting prefix: {e}")
-            await ctx.send(embed=create_embed(f"Prefix ayarlanırken bir hata oluştu: {str(e)}", discord.Color.red()))
+    # Removed hybrid command - now integrated into /server_settings  
+    # Set prefix functionality is now accessible through:
+    # /server_settings -> 🤖 Bot Ayarları button -> Prefix settings
 
 class BotSettingsView(discord.ui.View):
     """Bot ayarları için ana görünüm"""
@@ -600,51 +525,51 @@ class BotSettingsView(discord.ui.View):
         super().__init__(timeout=timeout)
         self.bot = bot
         self.ctx = ctx
-        self.mongo_db = initialize_mongodb()
+        # Database connection handled via get_async_db() when needed
         
-    @discord.ui.button(label="Prefix Ayarla", style=discord.ButtonStyle.primary, emoji="📝", row=0)
+    @discord.ui.button(label="Set Prefix", style=discord.ButtonStyle.primary, emoji="📝", row=0)
     async def prefix_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        """Bot prefix'ini ayarla"""
+        """Set bot prefix"""
         await interaction.response.send_modal(PrefixModal(self.bot))
     
-    @discord.ui.button(label="Bot Görünümü", style=discord.ButtonStyle.primary, emoji="🖼️", row=0)
+    @discord.ui.button(label="Bot Appearance", style=discord.ButtonStyle.primary, emoji="🖼️", row=0)
     async def appearance_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        """Bot görünümünü ayarla"""
-        # Sadece bot sahibi için
+        """Configure bot appearance"""
+        # Only for bot owner
         app_info = await self.bot.application_info()
         if interaction.user.id != app_info.owner.id:
             return await interaction.response.send_message(
-                embed=create_embed("❌ Bu ayarı sadece bot sahibi değiştirebilir.", discord.Color.red()),
+                embed=create_embed("❌ Only the bot owner can change this setting.", discord.Color.red()),
                 ephemeral=True
             )
         
         await interaction.response.send_message(
-            embed=create_embed("Bot görünümü ayarları:", discord.Color.blue()),
+            embed=create_embed("Bot appearance settings:", discord.Color.blue()),
             view=BotAppearanceView(self.bot),
             ephemeral=True
         )
     
-    @discord.ui.button(label="Performans Ayarları", style=discord.ButtonStyle.primary, emoji="⚙️", row=1)
+    @discord.ui.button(label="Performance Settings", style=discord.ButtonStyle.primary, emoji="⚙️", row=1)
     async def performance_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        """Performans ayarlarını yapılandır"""
+        """Configure performance settings"""
         await interaction.response.send_message(
-            embed=create_embed("Performans ayarları yakında eklenecek.", discord.Color.blue()),
+            embed=create_embed("Performance settings will be added soon.", discord.Color.blue()),
             ephemeral=True
         )
     
-    @discord.ui.button(label="Geliştirici Seçenekleri", style=discord.ButtonStyle.danger, emoji="👑", row=1)
+    @discord.ui.button(label="Developer Options", style=discord.ButtonStyle.danger, emoji="👑", row=1)
     async def developer_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        """Geliştirici seçeneklerini aç"""
-        # Sadece bot sahibi için
+        """Open developer options"""
+        # Only for bot owner
         app_info = await self.bot.application_info()
         if interaction.user.id != app_info.owner.id:
             return await interaction.response.send_message(
-                embed=create_embed("❌ Bu seçenekler sadece bot sahibi tarafından erişilebilir.", discord.Color.red()),
+                embed=create_embed("❌ These options are only accessible to the bot owner.", discord.Color.red()),
                 ephemeral=True
             )
         
         await interaction.response.send_message(
-            embed=create_embed("Geliştirici seçenekleri yakında eklenecek.", discord.Color.blue()),
+            embed=create_embed("Developer options will be added soon.", discord.Color.blue()),
             ephemeral=True
         )
 
@@ -662,12 +587,13 @@ class PrefixModal(discord.ui.Modal, title="Prefix Ayarla"):
     def __init__(self, bot):
         super().__init__()
         self.bot = bot
-        self.mongo_db = initialize_mongodb()
+        # Database connection handled via get_async_db() when needed
     
     async def on_submit(self, interaction: discord.Interaction):
         try:
             # Veritabanında prefix'i güncelle
-            self.mongo_db["bot_settings"].update_one(
+            mongo_db = get_async_db()
+            await mongo_db["bot_settings"].update_one(
                 {"_id": "prefix"},
                 {"$set": {"value": self.prefix.value}},
                 upsert=True

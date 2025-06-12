@@ -23,7 +23,10 @@ class VersionCommands(commands.Cog):
         self.bot = bot
         self.version_manager = get_version_manager()
     
-    @app_commands.command(name="version", description="🔖 Show current bot version and information")
+    # Main version command group
+    version_group = app_commands.Group(name="bot_version", description="🔖 Bot version management commands")
+    
+    @version_group.command(name="info", description="Show current bot version and information")
     async def version_info(self, interaction: discord.Interaction):
         """Display current version information"""
         try:
@@ -31,7 +34,7 @@ class VersionCommands(commands.Cog):
             version_history = self.version_manager.get_version_history(1)
             
             embed = create_embed(
-                title="🤖 CONTRO Bot Version Information",
+                title="🤖 CONTRO Bot Version",
                 description=f"**Current Version:** `{current_version}`",
                 color=discord.Color.blue()
             )
@@ -47,7 +50,7 @@ class VersionCommands(commands.Cog):
                 if latest.get('git_commit'):
                     embed.add_field(
                         name="🔄 Git Commit",
-                        value=f"`{latest['git_commit']}`",
+                        value=f"`{latest['git_commit'][:8]}`",
                         inline=True
                     )
                 
@@ -58,40 +61,40 @@ class VersionCommands(commands.Cog):
                 )
                 
                 if latest.get('features'):
-                    features_text = "\\n".join([f"• {f}" for f in latest['features'][:5]])
-                    if len(latest['features']) > 5:
-                        features_text += f"\\n• ... and {len(latest['features']) - 5} more"
+                    features_text = "\\n".join([f"• {f}" for f in latest['features'][:3]])
+                    if len(latest['features']) > 3:
+                        features_text += f"\\n• ... and {len(latest['features']) - 3} more"
                     
                     embed.add_field(
-                        name="✨ Recent Features",
+                        name="✨ Latest Features",
                         value=features_text,
                         inline=False
                     )
             
             embed.add_field(
                 name="🔗 System Info",
-                value=f"• **Database:** MongoDB (Async)\\n• **Language:** Python 3.10+\\n• **Framework:** discord.py 2.3.2",
+                value="• **Database:** MongoDB\\n• **Language:** Python 3.10+\\n• **Framework:** discord.py 2.3.2",
                 inline=False
             )
             
-            embed.set_footer(text=f"Bot developed by your team • Version tracked automatically")
+            embed.set_footer(text="Use /bot_version history for changelog")
             
             await interaction.response.send_message(embed=embed)
             
         except Exception as e:
-            logger.error(f"Error in version command: {e}")
+            logger.error(f"Error in version info command: {e}")
             await interaction.response.send_message(
                 "❌ Error retrieving version information.", 
                 ephemeral=True
             )
     
-    @app_commands.command(name="version_history", description="📖 Show version history and changelog")
-    @app_commands.describe(limit="Number of versions to show (default: 5, max: 20)")
+    @version_group.command(name="history", description="Show version history and changelog")
+    @app_commands.describe(limit="Number of versions to show (default: 5, max: 10)")
     async def version_history(self, interaction: discord.Interaction, limit: Optional[int] = 5):
         """Display version history"""
         try:
-            if limit > 20:
-                limit = 20
+            if limit > 10:
+                limit = 10
             elif limit < 1:
                 limit = 5
             
@@ -107,35 +110,33 @@ class VersionCommands(commands.Cog):
                 return
             
             embed = create_embed(
-                title="📖 CONTRO Bot Version History",
-                description=f"Showing last {len(versions)} versions",
+                title="📖 CONTRO Bot Changelog",
+                description=f"Last {len(versions)} versions",
                 color=discord.Color.green()
             )
             
             for version in reversed(versions):  # Show newest first
                 features_text = ""
                 if version.get('features'):
-                    features_text += "**Features:**\\n" + "\\n".join([f"• {f}" for f in version['features'][:3]])
-                    if len(version['features']) > 3:
-                        features_text += f"\\n• ... {len(version['features']) - 3} more"
+                    features_text += "**New:**\\n" + "\\n".join([f"• {f}" for f in version['features'][:2]])
+                    if len(version['features']) > 2:
+                        features_text += f"\\n• ... {len(version['features']) - 2} more"
                 
                 if version.get('fixes'):
                     if features_text:
                         features_text += "\\n\\n"
-                    features_text += "**Fixes:**\\n" + "\\n".join([f"• {f}" for f in version['fixes'][:2]])
-                    if len(version['fixes']) > 2:
-                        features_text += f"\\n• ... {len(version['fixes']) - 2} more"
+                    features_text += "**Fixed:**\\n" + "\\n".join([f"• {f}" for f in version['fixes'][:2]])
                 
                 if not features_text:
-                    features_text = "No detailed changelog available"
+                    features_text = "Minor updates and improvements"
                 
                 embed.add_field(
-                    name=f"🔖 Version {version['version']} - {version.get('date', 'Unknown')}",
+                    name=f"🔖 v{version['version']} - {version.get('date', 'Unknown')}",
                     value=features_text[:1024],  # Discord field limit
                     inline=False
                 )
             
-            embed.set_footer(text="Use /version for current version details")
+            embed.set_footer(text="Use /bot_version info for current version details")
             
             await interaction.response.send_message(embed=embed)
             
@@ -146,7 +147,7 @@ class VersionCommands(commands.Cog):
                 ephemeral=True
             )
     
-    @app_commands.command(name="create_version", description="🎯 Create a new version (Admin only)")
+    @version_group.command(name="create", description="Create a new version (Admin only)")
     @app_commands.describe(
         version_type="Type of version increment",
         description="Description of this version"
@@ -179,51 +180,6 @@ class VersionCommands(commands.Cog):
             logger.error(f"Error in create version command: {e}")
             await interaction.response.send_message(
                 "❌ Error creating version.", 
-                ephemeral=True
-            )
-    
-    @app_commands.command(name="version_check", description="🔍 Check for potential version updates")
-    async def version_check(self, interaction: discord.Interaction):
-        """Check if version should be updated"""
-        try:
-            if not interaction.user.guild_permissions.administrator:
-                await interaction.response.send_message(
-                    "❌ You need administrator permissions to check versions.", 
-                    ephemeral=True
-                )
-                return
-            
-            check_result = self.version_manager.auto_version_check()
-            
-            embed = create_embed(
-                title="🔍 Version Update Check",
-                color=discord.Color.blue()
-            )
-            
-            if check_result:
-                embed.description = f"⚠️ **Update Recommended**\\n{check_result}"
-                embed.color = discord.Color.orange()
-                embed.add_field(
-                    name="Recommended Action",
-                    value="Consider creating a new version with `/create_version`",
-                    inline=False
-                )
-            else:
-                embed.description = "✅ **Version is up to date**\\nNo version update needed at this time."
-                embed.color = discord.Color.green()
-            
-            embed.add_field(
-                name="Current Version",
-                value=f"`{self.version_manager.get_current_version()}`",
-                inline=True
-            )
-            
-            await interaction.response.send_message(embed=embed, ephemeral=True)
-            
-        except Exception as e:
-            logger.error(f"Error in version check command: {e}")
-            await interaction.response.send_message(
-                "❌ Error checking version status.", 
                 ephemeral=True
             )
 

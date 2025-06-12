@@ -231,20 +231,10 @@ class PerplexityChat(commands.Cog):
         if allowed_channels and str(message.channel.id) not in allowed_channels:
             return
         
-        # Check if user has credits
-        if not await self.use_credit(message.guild.id, message.author.id):
-            # No credits left
-            embed = discord.Embed(
-                title="❌ Kredi Limiti Aşıldı",
-                description="AI sohbet kredileriniz tükendi!",
-                color=discord.Color.red()
-            )
-            embed.add_field(
-                name="Nasıl Kredi Kazanılır?",
-                value="[Top.gg'de oy vererek](https://top.gg/bot/your-bot-id/vote) her gün 5 kredi kazanabilirsiniz.",
-                inline=False
-            )
-            return await message.reply(embed=embed)
+        # Check if user has credits (background check, don't block)
+        has_credits = await self.use_credit(message.guild.id, message.author.id)
+        if not has_credits:
+            logger.info(f"User {message.author.id} has no credits but continuing with AI response")
         
         # Typing indicator while processing
         async with message.channel.typing():
@@ -319,100 +309,16 @@ class PerplexityChat(commands.Cog):
                 logger.error(f"Error in AI chat: {e}")
                 await message.reply("❌ AI yanıtı alınırken bir hata oluştu. Lütfen daha sonra tekrar deneyin.")
 
-    @commands.hybrid_group(name="ai", description="AI sohbet ve ayarları")
-    async def ai(self, ctx):
-        """AI sohbet komutları"""
-        if ctx.invoked_subcommand is None:
-            embed = discord.Embed(
-                title="🤖 AI Sohbet Yardımı",
-                description="AI ile sohbet etmek için botun mesajına yanıt verin veya aşağıdaki komutları kullanın.",
-                color=discord.Color.blue()
-            )
-            
-            embed.add_field(
-                name="Komutlar",
-                value=(
-                    "`/ai ask [soru]` - AI'ya soru sorun\n"
-                    "`/ai credits` - Kalan kredilerinizi görün\n"
-                    "`/ai settings` - AI ayarlarını yapılandırın (Admin)"
-                ),
-                inline=False
-            )
-            
-            embed.add_field(
-                name="Kredi Sistemi",
-                value="Her AI yanıtı 1 kredi harcamanızı gerektirir. Krediler günlük olarak yenilenebilir.",
-                inline=False
-            )
-            
-            await ctx.send(embed=embed)
-    
-    @ai.command(name="credits", description="Kalan AI kredilerinizi görün")
-    async def credits(self, ctx):
-        """Kalan AI kredilerinizi görün ve kredi kazanma yollarını öğrenin"""
-        # Get user credits
-        credits = await self.get_user_credits(ctx.guild.id, ctx.author.id)
-        
-        # Get server config for credit settings
-        server_config = await self.mongo_db.perplexity_config.find_one({"guild_id": str(ctx.guild.id)})
-        
-        default_credits = server_config.get("default_credits", self.default_credits) if server_config else self.default_credits
-        max_credits = server_config.get("max_credits", self.default_max_credits) if server_config else self.default_max_credits
-        reset_daily = server_config.get("daily_reset", self.default_daily_reset) if server_config else self.default_daily_reset
-        
-        # Create credits info embed
-        embed = discord.Embed(
-            title="💳 AI Sohbet Kredileri",
-            description=f"**{ctx.author.display_name}**, mevcut AI sohbet kredileriniz: **{credits}**",
-            color=discord.Color.blue()
-        )
-        
-        # Add credit info
-        embed.add_field(
-            name="💸 Kredi Bilgileri",
-            value=(
-                f"\u2022 Her AI yanıtı **1 kredi** harcamanızı gerektirir\n"
-                f"\u2022 Günlük başlangıç kredisi: **{default_credits}**\n"
-                f"\u2022 Maksimum biriktirebileceğiniz kredi: **{max_credits}**\n"
-                f"\u2022 Günlük sıfırlama: **{'Aktif' if reset_daily else 'Devre dışı'}**"
-            ),
-            inline=False
-        )
-        
-        # Add how to earn more credits
-        embed.add_field(
-            name="💰 Nasıl Daha Fazla Kredi Kazanılır?",
-            value=(
-                "\u2022 [Top.gg'de oy vererek](https://top.gg/bot/your-bot-id/vote) **5 kredi** kazanabilirsiniz.\n"
-                "\u2022 Sunucu yöneticileri size ekstra kredi verebilir.\n"
-                "\u2022 Bot sahibine destek olarak özel avantajlar kazanabilirsiniz."
-            ),
-            inline=False
-        )
-        
-        # Add footer with tip
-        embed.set_footer(text="İpucu: AI ile sohbet etmek için botun herhangi bir mesajına yanıt verin.")
-        
-        await ctx.send(embed=embed, ephemeral=True)
-    
-    @ai.command(name="ask", description="AI'ya soru sorun")
+    @commands.hybrid_command(name="ask", description="AI'ya soru sorun")
     @app_commands.describe(soru="AI'ya sormak istediğiniz soru")
     async def ask(self, ctx, *, soru: str):
         """AI'ya direkt soru sorun"""
-        # Check if user has credits
-        if not await self.use_credit(ctx.guild.id, ctx.author.id):
-            # No credits left
-            embed = discord.Embed(
-                title="❌ Kredi Limiti Aşıldı",
-                description="AI sohbet kredileriniz tükendi!",
-                color=discord.Color.red()
-            )
-            embed.add_field(
-                name="Nasıl Kredi Kazanılır?",
-                value="[Top.gg'de oy vererek](https://top.gg/bot/your-bot-id/vote) her gün 5 kredi kazanabilirsiniz.",
-                inline=False
-            )
-            return await ctx.send(embed=embed, ephemeral=True)
+        # Arka planda kredi kontrolü yap (sessizce)
+        has_credits = await self.use_credit(ctx.guild.id, ctx.author.id)
+        
+        # Kredi yoksa bile devam et (kredi sistemi arka planda çalışır)
+        if not has_credits:
+            logger.info(f"User {ctx.author.id} has no credits but continuing with AI request")
         
         # Get server settings
         server_config = await self.mongo_db.perplexity_config.find_one({"guild_id": str(ctx.guild.id)})
@@ -491,92 +397,6 @@ class PerplexityChat(commands.Cog):
             except Exception as e:
                 logger.error(f"Error in AI chat: {e}")
                 await ctx.send("❌ AI yanıtı alınırken bir hata oluştu. Lütfen daha sonra tekrar deneyin.", ephemeral=True)
-    
-    @ai.command(name="settings", description="AI sohbet ayarlarını yapılandırın")
-    @commands.has_permissions(administrator=True)
-    async def settings(self, ctx):
-        """Configure AI chat settings for your server"""
-        # Check if MongoDB is available
-        if not await is_db_available():
-            return await ctx.send(
-                embed=create_embed("❌ Veritabanı bağlantısı kurulamadı. Lütfen daha sonra tekrar deneyin.", discord.Color.red()),
-                ephemeral=True
-            )
-        
-        # Get current settings
-        server_config = await self.mongo_db.perplexity_config.find_one({"guild_id": str(ctx.guild.id)})
-        
-        # Set default values if config doesn't exist
-        if not server_config:
-            server_config = {
-                "guild_id": str(ctx.guild.id),
-                "enabled": True,
-                "streaming": self.streaming_responses,
-                "default_credits": self.default_credits,
-                "max_credits": self.default_max_credits,
-                "daily_reset": self.default_daily_reset,
-                "allowed_channels": []
-            }
-            await self.mongo_db.perplexity_config.insert_one(server_config)
-        
-        # Create settings embed
-        embed = discord.Embed(
-            title="🤖 AI Sohbet Ayarları",
-            description="Sunucunuz için AI sohbet sistemini yapılandırın.",
-            color=discord.Color.blue()
-        )
-        
-        # Display current settings
-        embed.add_field(
-            name="💳 Kredi Ayarları",
-            value=f"Başlangıç Kredisi: **{server_config.get('default_credits', self.default_credits)}**\n"
-                  f"Maksimum Kredi: **{server_config.get('max_credits', self.default_max_credits)}**\n"
-                  f"Günlük Sıfırlama: **{'Aktif' if server_config.get('daily_reset', self.default_daily_reset) else 'Devre dışı'}**",
-            inline=False
-        )
-        
-        # API Key status
-        api_key = server_config.get("api_key", None)
-        embed.add_field(
-            name="🔑 API Anahtarı",
-            value=f"Durum: **{'Ayarlandı' if api_key else 'Ayarlanmadı (Varsayılan kullanılıyor)'}**",
-            inline=False
-        )
-        
-        # Streaming mode
-        streaming = server_config.get("streaming", self.streaming_responses)
-        embed.add_field(
-            name="📡 Yanıt Modu",
-            value=f"**{'Akan Yanıt Modu' if streaming else 'Tam Yanıt Modu'}**",
-            inline=False
-        )
-        
-        # AI Status
-        enabled = server_config.get("enabled", True)
-        embed.add_field(
-            name="⚡ AI Durumu",
-            value=f"**{'Aktif' if enabled else 'Devre dışı'}**",
-            inline=False
-        )
-        
-        # Channel restrictions
-        allowed_channels = server_config.get("allowed_channels", [])
-        channel_status = "Tüm kanallarda kullanılabilir"
-        if allowed_channels:
-            channel_count = len(allowed_channels)
-            channel_status = f"**{channel_count}** kanalda kullanılabilir"
-        
-        embed.add_field(
-            name="📰 Kanal İzinleri",
-            value=channel_status,
-            inline=False
-        )
-        
-        # Create settings view
-        view = PerplexitySettingsView(self.bot)
-        
-        # Send settings panel
-        await ctx.send(embed=embed, view=view, ephemeral=True)
 
 # Setup function
 async def setup(bot):

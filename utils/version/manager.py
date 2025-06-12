@@ -8,13 +8,34 @@ import os
 from datetime import datetime
 from typing import Dict, List, Optional, Any
 import logging
-import git
 import subprocess
 
-logger = logging.getLogger('version_manager')
+# Import base utilities
+try:
+    from ..core.base import BaseModule, DataManager, get_module_logger
+    BASE_AVAILABLE = True
+except ImportError:
+    BASE_AVAILABLE = False
 
-class VersionManager:
+# Optional imports for enhanced functionality
+try:
+    import git
+    GIT_AVAILABLE = True
+except ImportError:
+    git = None
+    GIT_AVAILABLE = False
+
+logger = get_module_logger('version') if BASE_AVAILABLE else logging.getLogger('version_manager')
+
+class VersionManager(BaseModule if BASE_AVAILABLE else object):
+    """Version control manager with automatic change detection and changelog generation"""
+    
     def __init__(self, data_dir: str = "data"):
+        # Initialize BaseModule if available
+        if BASE_AVAILABLE:
+            super().__init__(name="version_manager", config={"data_dir": data_dir})
+            self.data_manager = DataManager(data_dir)
+        
         self.data_dir = data_dir
         self.versions_file = os.path.join(data_dir, "versions.json")
         self.ensure_data_directory()
@@ -99,8 +120,7 @@ class VersionManager:
         
         self.save_versions(data)
         logger.info(f"Created new version: {new_version}")
-        
-        return new_version
+          return new_version
     
     def detect_changes(self) -> tuple[List[str], List[str]]:
         """
@@ -109,6 +129,10 @@ class VersionManager:
         """
         features = []
         fixes = []
+        
+        if not GIT_AVAILABLE:
+            logger.warning("GitPython not available, cannot auto-detect changes")
+            return features, fixes
         
         try:
             # Try to get git repository
@@ -251,12 +275,15 @@ class VersionManager:
                 html += "</ul>"
                 
             html += "</div>"
-        
-        html += "</div>"
+          html += "</div>"
         return html
     
     def create_git_tag(self, version: str = None) -> bool:
         """Create a git tag for the current version"""
+        if not GIT_AVAILABLE:
+            logger.warning("GitPython not available, cannot create git tag")
+            return False
+            
         try:
             if not version:
                 version = self.get_current_version()

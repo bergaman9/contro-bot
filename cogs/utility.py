@@ -24,7 +24,7 @@ from io import BytesIO
 
 # Use consistent import paths
 from utils.core.formatting import create_embed, hex_to_int, calculate_how_long_ago_member_joined, calculate_how_long_ago_member_created
-from utils.database.connection import initialize_mongodb, is_db_available
+from utils.database.connection import get_async_db, is_db_available
 from utils.core.db import get_document, get_documents, update_document
 
 # Configure logger
@@ -153,7 +153,7 @@ class VersionButtonView(discord.ui.View):
                         value="- Temporary Voice and Text Channels \n- Text and Voice Level System \n- Advanced Logging System \n- Web Dashboard \n- Translation to TR, ENG, GER")
 
         await interaction.response.send_message(embed=self.embed, ephemeral=True)
-
+    
     async def on_timeout(self):
         """Timeout bittiğinde bu fonksiyon çağrılır."""
         if self.message:
@@ -162,7 +162,7 @@ class VersionButtonView(discord.ui.View):
 class Utility(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.mongo_db = initialize_mongodb()
+        # Database connection handled via get_async_db() when needed
         
         # Add format file path
         self.format_file_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'format.json')
@@ -283,13 +283,11 @@ class Utility(commands.Cog):
         embed.add_field(name="Voice Channels", value=f"{len(guild.voice_channels)} channels", inline=True)
         embed.add_field(name="Boost Level", value=f"Level {guild.premium_tier} ({guild.premium_subscription_count} boosts)", inline=True)
         embed.set_footer(text=f"Requested by {ctx.author.display_name}", icon_url=ctx.author.display_avatar)
-        await ctx.send(embed=embed)
-
-    @commands.hybrid_command(name="privacy_policy", description="Displays the privacy policy for the bot.")
+        await ctx.send(embed=embed)    @commands.hybrid_command(name="privacy_policy", description="Displays the privacy policy for the bot.")
     async def privacy_policy(self, ctx):
         embed = discord.Embed(
             title="Privacy Policy for Contro",
-            description="Effective Date: 23.01.2025",
+            description="Effective Date: 10.06.2025",
             color=discord.Color.blue()
         )
         
@@ -298,7 +296,9 @@ class Utility(commands.Cog):
             value=(
                 "Welcome to Contro. This Privacy Policy explains how we collect, use, "
                 "and protect your information when you use our Discord bot. By using Contro, "
-                "you agree to the collection and use of information in accordance with this policy."
+                "you agree to the collection and use of information in accordance with this policy. "
+                "Contro is developed as a hobby project to enhance software development experience, "
+                "not for commercial purposes."
             ),
             inline=False
         )
@@ -306,12 +306,12 @@ class Utility(commands.Cog):
         embed.add_field(
             name="2. Information We Collect",
             value=(
-                "- **User Data:** We may collect your Discord user ID, username, and discriminator to provide personalized services and features.\n"
-                "- **Message Content:** We may access the content of messages for command processing and moderation purposes. "
-                "We do not store message content unless explicitly stated.\n"
-                "- **Guild Data:** We collect information about the servers (guilds) where the bot is used, "
-                "including server ID, name, and member count.\n"
-                "- **Activity Data:** We may track user activities, such as game playing status, for features like game statistics and leaderboards."
+                "- **User Data:** Discord user ID, username, display name, and avatar for personalized services\n"
+                "- **Message Content:** Command inputs and context for processing (not stored permanently)\n"
+                "- **Guild Data:** Server ID, name, member count, channels, and roles for bot functionality\n"
+                "- **Activity Data:** Game statistics, command usage, and interaction patterns for features\n"
+                "- **Settings Data:** User preferences, server configurations, and customization options\n"
+                "- **Log Data:** Error logs, usage statistics, and performance metrics for improvements"
             ),
             inline=False
         )
@@ -319,47 +319,47 @@ class Utility(commands.Cog):
         embed.add_field(
             name="3. How We Use Your Information",
             value=(
-                "- **To Provide Services:** We use your information to operate and improve the bot's features and functionality.\n"
-                "- **Moderation and Safety:** We use message content and user data to enforce server rules and ensure a safe environment.\n"
-                "- **Analytics:** We may use aggregated data for analytics to understand usage patterns and improve the bot."
+                "- **Service Provision:** Operating bot features like moderation, games, and utilities\n"
+                "- **Personalization:** Customizing user experience and server-specific configurations\n"
+                "- **Improvement:** Analyzing usage patterns to enhance functionality and fix bugs\n"
+                "- **Support:** Troubleshooting issues and providing user assistance\n"
+                "- **Security:** Preventing abuse and maintaining server safety"
             ),
             inline=False
         )
         
         embed.add_field(
-            name="4. Data Storage and Security",
+            name="4. Data Protection & Non-Commercial Use",
             value=(
-                "- **Data Storage:** User data is stored securely in our database. "
-                "We take reasonable measures to protect your information from unauthorized access or disclosure.\n"
-                "- **Data Retention:** We retain user data only as long as necessary to provide our services or as required by law."
+                "- **Security:** Data is stored securely with encryption and access controls\n"
+                "- **No Sale:** Your data is NEVER sold or shared with third parties for profit\n"
+                "- **Hobby Project:** Contro is developed for learning and community benefit, not commercial gain\n"
+                "- **Retention:** Data kept only as long as necessary for service provision\n"
+                "- **Purpose Limitation:** Data used solely for stated purposes, never for advertising or marketing"
             ),
             inline=False
         )
         
         embed.add_field(
-            name="5. Sharing Your Information",
-            value="We do not share your personal information with third parties, except as required by law or to protect our rights.",
-            inline=False
-        )
-        
-        embed.add_field(
-            name="6. Your Rights",
+            name="5. Your Rights & Data Control",
             value=(
-                "- **Access and Correction:** You have the right to access and correct your personal information.\n"
-                "- **Data Deletion:** You can request the deletion of your data by contacting us at omerguler53@gmail.com."
+                "- **Access:** View your stored data upon request\n"
+                "- **Correction:** Update incorrect personal information\n"
+                "- **Deletion:** Request complete data removal at any time\n"
+                "- **Portability:** Export your data in standard formats\n"
+                "- **Opt-out:** Disable specific features or data collection\n"
+                "Contact: bergasoft@pm.me for any data requests"
             ),
             inline=False
         )
         
         embed.add_field(
-            name="7. Changes to This Privacy Policy",
-            value="We may update this Privacy Policy from time to time. We will notify you of any changes by posting the new policy on this page.",
-            inline=False
-        )
-        
-        embed.add_field(
-            name="8. Contact Us",
-            value="If you have any questions or concerns about this Privacy Policy, please contact us at omerguler53@gmail.com.",
+            name="6. Policy Updates & Contact",
+            value=(
+                "This policy may be updated to reflect new features or legal requirements. "
+                "Users will be notified of significant changes. For questions, concerns, or data requests, "
+                "contact us at bergasoft@pm.me. We typically respond within 48 hours."
+            ),
             inline=False
         )
 
@@ -376,41 +376,7 @@ class Utility(commands.Cog):
 
         embeds = generate_members_of_role_embeds(members_with_role, role)
         paginator = Paginator(embed_list=embeds)
-        await paginator.send_initial_message(ctx)
-
-    @commands.hybrid_command(name="advertisements", description="Detects and lists all custom activities that are discord invites or suspicious links.")
-    @commands.has_permissions(manage_guild=True)
-    async def advertisements(self, ctx):
-        guild = ctx.guild
-        found_advertisements = False
-        suspicious_keywords = ["discord.gg/", "https://", "http://", "www.", ".com", ".net", ".org"]
-
-        embed = discord.Embed(
-            title="Detected Advertisements",
-            description="List of members with suspicious custom statuses:",
-            color=discord.Color.red()
-        )
-
-        for member in guild.members:
-            for activity in member.activities:
-                if activity.type == discord.ActivityType.custom:
-                    message = activity.name
-                    if message and any(keyword in message.lower() for keyword in suspicious_keywords):
-                        embed.add_field(
-                            name=f"{member.display_name} ({member.id})",
-                            value=f"Custom Status: `{message}`",
-                            inline=False
-                        )
-                        found_advertisements = True
-
-        if found_advertisements:
-            await ctx.send(embed=embed)
-        else:
-            await ctx.send(
-                embed=create_embed(description="No advertisements or suspicious links found in the server.", color=discord.Color.green())
-            )
-
-    # Emoji related commands
+        await paginator.send_initial_message(ctx)    # Emoji related commands
     @commands.hybrid_command(name="emoji_list", description="Fetch emojis of the server.")
     async def emoji_list(self, ctx):
         emojis = await ctx.guild.fetch_emojis()
@@ -683,63 +649,13 @@ class Utility(commands.Cog):
         # Update or insert the document that matches the guild id
         collection.update_one({"guild_id": ctx.guild.id},
                               {"$set": {"custom_status": cleaned_custom_status, "role_id": role.id}}, upsert=True)
-        await ctx.send(f"Status role set to {role.mention} for custom status '{custom_status}'.")
-
-    @commands.hybrid_command(name="reset_nicknames", description="Resets everyone's nickname.")
-    @commands.has_permissions(manage_guild=True)
-    async def reset_nicknames(self, ctx):
-        async for member in ctx.guild.fetch_members(limit=5000):
-            if member.nick:
-                await member.edit(nick=None)
-                await ctx.send(f"{member.mention}'s nickname has been reset.")
-        await ctx.send("All nicknames have been reset.")
-
-    @app_commands.command(name="mass_unban", description="Mass unban people banned from the server.")
+        await ctx.send(f"Status role set to {role.mention} for custom status '{custom_status}'.")    @app_commands.command(name="mass_unban", description="Mass unban people banned from the server.")
     @commands.has_permissions(manage_guild=True)
     async def mass_unban(self, interaction):
         async for entry in interaction.guild.bans(limit=None):
             await interaction.guild.unban(entry.user)
 
         await interaction.response.send_message("All banned members from the server unbanned.", ephemeral=True)
-
-    @commands.hybrid_command(name="give_everyone", description="Gives everyone a role.")
-    @commands.has_permissions(manage_guild=True)
-    @app_commands.describe(role="The role to give to everyone in the server.")
-    async def give_everyone(self, ctx, role: discord.Role):
-        await ctx.defer()
-        for member in ctx.guild.members:
-            if not member.bot:
-                await member.add_roles(role)
-        await ctx.send(f"{role.mention} role has been given to everyone.")
-
-    @commands.hybrid_command(name="edit_nicknames", description="Edits everyone's nickname.")
-    @commands.has_permissions(manage_guild=True)
-    @app_commands.describe(
-        role_name="The name of the role to target for nickname changes",
-        new_name="The new nickname to set for all members with the specified role"
-    )
-    async def edit_nicknames(self, ctx, role_name: str, new_name):
-
-        guild = ctx.guild
-        role = discord.utils.get(guild.roles, name=role_name)
-
-        if not role:
-            await ctx.send(f"Rol bulunamadı: {role}")
-            return
-
-        count = 0
-        for member in guild.members:
-            if role in member.roles:
-                try:
-                    await member.edit(nick=new_name)
-                    await ctx.send(f"{member.name} kullanıcısının {new_name} olarak düzenlendi.")
-                    count += 1
-                except discord.Forbidden:
-                    await ctx.send(f"Bot, {member.mention} kullanıcısının ismini değiştiremiyor.")
-                except discord.HTTPException as e:
-                    await ctx.send(f"Bir hata oluştu: {e}")
-
-        await ctx.send(f"{count} kullanıcının ismi düzenlendi.")
 
     # Embed and content commands
     @commands.hybrid_command(name="poll", description="Creates a poll.")
@@ -1166,57 +1082,86 @@ class Config(commands.Cog):
             
         except Exception as e:
             print(f"Error in ping command: {e}")
-            await ctx.send(embed=discord.Embed(description="An error occurred while getting server status.", color=discord.Color.red()))
-
-    @commands.hybrid_command(name="contro_guilds", description="Shows a list of all servers the bot is in.")
+            await ctx.send(embed=discord.Embed(description="An error occurred while getting server status.", color=discord.Color.red()))    @commands.hybrid_command(name="guilds", description="Display detailed information about all servers where the bot is active, including member counts, join dates, and server statistics. Owner only command for bot administration.")
     @commands.is_owner()
-    async def contro_guilds(self, ctx):
-        """Shows a list of all servers the bot is in with detailed information."""
+    async def guilds(self, ctx):
+        """Shows comprehensive server statistics and information for all guilds where the bot is active. Owner-only command for administrative purposes."""
         try:
             await ctx.defer()
-            guilds_sorted = sorted(self.bot.guilds, key=lambda g: g.created_at,
-                                   reverse=True)  # Sunucuları tarihe göre sırala
-
-            each_page = 7
+            guilds_sorted = sorted(self.bot.guilds, key=lambda g: g.member_count, reverse=True)  # Sort by member count
+            
+            each_page = 6  # Reduced for better display
             pages = math.ceil(len(guilds_sorted) / each_page)
             embeds = []
 
+            total_members = sum(guild.member_count for guild in self.bot.guilds)
+            
             for page in range(pages):
-                embed = discord.Embed(title=f"Server List ({len(guilds_sorted)})", color=discord.Color.pink())
+                embed = discord.Embed(
+                    title=f"🌐 Bot Servers ({len(guilds_sorted)} servers, {total_members:,} total members)", 
+                    color=discord.Color.blue(),
+                    description=f"Detailed information about all servers where the bot is active"
+                )
+                
                 start_idx = page * each_page
                 end_idx = start_idx + each_page
 
                 for guild in guilds_sorted[start_idx:end_idx]:
                     try:
+                        # Get invite link
                         invites = await guild.invites()
-                        first_invite = invites[0].url if invites else 'No invite link'
-                    except Exception:  # Tüm exceptionları yakalamak için genel bir Exception kullanın
-                        first_invite = 'No invite link'
-                    member = await guild.fetch_member(783064615012663326)
+                        invite_link = invites[0].url if invites else 'No invite available'
+                    except:
+                        invite_link = 'No permissions'
+                    
+                    try:
+                        # Get bot's join date
+                        bot_member = await guild.fetch_member(self.bot.user.id)
+                        join_date = bot_member.joined_at.strftime('%d/%m/%Y %H:%M')
+                    except:
+                        join_date = 'Unknown'
+                    
+                    # Calculate server age
+                    server_age = (datetime.now() - guild.created_at.replace(tzinfo=None)).days
+                    
+                    # Get server features
+                    features = []
+                    if guild.premium_tier > 0:
+                        features.append(f"Boost Tier {guild.premium_tier}")
+                    if guild.verification_level.name != 'none':
+                        features.append(f"Verified")
+                    if len(guild.features) > 0:
+                        features.append("Partnered" if "PARTNERED" in guild.features else "Featured")
+                    
+                    feature_text = " • ".join(features) if features else "None"
+                    
                     embed.add_field(
-                        name=f"{guild.name} ({guild.member_count})",
-                        value=f"*Owner:* <@{guild.owner_id}> \n*Join Date:* {member.joined_at.strftime('%m/%d/%Y, %H:%M:%S')} \n*Invite:* {first_invite}",
+                        name=f"📊 {guild.name}",
+                        value=(
+                            f"👥 **Members:** {guild.member_count:,}\n"
+                            f"👑 **Owner:** <@{guild.owner_id}>\n"
+                            f"📅 **Joined:** {join_date}\n"
+                            f"🎯 **Server Age:** {server_age} days\n"
+                            f"✨ **Features:** {feature_text}\n"
+                            f"🔗 **Invite:** [Join Server]({invite_link})" if invite_link != 'No invite available' and invite_link != 'No permissions' else f"🔗 **Invite:** {invite_link}"
+                        ),
                         inline=False
                     )
-                embed.set_footer(text=f"Page: {page + 1}/{pages}")
+                
+                embed.set_footer(text=f"Page {page + 1} of {pages} • Use navigation buttons below")
+                embed.set_thumbnail(url=self.bot.user.display_avatar.url)
                 embeds.append(embed)
 
             view = Paginator(embeds)
             await view.send_initial_message(ctx)
+            
         except Exception as e:
-            print(e)
-
-    @commands.hybrid_command(name="support", description="Shows information about the bot's support server.")
+            logger.error(f"Error in guilds command: {e}")
+            await ctx.send(embed=create_embed(f"❌ An error occurred: {str(e)}", discord.Color.red()))@commands.hybrid_command(name="support", description="Shows information about the bot's support server.")
     async def support(self, ctx):
         """Provides links to the bot's support server, invite link, and other helpful resources."""
         embed = discord.Embed(title=f"Do you need help {ctx.author.name}?", description="You can join bot's support server: \nhttps://discord.gg/ynGqvsYxah", color=discord.Color.pink())
         await ctx.send(embed=embed, view=SupportView(self.bot))
-
-    @commands.hybrid_command(name="version", description="Shows the current bot version and planned features.")
-    async def version(self, ctx):
-        """Displays information about the bot's current version and planned features."""
-        view = VersionButtonView(self.bot)
-        await view.send_initial_message(ctx, self.bot)
 
     @commands.Cog.listener()
     async def on_interaction(self, interaction: discord.Interaction):

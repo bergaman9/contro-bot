@@ -14,14 +14,16 @@ import pathlib
 from utils.core.formatting import create_embed
 from utils.content_loader import load_content
 from utils.setup import LanguageSelectView
-from utils.database.connection import initialize_mongodb
+from utils.database.connection import get_async_db
+
+# Set up logging
+logger = logging.getLogger('server_setup')
 
 dotenv.load_dotenv()
 
 class ServerSetup(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.mongo_db = initialize_mongodb()
         self.perplexity_api_key = os.getenv("PERPLEXITY_API_KEY")
         self.perplexity_api_url = "https://api.perplexity.ai/chat/completions"
         
@@ -431,200 +433,50 @@ class ServerSetup(commands.Cog):
             return f"Kanal: {channel_name}"
     # endregion
 
-    @app_commands.command(name="load_cogs", description="Tüm cogları yükleyerek dev bot sorununu çözer")
-    async def load_all_cogs(self, interaction: discord.Interaction):
-        """Tüm cogları yükler ve dev bot sorununu çözer"""
-        await interaction.response.defer(thinking=True)
-        
-        try:
-            results = await self.fix_dev_bot()
-            
-            loaded_cogs = "\n".join(results["loaded"])
-            failed_cogs = "\n".join([f"{cog}" for cog in results["failed"]])
-            
-            embed = discord.Embed(
-                title="🔧 Cog Yükleme Sonuçları",
-                color=discord.Color.green()
-            )
-            
-            if loaded_cogs:
-                embed.add_field(name="✅ Yüklenen Coglar", value=f"```\n{loaded_cogs}\n```", inline=False)
-            else:
-                embed.add_field(name="❌ Yüklenen Cog Yok", value="Hiçbir cog yüklenemedi.", inline=False)
-                
-            if failed_cogs:
-                embed.add_field(name="❌ Yüklenemeyen Coglar", value=f"```\n{failed_cogs}\n```", inline=False)
-            
-            embed.set_footer(text=f"Toplam: {len(results['loaded'])} başarılı, {len(results['failed'])} başarısız")
-            
-            await interaction.followup.send(embed=embed)
-        except Exception as e:
-            await interaction.followup.send(f"❌ Hata: {str(e)}")
-
-    @staticmethod
-    async def fix_dev_bot():
-        """A utility method to fix development bot cog loading issues"""
-        import discord
-        from discord.ext import commands
-        import os
-        import pathlib
-        import asyncio
-        
-        bot = commands.Bot(command_prefix=">>", intents=discord.Intents.all())
-        
-        # Count available cogs
-        cogs_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "cogs")
-        cog_files = [f.stem for f in pathlib.Path(cogs_dir).glob("*.py") if f.stem != "__init__"]
-        
-        print(f"Found {len(cog_files)} cogs to load")
-        
-        # Load all cogs
-        loaded = []
-        failed = []
-        
-        for cog in cog_files:
-            try:
-                await bot.load_extension(f"cogs.{cog}")
-                loaded.append(cog)
-                print(f"Loaded: {cog}")
-            except Exception as e:
-                failed.append(f"{cog}: {e}")
-                print(f"Failed to load {cog}: {e}")
-        
-        print(f"\nResults: Loaded {len(loaded)} cogs, {len(failed)} failed")
-        if failed:
-            print("\nFailed cogs:")
-            for fail in failed:
-                print(f"- {fail}")
-                
-        # Sync commands
-        try:
-            await bot.tree.sync()
-            print("Commands synced successfully")
-        except Exception as e:
-            print(f"Error syncing commands: {e}")
-        
-        return {"loaded": loaded, "failed": failed}
-
     # New method to handle settings
-    @app_commands.command(name="server_settings", description="Sunucu ayarlarını yönetmenizi sağlar")
-    async def server_settings(self, interaction: discord.Interaction):
-        """Sunucu ayarları menüsünü gösterir"""
+    @app_commands.command(name="settings", description="Manage server settings and configurations")
+    async def settings(self, interaction: discord.Interaction):
+        """Display server settings menu"""
         try:
-            # Create embed for settings
+            # Import the MainSettingsView
+            from utils.settings.views import MainSettingsView
+            
+            # Create main settings embed
             embed = discord.Embed(
-                title="⚙️ Sunucu Ayarları",
-                description="Aşağıdaki butonları kullanarak sunucu ayarlarını yapılandırabilirsiniz.",
+                title="⚙️ Server Settings Panel",
+                description="Manage all your server settings from one place:",
                 color=discord.Color.blue()
             )
-            
             embed.add_field(
-                name="📋 Mevcut Kategoriler",
+                name="📋 Available Categories",
                 value=(
-                    "🔧 **Feature Management** - Özellikleri aç/kapat\n"
-                    "🏠 **Server Settings** - Temel sunucu ayarları\n"
-                    "👋 **Welcome/Goodbye** - Karşılama ve vedalaşma sistemi\n"
-                    "🛡️ **Moderation** - Moderasyon araçları ve otomatik roller\n"
-                    "📊 **Logging** - Sunucu eventi logları\n"
-                    "🎫 **Ticket System** - Destek ticket sistemi\n"
-                    "👑 **Role Management** - Rol yönetimi ve reaksiyon rolleri\n"
-                    "⭐ **Starboard** - Yıldız panosu sistemi\n"
-                    "🎮 **Temp Channels** - Geçici sesli kanal sistemi"
+                    "📊 **Registration System** - Member registration settings\n"
+                    "💫 **Levelling System** - XP and level configurations\n"
+                    "👋 **Welcome/Goodbye** - Member greeting system\n"
+                    "🎫 **Ticket System** - Support ticket management\n"
+                    "🛡️ **Moderation** - Moderation tools and auto roles\n"
+                    "🔧 **Feature Management** - Enable/disable features\n"
+                    "🏠 **Server Settings** - Basic server configurations\n"
+                    "📊 **Logging** - Server event logs\n"
+                    "🎮 **Temp Channels** - Temporary voice channels system\n"
+                    "🤖 **Bot Settings** - Bot configuration options"
                 ),
                 inline=False
             )
             
-            # Create view with buttons
-            view = discord.ui.View(timeout=180)
+            # Use the updated MainSettingsView
+            view = MainSettingsView(self.bot, "en")
             
-            # Feature management button
-            feature_button = discord.ui.Button(
-                style=discord.ButtonStyle.secondary,
-                label="🔧 Özellik Yönetimi", 
-                custom_id="features_button"
-            )
+            # Send the response with the organized view
+            await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
             
-            # Server settings button
-            server_button = discord.ui.Button(
-                style=discord.ButtonStyle.secondary,
-                label="🏠 Sunucu Ayarları", 
-                custom_id="server_button"
-            )
-            
-            # Welcome/goodbye button
-            welcome_button = discord.ui.Button(
-                style=discord.ButtonStyle.secondary,
-                label="👋 Hoş Geldin/Güle Güle", 
-                custom_id="welcome_button"
-            )
-            
-            # Moderation button
-            moderation_button = discord.ui.Button(
-                style=discord.ButtonStyle.secondary,
-                label="🛡️ Moderasyon", 
-                custom_id="moderation_button"
-            )
-            
-            # Logging button
-            logging_button = discord.ui.Button(
-                style=discord.ButtonStyle.secondary,
-                label="📊 Logging", 
-                custom_id="logging_button"
-            )
-            
-            # Add button callbacks
-            async def feature_callback(interaction: discord.Interaction):
-                await interaction.response.send_message(
-                    "Özellik yönetimi menüsü açılıyor...", 
-                    ephemeral=True
-                )
-            
-            async def server_callback(interaction: discord.Interaction):
-                await interaction.response.send_message(
-                    "Sunucu ayarları menüsü açılıyor...", 
-                    ephemeral=True
-                )
-                
-            async def welcome_callback(interaction: discord.Interaction):
-                await interaction.response.send_message(
-                    "Hoş geldin/güle güle ayarları menüsü açılıyor...", 
-                    ephemeral=True
-                )
-                
-            async def moderation_callback(interaction: discord.Interaction):
-                await interaction.response.send_message(
-                    "Moderasyon ayarları menüsü açılıyor...", 
-                    ephemeral=True
-                )
-                
-            async def logging_callback(interaction: discord.Interaction):
-                await interaction.response.send_message(
-                    "Logging ayarları menüsü açılıyor...", 
-                    ephemeral=True
-                )
-            
-            # Assign callbacks to buttons
-            feature_button.callback = feature_callback
-            server_button.callback = server_callback
-            welcome_button.callback = welcome_callback
-            moderation_button.callback = moderation_callback
-            logging_button.callback = logging_callback
-            
-            # Add buttons to view
-            view.add_item(feature_button)
-            view.add_item(server_button)
-            view.add_item(welcome_button)
-            view.add_item(moderation_button)
-            view.add_item(logging_button)
-            
-            # Send response
-            await interaction.response.send_message(embed=embed, view=view)
         except Exception as e:
-            logging.error(f"Settings command error: {e}")
-            await interaction.response.send_message(
-                f"⚠️ Ayarlar menüsünü açarken bir hata oluştu: {str(e)}",
-                ephemeral=True
-            )
+            logger.error(f"Error in settings command: {e}")
+            if not interaction.response.is_done():
+                await interaction.response.send_message(
+                    f"❌ Settings panel error: {str(e)}", 
+                    ephemeral=True
+                )
 
 async def setup(bot):
     await bot.add_cog(ServerSetup(bot))

@@ -1,5 +1,3 @@
-
-
 import discord, asyncio, os, json, logging
 from ordinal import ordinal
 from discord.ext import commands
@@ -15,7 +13,7 @@ from typing import Optional, List, Union
 
 # Updated imports for new organization
 from utils.core.formatting import create_embed, hex_to_int
-from utils.database.connection import initialize_mongodb 
+from utils.database.connection import get_async_db 
 from utils.greeting.imaging import download_background
 
 # Import new view components from updated paths
@@ -32,7 +30,7 @@ class Welcomer(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.name = "hidden"
-        self.mongo_db = initialize_mongodb()
+        # Database connection handled via get_async_db() when needed
         self.predefined_backgrounds = get_predefined_backgrounds()
         
         # Create directories for temporary files if they don't exist
@@ -300,10 +298,22 @@ class Welcomer(commands.Cog):
                         # Send embed without image
                         await channel.send(embed=embed)
                     finally:
-                        # Clean up temporary file
+                        # Clean up temporary file with proper file handling
                         try:
                             if filename and os.path.exists(filename):
+                                # Add small delay to ensure file is released
+                                await asyncio.sleep(0.1)
                                 os.remove(filename)
+                                logger.debug(f"Successfully removed temporary file: {filename}")
+                        except PermissionError:
+                            # Windows-specific handling for files in use
+                            logger.warning(f"File in use, will retry deletion: {filename}")
+                            try:
+                                await asyncio.sleep(0.5)
+                                os.remove(filename)
+                                logger.debug(f"Successfully removed temporary file on retry: {filename}")
+                            except Exception as retry_e:
+                                logger.error(f"Failed to remove temporary file after retry: {retry_e}")
                         except Exception as e:
                             logger.error(f"Failed to remove temporary file: {e}")
                 else:
@@ -321,11 +331,58 @@ class Welcomer(commands.Cog):
         except Exception as e:
             logger.error(f"Error in send_welcome_message: {e}", exc_info=True)
 
+    async def setup_welcomer(self, interaction):
+        """Advanced setup method for welcome system"""
+        try:
+            # Create the advanced welcome configuration view
+            from utils.settings.views import WelcomeConfigView
+            
+            embed = discord.Embed(
+                title="🎉 Advanced Welcome System Setup",
+                description="Configure your welcome system with the buttons below. Image generation is fully supported!",
+                color=discord.Color.green()
+            )
+            
+            embed.add_field(
+                name="🎨 Full Setup",
+                value="Complete configuration with background customization, text styling, and advanced options",
+                inline=False
+            )
+            
+            embed.add_field(
+                name="⚡ Quick Setup", 
+                value="Fast setup with default settings - just choose channel and message",
+                inline=False
+            )
+            
+            embed.add_field(
+                name="🖼️ Features Available",
+                value=(
+                    "• **Image Generation**: Beautiful welcome cards with user avatars\n"
+                    "• **Background Customization**: Choose from presets or upload custom\n"
+                    "• **Text Styling**: Customize colors, fonts, and effects\n"
+                    "• **Message Templates**: Dynamic variables like {user}, {server}, {count}\n"
+                    "• **Language Support**: English and Turkish language options"
+                ),
+                inline=False
+            )
+            
+            # Create the configuration view with buttons
+            view = WelcomeConfigView(self.bot, "en")
+            
+            await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+            
+        except Exception as e:
+            logger.error(f"Error in setup_welcomer: {e}")
+            # Fallback to modal setup
+            from utils.settings.views import WelcomeMessageModal
+            modal = WelcomeMessageModal("en", quick=False)
+            await interaction.response.send_modal(modal)
 
 class ByeBye(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.mongo_db = initialize_mongodb()
+        # Database connection handled via get_async_db() when needed
         self.welcomer = bot.get_cog("Welcomer")  # Get reference to Welcomer cog for image utilities
         self.predefined_backgrounds = get_predefined_backgrounds("byebye")
         
@@ -487,6 +544,54 @@ class ByeBye(commands.Cog):
         except Exception as e:
             logger.error(f"Error in create_goodbye_image: {e}")
             return None
+
+    async def setup_byebye(self, interaction):
+        """Advanced setup method for goodbye system"""
+        try:
+            # Create the advanced goodbye configuration view
+            from utils.settings.views import GoodbyeConfigView
+            
+            embed = discord.Embed(
+                title="👋 Advanced Goodbye System Setup",
+                description="Configure your goodbye system with the buttons below. Image generation is fully supported!",
+                color=discord.Color.orange()
+            )
+            
+            embed.add_field(
+                name="🎨 Full Setup",
+                value="Complete configuration with background customization, text styling, and advanced options",
+                inline=False
+            )
+            
+            embed.add_field(
+                name="⚡ Quick Setup", 
+                value="Fast setup with default settings - just choose channel and message",
+                inline=False
+            )
+            
+            embed.add_field(
+                name="🖼️ Features Available",
+                value=(
+                    "• **Image Generation**: Beautiful goodbye cards with user avatars\n"
+                    "• **Background Customization**: Choose from presets or upload custom\n"
+                    "• **Text Styling**: Customize colors, fonts, and effects\n"
+                    "• **Message Templates**: Dynamic variables like {user}, {server}, {count}\n"
+                    "• **Language Support**: English and Turkish language options"
+                ),
+                inline=False
+            )
+            
+            # Create the configuration view with buttons
+            view = GoodbyeConfigView(self.bot, "en")
+            
+            await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+            
+        except Exception as e:
+            logger.error(f"Error in setup_byebye: {e}")
+            # Fallback to modal setup
+            from utils.settings.views import GoodbyeMessageModal
+            modal = GoodbyeMessageModal("en")
+            await interaction.response.send_modal(modal)
 
 async def setup(bot):
     # Use async setup function for modern discord.py

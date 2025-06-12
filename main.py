@@ -18,6 +18,7 @@ from typing import Optional
 from utils.core.formatting import create_embed
 from utils.core.logger import logger, setup_logging, LOGS_DIR
 from utils.core.config import ConfigManager
+from utils.version import get_version_manager
 from api.ping_api import app, initialize_api
 from api import initialize_all_apis
 from utils.database import initialize_async_mongodb, get_async_db, close_async_mongodb, DummyAsyncDatabase
@@ -559,10 +560,12 @@ async def main():
             
             # Import ticket views
             try:
-                from cogs.ticket import TicketButton, TicketCloseButtonView
+                from cogs.ticket import TicketButton, TicketControlView
                 register_persistent_view(TicketButton())
-                register_persistent_view(TicketCloseButtonView())
+                register_persistent_view(TicketControlView())
                 logger.info("Ticket views preloaded")
+            except ImportError as e:
+                logger.warning(f"Ticket views module not found, skipping: {e}")
             except Exception as e:
                 logger.error(f"Error preloading ticket views: {e}")
             
@@ -956,51 +959,57 @@ async def main():
             msg += f"\n❌ Failed: {', '.join(failed)}"
         await ctx.send(msg)
 
-    # Helper function to load cogs with improved parallel loading
+    # Optimized cog loading function
     async def load_cogs():
-        # Get enabled cogs for this client
+        """Load bot cogs with parallel processing and better error handling"""
         enabled_cogs = config_manager.get_enabled_cogs(client_id)
         
-        logger.info(f"Loading {len(enabled_cogs)} cogs for {client_id} client")
-        print_colored(f"Loading {len(enabled_cogs)} cogs: {', '.join(enabled_cogs)}", "cyan")
-        
-        # Check if we found any cogs to load
         if not enabled_cogs:
             logger.warning(f"No enabled cogs found for client '{client_id}'")
             print_colored(f"⚠️ No enabled cogs found for client '{client_id}'", "yellow")
-            print_colored("Check config.json to ensure 'enabled_cogs' is correctly set", "yellow")
+            return
         
-        # Use asyncio.gather to load cogs in parallel for faster startup
-        async def load_cog(cog_name):
+        logger.info(f"Loading {len(enabled_cogs)} cogs for {client_id} client")
+        print_colored(f"🔄 Loading cogs: {', '.join(enabled_cogs)}", "cyan")
+        
+        async def load_single_cog(cog_name):
+            """Load a single cog with error handling"""
             try:
-                # Check if cog is already loaded and remove it first
-                if f"cogs.{cog_name}" in bot.extensions:
-                    logger.warning(f"Cog {cog_name} already loaded, unloading first")
-                    await bot.unload_extension(f"cogs.{cog_name}")
+                # Unload if already loaded
+                extension_name = f"cogs.{cog_name}"
+                if extension_name in bot.extensions:
+                    await bot.unload_extension(extension_name)
                 
-                await bot.load_extension(f"cogs.{cog_name}")
-                logger.info(f"Loaded cog: {cog_name}")
-                return True, cog_name
+                await bot.load_extension(extension_name)
+                return {"name": cog_name, "status": "success", "error": None}
             except Exception as e:
-                logger.error(f"Failed to load cog {cog_name}: {e}", exc_info=True)
-                return False, cog_name
+                logger.error(f"Failed to load cog {cog_name}: {e}")
+                return {"name": cog_name, "status": "failed", "error": str(e)}
 
-        # Load cogs in parallel
-        results = await asyncio.gather(*[load_cog(cog) for cog in enabled_cogs], return_exceptions=False)
+        # Load all cogs in parallel
+        results = await asyncio.gather(*[load_single_cog(cog) for cog in enabled_cogs])
         
-        # Count success/failures
-        success_count = sum(1 for r in results if isinstance(r, tuple) and r[0])
-        failed_count = len(enabled_cogs) - success_count
+        # Process results
+        successful = [r for r in results if r["status"] == "success"]
+        failed = [r for r in results if r["status"] == "failed"]
         
-        logger.info(f"Cog loading complete: {success_count} loaded, {failed_count} failed")
+        # Log results
+        if successful:
+            print_colored(f"✅ Loaded {len(successful)} cogs successfully", "green")
+            logger.info(f"Successfully loaded cogs: {[r['name'] for r in successful]}")
         
-        # Sync commands after cogs are loaded
+        if failed:
+            print_colored(f"❌ Failed to load {len(failed)} cogs", "red")
+            logger.error(f"Failed cogs: {[(r['name'], r['error']) for r in failed]}")
+        
+        # Sync application commands
         try:
             logger.info("Syncing application commands...")
             await bot.tree.sync()
-            logger.info("Application commands synced successfully")
+            print_colored("✅ Application commands synced", "green")
         except Exception as e:
             logger.error(f"Error syncing commands: {e}")
+            print_colored(f"❌ Command sync failed: {e}", "red")
     
     # Start the bot with the client-specific token
     try:
@@ -1035,7 +1044,7 @@ async def main():
     finally:
         logger.info("Bot shutdown complete")
         # Ensure any remaining tasks are properly closed
-        if 'bot' in locals() and hasattr(bot, 'loop') and bot.loop.is_running():
+        if 'bot' in locals() and bot is not None and hasattr(bot, 'loop') and bot.loop and bot.loop.is_running():
             tasks = asyncio.all_tasks(bot.loop)
             for task in tasks:
                 task.cancel()

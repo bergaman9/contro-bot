@@ -4,7 +4,7 @@ import logging
 from typing import Optional, List
 import asyncio
 from utils.core.formatting import create_embed
-from utils.database.connection import get_async_db, ensure_async_db, initialize_mongodb
+from utils.database.connection import get_async_db, ensure_async_db
 
 # Setup logger
 logger = logging.getLogger('server_views')
@@ -12,24 +12,24 @@ logger = logging.getLogger('server_views')
 class ServerSettingsCustomView(ui.View):
     """View for configuring server settings"""
     
-    def __init__(self, bot, guild, timeout=300):
+    def __init__(self, bot, guild, language="en", timeout=300):
         super().__init__(timeout=timeout)
         self.bot = bot
         self.guild = guild
-        self.mongo_db = initialize_mongodb()
-        
-    @ui.button(label="🔤 Bot Öneki", style=discord.ButtonStyle.primary, row=0)
+        self.language = language
+
+    @ui.button(label="🔤 Bot Prefix", style=discord.ButtonStyle.primary, row=0)
     async def prefix_settings(self, interaction: discord.Interaction, button: ui.Button):
         # Open prefix settings modal
         modal = PrefixSettingsModal(self.bot, self.guild)
         await interaction.response.send_modal(modal)
 
-    @ui.button(label="🎨 Embed Rengi", style=discord.ButtonStyle.primary, row=0) 
+    @ui.button(label="🎨 Embed Color", style=discord.ButtonStyle.primary, row=0) 
     async def embed_color(self, interaction: discord.Interaction, button: ui.Button):
         # Open embed color selector
         embed = discord.Embed(
-            title="🎨 Embed Rengi Seçimi",
-            description="Bot tarafından kullanılan gömme mesajların rengini seçin:",
+            title="🎨 Embed Color Selection" if self.language == "en" else "🎨 Embed Rengi Seçimi",
+            description="Choose the color for bot embed messages:" if self.language == "en" else "Bot tarafından kullanılan gömme mesajların rengini seçin:",
             color=discord.Color.blue()
         )
         
@@ -37,18 +37,18 @@ class ServerSettingsCustomView(ui.View):
         view = EmbedColorView(self.bot, self.guild)
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
-    @ui.button(label="🔔 Rapor Kanalı", style=discord.ButtonStyle.secondary, row=0)
+    @ui.button(label="🔔 Report Channel", style=discord.ButtonStyle.secondary, row=0)
     async def report_channel(self, interaction: discord.Interaction, button: ui.Button):
         # Open report channel selector
-        modal = ReportChannelModal(self.bot, self.guild)
+        modal = ReportChannelModal(self.language)
         await interaction.response.send_modal(modal)
     
-    @ui.button(label="🌍 Dil Ayarı", style=discord.ButtonStyle.success, row=1)
+    @ui.button(label="🌍 Language Settings", style=discord.ButtonStyle.success, row=1)
     async def language_settings(self, interaction: discord.Interaction, button: ui.Button):
         # Open language selector
         embed = discord.Embed(
-            title="🌍 Bot Dili",
-            description="Bot arayüzü için bir dil seçin:",
+            title="🌍 Bot Language" if self.language == "en" else "🌍 Bot Dili",
+            description="Choose a language for the bot interface:" if self.language == "en" else "Bot arayüzü için bir dil seçin:",
             color=discord.Color.blue()
         )
         
@@ -56,40 +56,40 @@ class ServerSettingsCustomView(ui.View):
         view = LanguageSelectorView(self.bot, self.guild)
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
-    @ui.button(label="📋 Mevcut Ayarlar", style=discord.ButtonStyle.secondary, row=1)
+    @ui.button(label="📋 Current Settings", style=discord.ButtonStyle.secondary, row=1)
     async def current_settings(self, interaction: discord.Interaction, button: ui.Button):
         # Display current server settings
         await self.display_current_settings(interaction)
     
-    @ui.button(label="❌ Kapat", style=discord.ButtonStyle.danger, row=2)
+    @ui.button(label="❌ Close", style=discord.ButtonStyle.danger, row=2)
     async def close_menu(self, interaction: discord.Interaction, button: ui.Button):
         # Close the menu
+        content = "Server settings closed." if self.language == "en" else "Sunucu ayarları kapatıldı."
         await interaction.response.edit_message(
-            content="Sunucu ayarları kapatıldı.",
-            embed=None,
-            view=None
+            content=content,
+            embed=None,            view=None
         )
     
     async def display_current_settings(self, interaction):
         """Display current server settings"""
-        try:
-            # Get server settings from database
+        try:            # Get server settings from database
             settings = None
-            if self.mongo_db is not None:
+            mongo_db = get_async_db()
+            if mongo_db is not None:
                 guild_id = interaction.guild.id
-                settings = self.mongo_db['server_settings'].find_one({"guild_id": guild_id}) or {}
+                settings = await mongo_db['server_settings'].find_one({"guild_id": guild_id}) or {}
             
             # Create embed
             embed = discord.Embed(
-                title="📊 Mevcut Sunucu Ayarları",
-                description="Sunucunuz için yapılandırılmış ayarlar:",
+                title="📊 Current Server Settings" if self.language == "en" else "📊 Mevcut Sunucu Ayarları",
+                description="Configured settings for your server:" if self.language == "en" else "Sunucunuz için yapılandırılmış ayarlar:",
                 color=discord.Color.blue()
             )
             
             # Bot prefix
             prefix = settings.get("prefix", "!") if settings else "!"
             embed.add_field(
-                name="🔤 Bot Öneki",
+                name="🔤 Bot Prefix" if self.language == "en" else "🔤 Bot Öneki",
                 value=f"`{prefix}`",
                 inline=True
             )
@@ -97,32 +97,32 @@ class ServerSettingsCustomView(ui.View):
             # Embed color
             color_hex = settings.get("embed_color", "#3498db") if settings else "#3498db"
             embed.add_field(
-                name="🎨 Embed Rengi",
+                name="🎨 Embed Color" if self.language == "en" else "🎨 Embed Rengi",
                 value=f"`{color_hex}`",
                 inline=True
             )
             
             # Language
             language = settings.get("language", "tr") if settings else "tr"
-            language_name = "Türkçe" if language == "tr" else "English"
+            language_name = "English" if language == "en" else "Türkçe"
             embed.add_field(
-                name="🌍 Dil",
+                name="🌍 Language" if self.language == "en" else "🌍 Dil",
                 value=language_name,
                 inline=True
             )
             
             # Report channel
             report_channel_id = settings.get("report_channel") if settings else None
-            report_channel_text = "Ayarlanmamış"
+            report_channel_text = "Not set" if self.language == "en" else "Ayarlanmamış"
             if report_channel_id:
                 channel = interaction.guild.get_channel(report_channel_id)
                 if channel:
                     report_channel_text = channel.mention
                 else:
-                    report_channel_text = f"Kanal bulunamadı (ID: {report_channel_id})"
+                    report_channel_text = f"Channel not found (ID: {report_channel_id})" if self.language == "en" else f"Kanal bulunamadı (ID: {report_channel_id})"
             
             embed.add_field(
-                name="🔔 Rapor Kanalı",
+                name="🔔 Report Channel" if self.language == "en" else "🔔 Rapor Kanalı",
                 value=report_channel_text,
                 inline=False
             )
@@ -131,18 +131,19 @@ class ServerSettingsCustomView(ui.View):
             
         except Exception as e:
             logger.error(f"Error displaying current settings: {e}")
+            error_msg = f"An error occurred while displaying settings: {str(e)}" if self.language == "en" else f"Ayarlar görüntülenirken bir hata oluştu: {str(e)}"
             await interaction.response.send_message(
-                embed=create_embed(f"Ayarlar görüntülenirken bir hata oluştu: {str(e)}", discord.Color.red()),
+                embed=create_embed(error_msg, discord.Color.red()),
                 ephemeral=True
             )
 
 
-class PrefixSettingsModal(ui.Modal, title="Bot Öneki Ayarları"):
+class PrefixSettingsModal(ui.Modal, title="Bot Prefix Settings"):
     """Modal for setting bot prefix"""
     
     prefix = ui.TextInput(
-        label="Bot Öneki",
-        placeholder="Örnek: ! veya /",
+        label="Bot Prefix",
+        placeholder="Example: ! or /",
         required=True,
         min_length=1,
         max_length=5
@@ -152,30 +153,29 @@ class PrefixSettingsModal(ui.Modal, title="Bot Öneki Ayarları"):
         super().__init__()
         self.bot = bot
         self.guild = guild
-        self.mongo_db = initialize_mongodb()
     
     async def on_submit(self, interaction: discord.Interaction):
         try:
             # Get the prefix
             prefix = self.prefix.value
-            
-            # Save to database
-            if self.mongo_db is not None:
-                self.mongo_db['server_settings'].update_one(
+              # Save to database
+            mongo_db = get_async_db()
+            if mongo_db is not None:
+                await mongo_db['server_settings'].update_one(
                     {"guild_id": self.guild.id},
                     {"$set": {"prefix": prefix}},
                     upsert=True
                 )
             
             await interaction.response.send_message(
-                embed=create_embed(f"Bot öneki `{prefix}` olarak ayarlandı.", discord.Color.green()),
+                embed=create_embed(f"Bot prefix set to `{prefix}`.", discord.Color.green()),
                 ephemeral=True
             )
             
         except Exception as e:
             logger.error(f"Error setting bot prefix: {e}")
             await interaction.response.send_message(
-                embed=create_embed(f"Bot öneki ayarlanırken bir hata oluştu: {str(e)}", discord.Color.red()),
+                embed=create_embed(f"An error occurred while setting bot prefix: {str(e)}", discord.Color.red()),
                 ephemeral=True
             )
 
@@ -187,41 +187,40 @@ class EmbedColorView(ui.View):
         super().__init__(timeout=timeout)
         self.bot = bot
         self.guild = guild
-        self.mongo_db = initialize_mongodb()
     
-    @ui.button(label="🔴 Kırmızı", style=discord.ButtonStyle.danger, row=0)
+    @ui.button(label="🔴 Red", style=discord.ButtonStyle.danger, row=0)
     async def red_color(self, interaction: discord.Interaction, button: ui.Button):
-        await self.set_color(interaction, "#e74c3c", "Kırmızı")
+        await self.set_color(interaction, "#e74c3c", "Red")
     
-    @ui.button(label="🟢 Yeşil", style=discord.ButtonStyle.success, row=0)
+    @ui.button(label="🟢 Green", style=discord.ButtonStyle.success, row=0)
     async def green_color(self, interaction: discord.Interaction, button: ui.Button):
-        await self.set_color(interaction, "#2ecc71", "Yeşil")
+        await self.set_color(interaction, "#2ecc71", "Green")
     
-    @ui.button(label="🔵 Mavi", style=discord.ButtonStyle.primary, row=0)
+    @ui.button(label="🔵 Blue", style=discord.ButtonStyle.primary, row=0)
     async def blue_color(self, interaction: discord.Interaction, button: ui.Button):
-        await self.set_color(interaction, "#3498db", "Mavi")
+        await self.set_color(interaction, "#3498db", "Blue")
     
-    @ui.button(label="🟣 Mor", style=discord.ButtonStyle.secondary, row=1)
+    @ui.button(label="🟣 Purple", style=discord.ButtonStyle.secondary, row=1)
     async def purple_color(self, interaction: discord.Interaction, button: ui.Button):
-        await self.set_color(interaction, "#9b59b6", "Mor")
+        await self.set_color(interaction, "#9b59b6", "Purple")
     
-    @ui.button(label="🟠 Turuncu", style=discord.ButtonStyle.secondary, row=1)
+    @ui.button(label="🟠 Orange", style=discord.ButtonStyle.secondary, row=1)
     async def orange_color(self, interaction: discord.Interaction, button: ui.Button):
-        await self.set_color(interaction, "#e67e22", "Turuncu")
+        await self.set_color(interaction, "#e67e22", "Orange")
     
-    @ui.button(label="⚫ Siyah", style=discord.ButtonStyle.secondary, row=1)
+    @ui.button(label="⚫ Black", style=discord.ButtonStyle.secondary, row=1)
     async def black_color(self, interaction: discord.Interaction, button: ui.Button):
-        await self.set_color(interaction, "#2c3e50", "Siyah")
+        await self.set_color(interaction, "#2c3e50", "Black")
     
-    @ui.button(label="⚪ Beyaz", style=discord.ButtonStyle.secondary, row=2)
+    @ui.button(label="⚪ White", style=discord.ButtonStyle.secondary, row=2)
     async def white_color(self, interaction: discord.Interaction, button: ui.Button):
-        await self.set_color(interaction, "#ecf0f1", "Beyaz")
+        await self.set_color(interaction, "#ecf0f1", "White")
     
-    @ui.button(label="🟡 Sarı", style=discord.ButtonStyle.secondary, row=2)
+    @ui.button(label="🟡 Yellow", style=discord.ButtonStyle.secondary, row=2)
     async def yellow_color(self, interaction: discord.Interaction, button: ui.Button):
-        await self.set_color(interaction, "#f1c40f", "Sarı")
+                await self.set_color(interaction, "#f1c40f", "Yellow")
     
-    @ui.button(label="🏳️‍🌈 Özel Renk", style=discord.ButtonStyle.secondary, row=2)
+    @ui.button(label="🏳️‍🌈 Custom Color", style=discord.ButtonStyle.secondary, row=2)
     async def custom_color(self, interaction: discord.Interaction, button: ui.Button):
         # Open custom color modal
         modal = CustomColorModal(self.bot, self.guild)
@@ -231,8 +230,9 @@ class EmbedColorView(ui.View):
         """Set embed color"""
         try:
             # Save to database
-            if self.mongo_db is not None:
-                self.mongo_db['server_settings'].update_one(
+            mongo_db = get_async_db()
+            if mongo_db is not None:
+                await mongo_db['server_settings'].update_one(
                     {"guild_id": self.guild.id},
                     {"$set": {"embed_color": hex_color}},
                     upsert=True
@@ -241,8 +241,8 @@ class EmbedColorView(ui.View):
             # Create a sample embed with the new color
             color_int = int(hex_color.replace("#", ""), 16)
             sample_embed = discord.Embed(
-                title=f"🎨 {color_name} rengi seçildi",
-                description="Botun embed mesajları artık bu renkte görünecek.",
+                title=f"🎨 {color_name} color selected",
+                description="Bot embed messages will now appear in this color.",
                 color=discord.Color(color_int)
             )
             
@@ -254,17 +254,17 @@ class EmbedColorView(ui.View):
         except Exception as e:
             logger.error(f"Error setting embed color: {e}")
             await interaction.response.send_message(
-                embed=create_embed(f"Embed rengi ayarlanırken bir hata oluştu: {str(e)}", discord.Color.red()),
+                embed=create_embed(f"An error occurred while setting embed color: {str(e)}", discord.Color.red()),
                 ephemeral=True
             )
 
 
-class CustomColorModal(ui.Modal, title="Özel Renk Ayarı"):
+class CustomColorModal(ui.Modal, title="Custom Color Setting"):
     """Modal for setting custom embed color"""
     
     color_hex = ui.TextInput(
-        label="Renk Kodu (HEX)",
-        placeholder="Örnek: #3498db",
+        label="Color Code (HEX)",
+        placeholder="Example: #3498db",
         required=True,
         min_length=7,
         max_length=7
@@ -274,7 +274,6 @@ class CustomColorModal(ui.Modal, title="Özel Renk Ayarı"):
         super().__init__()
         self.bot = bot
         self.guild = guild
-        self.mongo_db = initialize_mongodb()
     
     async def on_submit(self, interaction: discord.Interaction):
         try:
@@ -284,7 +283,7 @@ class CustomColorModal(ui.Modal, title="Özel Renk Ayarı"):
             # Validate hex code format
             if not color_hex.startswith("#") or len(color_hex) != 7:
                 await interaction.response.send_message(
-                    embed=create_embed("Geçersiz renk kodu. '#' ile başlayan 6 haneli bir HEX kodu girin (örn: #3498db).", discord.Color.red()),
+                    embed=create_embed("Invalid color code. Enter a 6-digit HEX code starting with '#' (e.g., #3498db).", discord.Color.red()),
                     ephemeral=True
                 )
                 return
@@ -294,14 +293,14 @@ class CustomColorModal(ui.Modal, title="Özel Renk Ayarı"):
                 color_int = int(color_hex.replace("#", ""), 16)
             except ValueError:
                 await interaction.response.send_message(
-                    embed=create_embed("Geçersiz renk kodu. HEX renk kodu yalnızca 0-9 ve A-F karakterlerini içerebilir.", discord.Color.red()),
+                    embed=create_embed("Invalid color code. HEX color codes can only contain 0-9 and A-F characters.", discord.Color.red()),
                     ephemeral=True
                 )
                 return
-            
-            # Save to database
-            if self.mongo_db is not None:
-                self.mongo_db['server_settings'].update_one(
+              # Save to database
+            mongo_db = get_async_db()
+            if mongo_db is not None:
+                await mongo_db['server_settings'].update_one(
                     {"guild_id": self.guild.id},
                     {"$set": {"embed_color": color_hex}},
                     upsert=True
@@ -309,8 +308,8 @@ class CustomColorModal(ui.Modal, title="Özel Renk Ayarı"):
             
             # Create a sample embed with the new color
             sample_embed = discord.Embed(
-                title="🎨 Özel renk ayarlandı",
-                description=f"Botun embed mesajları artık {color_hex} kodlu renkte görünecek.",
+                title="🎨 Custom color set",
+                description=f"Bot embed messages will now appear in {color_hex} color.",
                 color=discord.Color(color_int)
             )
             
@@ -322,7 +321,7 @@ class CustomColorModal(ui.Modal, title="Özel Renk Ayarı"):
         except Exception as e:
             logger.error(f"Error setting custom embed color: {e}")
             await interaction.response.send_message(
-                embed=create_embed(f"Özel renk ayarlanırken bir hata oluştu: {str(e)}", discord.Color.red()),
+                embed=create_embed(f"An error occurred while setting custom color: {str(e)}", discord.Color.red()),
                 ephemeral=True
             )
 
@@ -341,7 +340,7 @@ class ReportChannelModal(ui.Modal, title="Rapor Kanalı Ayarı"):
         super().__init__()
         self.bot = bot
         self.guild = guild
-        self.mongo_db = initialize_mongodb()
+        self.mongo_db = get_async_db()
     
     async def on_submit(self, interaction: discord.Interaction):
         try:
@@ -406,7 +405,7 @@ class LanguageSelectorView(ui.View):
         super().__init__(timeout=timeout)
         self.bot = bot
         self.guild = guild
-        self.mongo_db = initialize_mongodb()
+        self.mongo_db = get_async_db()
     
     @ui.button(label="🇹🇷 Türkçe", style=discord.ButtonStyle.primary, row=0)
     async def turkish_language(self, interaction: discord.Interaction, button: ui.Button):
@@ -419,10 +418,13 @@ class LanguageSelectorView(ui.View):
     async def set_language(self, interaction, language_code, language_name):
         """Set bot language"""
         try:
+            # Ensure guild is a proper Guild object, not a string
+            guild_id = self.guild.id if hasattr(self.guild, 'id') else int(self.guild)
+            
             # Save to database
             if self.mongo_db is not None:
                 self.mongo_db['server_settings'].update_one(
-                    {"guild_id": self.guild.id},
+                    {"guild_id": guild_id},
                     {"$set": {"language": language_code}},
                     upsert=True
                 )

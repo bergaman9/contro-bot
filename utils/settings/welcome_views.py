@@ -4,7 +4,7 @@ import logging
 from typing import Optional, List
 import asyncio
 from utils.core.formatting import create_embed
-from utils.database.connection import get_async_db, ensure_async_db, initialize_mongodb
+from utils.database.connection import get_async_db, ensure_async_db
 
 # Setup logger
 logger = logging.getLogger('welcome_views')
@@ -16,7 +16,10 @@ class WelcomeSettingsCustomView(ui.View):
         super().__init__(timeout=timeout)
         self.bot = bot
         self.guild = guild
-        self.mongo_db = initialize_mongodb()
+        
+    async def get_db(self):
+        """Helper method to get async database connection"""
+        return get_async_db()
         
     @ui.button(label="👋 Hoş Geldin Mesajı", style=discord.ButtonStyle.primary, row=0)
     async def welcome_message(self, interaction: discord.Interaction, button: ui.Button):
@@ -168,7 +171,7 @@ class WelcomeMessageModal(ui.Modal, title="Hoş Geldin Mesajı Ayarları"):
         super().__init__()
         self.bot = bot
         self.guild = guild
-        self.mongo_db = initialize_mongodb()
+        self.mongo_db = get_async_db()
         
         # Load existing welcome message if available
         asyncio.create_task(self.load_existing_message())
@@ -249,7 +252,7 @@ class GoodbyeMessageModal(ui.Modal, title="Güle Güle Mesajı Ayarları"):
         super().__init__()
         self.bot = bot
         self.guild = guild
-        self.mongo_db = initialize_mongodb()
+        self.mongo_db = get_async_db()
         
         # Load existing goodbye message if available
         asyncio.create_task(self.load_existing_message())
@@ -330,7 +333,7 @@ class WelcomeChannelModal(ui.Modal, title="Karşılama/Veda Kanalı"):
         super().__init__()
         self.bot = bot
         self.guild = guild
-        self.mongo_db = initialize_mongodb()
+        self.mongo_db = get_async_db()
     
     async def on_submit(self, interaction: discord.Interaction):
         try:
@@ -395,7 +398,7 @@ class CardCustomizationView(ui.View):
         super().__init__(timeout=timeout)
         self.bot = bot
         self.guild = guild
-        self.mongo_db = initialize_mongodb()
+        self.mongo_db = get_async_db()
     
     @ui.button(label="✅ Kartları Etkinleştir", style=discord.ButtonStyle.success, row=0)
     async def enable_cards(self, interaction: discord.Interaction, button: ui.Button):
@@ -519,7 +522,7 @@ class BackgroundSelectorView(ui.View):
         super().__init__(timeout=timeout)
         self.bot = bot
         self.guild = guild
-        self.mongo_db = initialize_mongodb()
+        self.mongo_db = get_async_db()
     
     @ui.select(
         placeholder="Arka plan tipini seçin",
@@ -567,7 +570,7 @@ class ColorSchemeView(ui.View):
         super().__init__(timeout=timeout)
         self.bot = bot
         self.guild = guild
-        self.mongo_db = initialize_mongodb()
+        self.mongo_db = get_async_db()
     
     @ui.button(label="🔵 Mavi", style=discord.ButtonStyle.primary, row=0)
     async def blue_scheme(self, interaction: discord.Interaction, button: ui.Button):
@@ -638,7 +641,7 @@ class TextTemplateModal(ui.Modal, title="Kart Yazı Şablonu"):
         super().__init__()
         self.bot = bot
         self.guild = guild
-        self.mongo_db = initialize_mongodb()
+        self.mongo_db = get_async_db()
         
         # Load existing templates if available
         asyncio.create_task(self.load_existing_templates())
@@ -721,7 +724,7 @@ class DMSettingsView(ui.View):
         super().__init__(timeout=timeout)
         self.bot = bot
         self.guild = guild
-        self.mongo_db = initialize_mongodb()
+        self.mongo_db = get_async_db()
     
     @ui.button(label="✅ DM'leri Etkinleştir", style=discord.ButtonStyle.success, row=0)
     async def enable_dms(self, interaction: discord.Interaction, button: ui.Button):
@@ -776,7 +779,7 @@ class DMMessageModal(ui.Modal, title="DM Mesajı Ayarları"):
         super().__init__()
         self.bot = bot
         self.guild = guild
-        self.mongo_db = initialize_mongodb()
+        self.mongo_db = get_async_db()
         
         # Load existing DM message if available
         asyncio.create_task(self.load_existing_message())

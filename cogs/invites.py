@@ -62,8 +62,7 @@ class InviteTracker(commands.Cog):
                     logger.error(f"HTTP error when fetching invites for {guild.name} (ID: {guild.id}): {e}")
                 except Exception as e:
                     logger.error(f"Unexpected error caching invites for {guild.name} (ID: {guild.id}): {e}")
-                
-                # Add a small delay to avoid rate limiting
+                  # Add a small delay to avoid rate limiting
                 await asyncio.sleep(1)
                 
         except Exception as e:
@@ -83,11 +82,9 @@ class InviteTracker(commands.Cog):
                 'max_uses': invite.max_uses,
                 'max_age': invite.max_age
             }
-            
             logger.info(f"New invite created in {invite.guild.name} (ID: {invite.guild.id}): {invite.code}")
-            
             # Store in database
-            await self.mongo_db.invites.update_one(
+            result = await self.mongo_db.invites.update_one(
                 {"guild_id": invite.guild.id, "code": invite.code},
                 {"$set": {
                     "uses": invite.uses,
@@ -95,8 +92,7 @@ class InviteTracker(commands.Cog):
                     "created_at": invite.created_at,
                     "max_uses": invite.max_uses,
                     "max_age": invite.max_age,
-                    "channel_id": invite.channel.id
-                }},
+                    "channel_id": invite.channel.id                }},
                 upsert=True
             )
             
@@ -112,7 +108,7 @@ class InviteTracker(commands.Cog):
                 logger.info(f"Invite deleted in {invite.guild.name} (ID: {invite.guild.id}): {invite.code}")
                 
                 # Remove from database
-                await self.mongo_db.invites.delete_one(
+                result = await self.mongo_db.invites.delete_one(
                     {"guild_id": invite.guild.id, "code": invite.code}
                 )
                 
@@ -194,7 +190,7 @@ class InviteTracker(commands.Cog):
                 logger.info(f"{member} joined {member.guild.name} using invite code {used_invite.code} created by {inviter}")
                 
                 # Store this join in the database
-                await self.mongo_db.invite_joins.insert_one({
+                result = await self.mongo_db.invite_joins.insert_one({
                     "guild_id": member.guild.id,
                     "member_id": member.id,
                     "member_name": f"{member.name}#{member.discriminator}",
@@ -207,7 +203,7 @@ class InviteTracker(commands.Cog):
                 
                 # Update inviter's stats
                 if inviter:
-                    await self.mongo_db.invite_stats.update_one(
+                    result = await self.mongo_db.invite_stats.update_one(
                         {"guild_id": member.guild.id, "user_id": inviter.id},
                         {"$inc": {"total_invites": 1, "regular_invites": 1}},
                         upsert=True

@@ -421,8 +421,7 @@ class ServerSetup(commands.Cog):
                 async with session.post(self.perplexity_api_url, headers=headers, json=payload) as response:
                     if response.status == 200:
                         result = await response.json()
-                        choices = result.get("choices", [])
-                        if choices:
+                        choices = result.get("choices", [])                        if choices:
                             description = choices[0].get("message", {}).get("content", "")
                             return description if description else f"Kanal: {channel_name}"
                     return f"Kanal: {channel_name}"
@@ -430,81 +429,6 @@ class ServerSetup(commands.Cog):
             logging.error(f"AI açıklama üretme hatası: {e}")
             return f"Kanal: {channel_name}"
     # endregion
-
-    @app_commands.command(name="load_cogs", description="Tüm cogları yükleyerek dev bot sorununu çözer")
-    async def load_all_cogs(self, interaction: discord.Interaction):
-        """Tüm cogları yükler ve dev bot sorununu çözer"""
-        await interaction.response.defer(thinking=True)
-        
-        try:
-            results = await self.fix_dev_bot()
-            
-            loaded_cogs = "\n".join(results["loaded"])
-            failed_cogs = "\n".join([f"{cog}" for cog in results["failed"]])
-            
-            embed = discord.Embed(
-                title="🔧 Cog Yükleme Sonuçları",
-                color=discord.Color.green()
-            )
-            
-            if loaded_cogs:
-                embed.add_field(name="✅ Yüklenen Coglar", value=f"```\n{loaded_cogs}\n```", inline=False)
-            else:
-                embed.add_field(name="❌ Yüklenen Cog Yok", value="Hiçbir cog yüklenemedi.", inline=False)
-                
-            if failed_cogs:
-                embed.add_field(name="❌ Yüklenemeyen Coglar", value=f"```\n{failed_cogs}\n```", inline=False)
-            
-            embed.set_footer(text=f"Toplam: {len(results['loaded'])} başarılı, {len(results['failed'])} başarısız")
-            
-            await interaction.followup.send(embed=embed)
-        except Exception as e:
-            await interaction.followup.send(f"❌ Hata: {str(e)}")
-
-    @staticmethod
-    async def fix_dev_bot():
-        """A utility method to fix development bot cog loading issues"""
-        import discord
-        from discord.ext import commands
-        import os
-        import pathlib
-        import asyncio
-        
-        bot = commands.Bot(command_prefix=">>", intents=discord.Intents.all())
-        
-        # Count available cogs
-        cogs_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "cogs")
-        cog_files = [f.stem for f in pathlib.Path(cogs_dir).glob("*.py") if f.stem != "__init__"]
-        
-        print(f"Found {len(cog_files)} cogs to load")
-        
-        # Load all cogs
-        loaded = []
-        failed = []
-        
-        for cog in cog_files:
-            try:
-                await bot.load_extension(f"cogs.{cog}")
-                loaded.append(cog)
-                print(f"Loaded: {cog}")
-            except Exception as e:
-                failed.append(f"{cog}: {e}")
-                print(f"Failed to load {cog}: {e}")
-        
-        print(f"\nResults: Loaded {len(loaded)} cogs, {len(failed)} failed")
-        if failed:
-            print("\nFailed cogs:")
-            for fail in failed:
-                print(f"- {fail}")
-                
-        # Sync commands
-        try:
-            await bot.tree.sync()
-            print("Commands synced successfully")
-        except Exception as e:
-            print(f"Error syncing commands: {e}")
-        
-        return {"loaded": loaded, "failed": failed}
 
     @app_commands.command(name="fix_indentation", description="Otomatik girinti hatalarını düzeltir")
     async def fix_indentation_errors(self, interaction: discord.Interaction):
@@ -545,9 +469,8 @@ class ServerSetup(commands.Cog):
     async def fix_xp_manager_indentation():
         """XP Manager dosyasındaki girinti hatalarını düzeltir"""
         import re
-        
         file_path = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+            os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
             "utils", "community", "turkoyto", "xp_manager.py"
         )
         

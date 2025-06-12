@@ -467,6 +467,15 @@ This project maintains a clean, modular architecture that makes it easy to:
 - Customize for specific communities
 - Deploy across multiple servers
 
+## 📧 Contact & Support
+
+For questions, bug reports, or feature requests:
+- **Email**: bergasoft@pm.me
+- **Issues**: [GitHub Issues](https://github.com/bergaman9/contro-bot/issues)
+- **Security**: For security-related concerns, please email bergasoft@pm.me
+
+**Note**: Contro is developed as a hobby project to enhance software development experience, focusing on community benefit rather than commercial purposes.
+
 ## 📝 License
 
 This project is available under the MIT License. See the [LICENSE](LICENSE) file for details.

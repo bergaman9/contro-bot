@@ -48,10 +48,9 @@ class ConfigManager:
         """Load environment variables from .env file"""
         dotenv.load_dotenv()
         self.env_vars = {}
-        
-        # Load only the three standard tokens - direct access from environment
+          # Load only the three standard tokens - direct access from environment
         dev_token = os.getenv("CONTRO_DEV_TOKEN")
-        main_token = os.getenv("CONTRO_TOKEN")
+        main_token = os.getenv("CONTRO_MAIN_TOKEN")
         premium_token = os.getenv("CONTRO_PREMIUM_TOKEN")
         
         self.env_vars["tokens"] = {}
@@ -97,8 +96,7 @@ class ConfigManager:
         
         # Print detailed debug info
         logger.info(f"Getting token for client: '{original_client_id}'")
-        
-        # Direct environment variable check first - only support the three main tokens
+          # Direct environment variable check first - only support the three main tokens
         if client_id_lower == "dev":
             dev_token = os.getenv("CONTRO_DEV_TOKEN")
             if dev_token:
@@ -108,12 +106,12 @@ class ConfigManager:
                 logger.warning(f"✗ CONTRO_DEV_TOKEN environment variable not found for '{original_client_id}'")
                 
         elif client_id_lower == "main":
-            main_token = os.getenv("CONTRO_TOKEN")
+            main_token = os.getenv("CONTRO_MAIN_TOKEN")
             if main_token:
-                logger.info(f"✓ Using CONTRO_TOKEN for '{original_client_id}'")
+                logger.info(f"✓ Using CONTRO_MAIN_TOKEN for '{original_client_id}'")
                 return main_token
             else:
-                logger.warning(f"✗ CONTRO_TOKEN environment variable not found for '{original_client_id}'")
+                logger.warning(f"✗ CONTRO_MAIN_TOKEN environment variable not found for '{original_client_id}'")
                 
         elif client_id_lower == "premium":
             premium_token = os.getenv("CONTRO_PREMIUM_TOKEN")
@@ -133,9 +131,9 @@ class ConfigManager:
             return ""  # Return empty token to force exit in main.py
             
         # Last resort fallback to main token (but not for dev mode)
-        main_token = os.getenv("CONTRO_TOKEN")
+        main_token = os.getenv("CONTRO_MAIN_TOKEN")
         if main_token:
-            logger.warning(f"⚠ No specific token found for '{original_client_id}', falling back to CONTRO_TOKEN")
+            logger.warning(f"⚠ No specific token found for '{original_client_id}', falling back to CONTRO_MAIN_TOKEN")
             return main_token
             
         logger.error(f"✗ No token found for '{original_client_id}' and no fallback available")

@@ -7,7 +7,7 @@ import asyncio
 from typing import Optional
 
 from utils.core.formatting import create_embed
-from utils.database.connection import initialize_mongodb
+from utils.database.connection import get_async_db, initialize_async_mongodb
 from utils.community.turkoyto.xp_manager import XPManager, XP_VOICE_PER_MINUTE
 from utils.community.turkoyto.card_renderer import create_level_card, get_level_scheme, scheme_to_discord_color
 
@@ -19,12 +19,14 @@ class Levelling(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.mongo_db = None
-        self.setup_database()
         
         self.voice_time_tracker = {}  # Track users in voice channels
         
         # Initialize the XP manager
         self.xp_manager = XPManager()
+        
+        # Setup database after initialization
+        self.setup_database()
         
         # Start checking voice activity
         self.check_voice_activity.start()
@@ -33,19 +35,18 @@ class Levelling(commands.Cog):
         os.makedirs("data/Temp", exist_ok=True)
         
         logger.info("Levelling cog initialized")
-
+    
     def setup_database(self):
         """Setup database connections"""
         try:
             # Get async database from bot if available
-            if hasattr(self.bot, 'async_db') and self.bot.async_db:
+            if hasattr(self.bot, 'async_db') and self.bot.async_db is not None:
                 self.mongo_db = self.bot.async_db
                 logger.info("Using bot's async database connection")
                 # Update XP manager immediately if we have the DB
-                if self.xp_manager:
+                if hasattr(self, 'xp_manager') and self.xp_manager:
                     self.xp_manager.set_mongo_db(self.mongo_db)
-            else:
-                # Schedule database initialization for when bot is ready
+            else:                # Schedule database initialization for when bot is ready
                 asyncio.create_task(self.delayed_database_setup())
                 logger.info("Scheduled delayed database setup")
         except Exception as e:
@@ -63,16 +64,16 @@ class Levelling(commands.Cog):
             else:
                 # Try to initialize directly
                 try:
-                    self.mongo_db = initialize_mongodb()
+                    self.mongo_db = get_async_db()
                     if self.mongo_db is not None:
-                        logger.info("Initialized MongoDB connection directly")
+                        logger.info("Initialized async MongoDB connection directly")
                     else:
                         logger.error("Failed to initialize MongoDB connection")
                 except Exception as e:
                     logger.error(f"Error initializing MongoDB: {e}")
             
             # Update XP manager with database
-            if self.mongo_db is not None and self.xp_manager:
+            if self.mongo_db is not None and hasattr(self, 'xp_manager') and self.xp_manager:
                 self.xp_manager.set_mongo_db(self.mongo_db)
                 logger.info("Updated XP manager with database connection")
                 
@@ -89,7 +90,7 @@ class Levelling(commands.Cog):
             else:
                 # Try to initialize
                 try:
-                    self.mongo_db = initialize_mongodb()
+                    self.mongo_db = await initialize_async_mongodb()
                     if self.mongo_db is not None:
                         logger.info("Database connection established for Levelling")
                     else:
@@ -98,7 +99,7 @@ class Levelling(commands.Cog):
                     logger.error(f"Error ensuring database: {e}")
             
             # Update XP manager if we got a connection
-            if self.mongo_db is not None and self.xp_manager:
+            if self.mongo_db is not None and hasattr(self, 'xp_manager') and self.xp_manager:
                 self.xp_manager.set_mongo_db(self.mongo_db)
                 
         return self.mongo_db
@@ -122,8 +123,7 @@ class Levelling(commands.Cog):
                     "xp_multiplier": 1.0,
                     "voice_xp_multiplier": 1.0,
                     "cooldown_seconds": 60,
-                    "max_level": 100
-                }
+                    "max_level": 100                }
             return settings
         except Exception as e:
             logger.error(f"Error getting guild settings: {e}")
@@ -136,11 +136,16 @@ class Levelling(commands.Cog):
             logger.info("Levelling cog unloaded and tasks stopped")
         except Exception as e:
             logger.error(f"Error during cog unload: {e}")
-
+    
     @tasks.loop(minutes=1)
     async def check_voice_activity(self):
         """Check and reward XP for users in voice channels"""
         try:
+            # Ensure XP manager exists
+            if not hasattr(self, 'xp_manager') or not self.xp_manager:
+                logger.warning("XP manager not available, skipping voice activity check")
+                return
+                
             logger.debug("Running voice activity check")
             users_processed = 0
             users_awarded = 0
@@ -212,7 +217,7 @@ class Levelling(commands.Cog):
     async def before_voice_check(self):
         """Wait until the bot is ready before starting the loop"""
         await self.bot.wait_until_ready()
-
+        
     @commands.Cog.listener()
     async def on_message(self, message):
         """Process messages and award XP based on content"""
@@ -221,6 +226,11 @@ class Levelling(commands.Cog):
             return
         
         try:
+            # Ensure XP manager exists
+            if not hasattr(self, 'xp_manager') or not self.xp_manager:
+                logger.warning("XP manager not available, skipping XP processing")
+                return
+                
             # Check if levelling is enabled for this guild
             settings = await self.get_guild_settings(message.guild.id)
             if not settings.get("enabled", True) or not settings.get("message_xp_enabled", True):
@@ -266,14 +276,17 @@ class Levelling(commands.Cog):
                 logger.debug(f"No XP awarded to {member.name} for message - calculated XP was {xp_gain}")
             
         except Exception as e:
-            logger.error(f"Error processing message for XP: {e}", exc_info=True)
-
-    @commands.Cog.listener()
+            logger.error(f"Error processing message for XP: {e}", exc_info=True)    @commands.Cog.listener()
     async def on_voice_state_update(self, member, before, after):
         """Handle voice state updates"""
         try:
             # Skip bots
             if member.bot:
+                return
+            
+            # Ensure XP manager exists
+            if not hasattr(self, 'xp_manager') or not self.xp_manager:
+                logger.warning("XP manager not available, skipping voice state update processing")
                 return
             
             # Check if levelling is enabled for this guild
@@ -308,7 +321,6 @@ class Levelling(commands.Cog):
                     
                     # Remove user from tracker
                     del self.voice_time_tracker[member.id]
-            
             # If user joined a voice channel and is not in tracker yet
             elif after.channel and not after.afk and member.id not in self.voice_time_tracker:
                 self.voice_time_tracker[member.id] = datetime.datetime.now()
@@ -317,14 +329,51 @@ class Levelling(commands.Cog):
         except Exception as e:
             logger.error(f"Error in voice state update: {e}", exc_info=True)
 
+    async def check_and_assign_level_roles(self, member, level):
+        """Check and assign level roles based on user's level"""
+        try:
+            await self.ensure_database()
+            if self.mongo_db is None:
+                return
+                
+            settings = await self.mongo_db.levelling_settings.find_one({"guild_id": int(member.guild.id)})
+            if not settings:
+                return
+                
+            level_roles = settings.get("level_roles", {})
+            if not level_roles:
+                return
+            
+            # Check if user should get a role for this level
+            if str(level) in level_roles:
+                role_id = level_roles[str(level)]
+                role = member.guild.get_role(int(role_id))
+                
+                if role and role not in member.roles:
+                    try:
+                        await member.add_roles(role, reason=f"Level {level} reward")
+                        logger.info(f"Assigned level {level} role '{role.name}' to {member.name}")
+                    except discord.Forbidden:
+                        logger.error(f"No permission to assign role '{role.name}' to {member.name}")
+                    except discord.HTTPException as e:
+                        logger.error(f"Failed to assign role '{role.name}' to {member.name}: {e}")
+                        
+        except Exception as e:
+            logger.error(f"Error checking and assigning level roles for {member.name}: {e}")
+
     async def send_level_up_notification(self, member, user_data):
         """Send a notification when user levels up"""
         try:
             settings = await self.get_guild_settings(member.guild.id)
             if not settings.get("level_up_notifications", True):
+                # Even if notifications are disabled, we still need to check for level roles
+                await self.check_and_assign_level_roles(member, user_data.get('level', 0))
                 return
                 
             new_level = user_data.get('level', 0)
+            
+            # Check and assign level roles
+            await self.check_and_assign_level_roles(member, new_level)
             
             # Get level up channel or use a default channel
             channel_id = settings.get("level_up_channel_id")
@@ -379,7 +428,7 @@ class Levelling(commands.Cog):
         except Exception as e:
             logger.error(f"Error sending level up notification: {e}", exc_info=True)
 
-    @commands.hybrid_command(name="level", aliases=["rank"], description="Show user's level card")
+    @commands.hybrid_command(name="level", description="Show user's level card")
     async def level(self, ctx, member: discord.Member = None):
         """
         Show user's level card.
@@ -396,6 +445,11 @@ class Levelling(commands.Cog):
                 await ctx.send("Levelling system is disabled in this server.", ephemeral=True)
                 return
             
+            # Ensure XP manager exists
+            if not hasattr(self, 'xp_manager') or not self.xp_manager:
+                await ctx.send("Levelling system is not properly initialized.", ephemeral=True)
+                return
+            
             # If no member is provided, use the command invoker
             if member is None:
                 member = ctx.author
@@ -410,9 +464,10 @@ class Levelling(commands.Cog):
             if self.mongo_db is None:
                 logger.error("MongoDB is not initialized in Levelling cog")
                 # Try to re-initialize
-                self.mongo_db = initialize_mongodb()
+                self.mongo_db = await initialize_async_mongodb()
                 # Also update XP manager's connection
-                self.xp_manager.mongo_db = self.mongo_db
+                if self.xp_manager:
+                    self.xp_manager.mongo_db = self.mongo_db
             
             # Use XPManager to create the level card
             card_path = await self.xp_manager.create_and_render_level_card(
@@ -444,6 +499,19 @@ class Levelling(commands.Cog):
             logger.error(f"Error in level command for user {member.id if member else 'None'}: {e}", exc_info=True)
             await ctx.send("An error occurred while showing the level card.", ephemeral=True)
 
+    @commands.hybrid_command(name="rank", description="Show user's rank card")
+    async def rank(self, ctx, member: discord.Member = None):
+        """
+        Show user's rank card (alias for level command).
+        
+        Parameters
+        ----------
+        member: discord.Member
+            Optional - User whose rank card to show. If not specified, shows command user's card.
+        """
+        # This is just an alias for the level command
+        await self.level(ctx, member)
+
     @commands.hybrid_command(name="levelinfo", aliases=["levelstats"], description="Show detailed level information")
     async def levelinfo(self, ctx, member: discord.Member = None):
         """
@@ -461,6 +529,11 @@ class Levelling(commands.Cog):
                 await ctx.send("Levelling system is disabled in this server.", ephemeral=True)
                 return
             
+            # Ensure XP manager exists
+            if not hasattr(self, 'xp_manager') or not self.xp_manager:
+                await ctx.send("Levelling system is not properly initialized.", ephemeral=True)
+                return
+
             # If no member is provided, use the command invoker
             if member is None:
                 member = ctx.author
@@ -536,9 +609,7 @@ class Levelling(commands.Cog):
 
         except Exception as e:
             logger.error(f"Error in levelinfo command for user {member.id if member else 'None'}: {e}", exc_info=True)
-            await ctx.send("An error occurred while displaying user information.", ephemeral=True)
-
-    @commands.hybrid_command(name="leaderboard", aliases=["lb", "top"], description="Show the server leaderboard")
+            await ctx.send("An error occurred while displaying user information.", ephemeral=True)    @commands.hybrid_command(name="leaderboard", aliases=["lb", "top"], description="Show the server leaderboard")
     async def leaderboard(self, ctx, limit: int = 10):
         """
         Show the server leaderboard.
@@ -553,6 +624,11 @@ class Levelling(commands.Cog):
             settings = await self.get_guild_settings(ctx.guild.id)
             if not settings.get("enabled", True):
                 await ctx.send("Levelling system is disabled in this server.", ephemeral=True)
+                return
+            
+            # Ensure XP manager exists
+            if not hasattr(self, 'xp_manager') or not self.xp_manager:
+                await ctx.send("Levelling system is not properly initialized.", ephemeral=True)
                 return
             
             # Limit the results

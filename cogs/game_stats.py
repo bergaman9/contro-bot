@@ -8,7 +8,7 @@ from discord import app_commands
 from discord.ext import commands, tasks
 import json
 
-from utils.database.connection import initialize_mongodb
+from utils.database.connection import get_async_db
 from utils.core.formatting import create_embed
 from utils.core.class_utils import Paginator
 from utils.core.db import get_document, get_documents, update_document
@@ -32,17 +32,16 @@ class GameStats(commands.Cog):
         self.game_logs_cache = {}   # Cache for game logs
         self.last_activity_check = {}  # Track when we last checked a user's activity
         self.init_task = asyncio.create_task(self.initialize())
-        
-        # Increased intervals to reduce load
+          # Increased intervals to reduce load
         self.update_interval = 300  # seconds (5 minutes)
         self.cleanup_interval = 60  # minutes (1 hour)
         self.cache_ttl = 300  # seconds (5 minutes)
         self.last_cache_cleanup = datetime.now()
-    
+        
     async def initialize(self):
         """Initialize the database connection asynchronously"""
         try:
-            self.mongodb = initialize_mongodb()
+            self.mongodb = get_async_db()
             if self.mongodb is not None:  # Proper way to check MongoDB connection
                 # Start background tasks after database is initialized
                 self.update_game_activities.start()
@@ -127,6 +126,12 @@ class GameStats(commands.Cog):
                 description=f"{ctx.guild.name} sunucusunda en çok oynanan oyunların istatistikleri:",
                 color=discord.Color.blue()
             )
+            
+            # Add gaming controller icon as thumbnail
+            embed.set_thumbnail(url="https://cdn.discordapp.com/emojis/1234567890123456789.png?v=1")
+            # Alternative: Use guild icon if available
+            if ctx.guild.icon:
+                embed.set_author(name=f"{ctx.guild.name} Oyun İstatistikleri", icon_url=ctx.guild.icon.url)
             
             if top_games:
                 game_list = []
@@ -235,21 +240,18 @@ class GameStats(commands.Cog):
                 
                 # Get current member IDs in guild - do this once to avoid repeated calls
                 current_member_ids = {member.id for member in guild.members if not member.bot}
-                
-                # Check the cached guild log first
+                  # Check the cached guild log first
                 guild_log_key = f"guild_log_{guild.id}"
-                
                 async def fetch_guild_log():
-                    if not self.mongodb:
+                    if self.mongodb is None:
                         return None
                     game_logs = self.mongodb["game_logs"]
                     return await game_logs.find_one({"guild_id": guild.id})
                 
                 guild_log = await self.get_cached_data(self.game_logs_cache, guild_log_key, fetch_guild_log)
-                
-                # Track existing active players from DB to identify who needs to be removed
+                  # Track existing active players from DB to identify who needs to be removed
                 existing_active_members = set()
-                if guild_log:
+                if guild_log is not None:
                     for game in guild_log.get("game_names", []):
                         for player in game.get("active_players", []):
                             existing_active_members.add(player.get("member_id"))
@@ -288,8 +290,7 @@ class GameStats(commands.Cog):
                     
                 # Invalidate cache after updates
                 self.game_logs_cache.pop(guild_log_key, None)
-                    
-                # Brief pause to avoid hitting rate limits
+                      # Brief pause to avoid hitting rate limits
                 await asyncio.sleep(1)
                 
         except Exception as e:
@@ -306,7 +307,7 @@ class GameStats(commands.Cog):
                 game_logs = self.mongodb["game_logs"]
                 guild_log = await game_logs.find_one({"guild_id": guild.id})
 
-                if not guild_log:
+                if guild_log is None:
                     continue
 
                 # Get current member IDs from guild - only do this once
@@ -351,7 +352,7 @@ class GameStats(commands.Cog):
                 
             guild_log = await self.get_cached_data(self.game_logs_cache, guild_log_key, fetch_guild_log)
             
-            if guild_log:
+            if guild_log is not None:
                 updated_game_names = []
                 modified = False
                 

@@ -5,6 +5,8 @@ import discord
 from discord.ext import commands
 import asyncio
 from typing import List, Optional, Any, Union, Callable, Dict
+from pathlib import Path
+import json
 
 class Paginator(discord.ui.View):
     """
@@ -95,8 +97,8 @@ class Paginator(discord.ui.View):
     
     @discord.ui.button(label="1/1", style=discord.ButtonStyle.gray, disabled=True)
     async def page_indicator(self, interaction: discord.Interaction, button: discord.ui.Button):
-        """Page indicator, not functional as a button."""
-        pass
+        """Page indicator (not clickable)."""
+        await interaction.response.defer()
     
     @discord.ui.button(emoji="▶️", style=discord.ButtonStyle.blurple)
     async def next_button(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -152,43 +154,98 @@ class Paginator(discord.ui.View):
             timeout: Seconds before the paginator times out
             author_id: User ID who can interact with the paginator
             start_page: The initial page to display
-            ephemeral: Whether the response should be ephemeral (only works with interactions)
+            ephemeral: Whether to send the paginator as ephemeral (interactions only)
             
         Returns:
-            Paginator: The created paginator instance
+            The created Paginator instance
         """
         if not pages:
-            raise ValueError("Cannot create a paginator with no pages")
-            
-        # Set author_id from context if not specified
+            raise ValueError("Pages list cannot be empty")
+        
+        # Auto-detect author if not provided
         if author_id is None:
-            if isinstance(ctx_or_interaction, commands.Context):
+            if hasattr(ctx_or_interaction, 'author'):
                 author_id = ctx_or_interaction.author.id
-            else:
+            elif hasattr(ctx_or_interaction, 'user'):
                 author_id = ctx_or_interaction.user.id
         
-        # Create the paginator
-        paginator = cls(pages, timeout=timeout, author_id=author_id, start_page=start_page)
+        paginator = cls(pages, timeout, author_id, start_page)
         
-        # Get current page content
+        # Prepare initial content
         current_content = pages[start_page]
-        
-        # Prepare kwargs based on content type
         kwargs = {"view": paginator}
+        
         if isinstance(current_content, discord.Embed):
             kwargs["embed"] = current_content
         else:
             kwargs["content"] = str(current_content)
         
-        # Send/respond based on the context type
-        if isinstance(ctx_or_interaction, commands.Context):
-            await ctx_or_interaction.send(**kwargs)
+        # Send the paginator
+        if isinstance(ctx_or_interaction, discord.Interaction):
+            kwargs["ephemeral"] = ephemeral
+            await ctx_or_interaction.response.send_message(**kwargs)
         else:
-            # It's an interaction
-            if ctx_or_interaction.response.is_done():
-                await ctx_or_interaction.followup.send(**kwargs, ephemeral=ephemeral)
-            else:
-                kwargs["ephemeral"] = ephemeral
-                await ctx_or_interaction.response.send_message(**kwargs)
+            await ctx_or_interaction.send(**kwargs)
         
         return paginator
+
+
+class DataManager:
+    """
+    A utility class for managing data storage and retrieval.
+    """
+    
+    def __init__(self, data_dir: str = "data"):
+        """
+        Initialize the DataManager.
+        
+        Args:
+            data_dir: Directory to store data files
+        """
+        self.data_dir = Path(data_dir)
+        self.data_dir.mkdir(exist_ok=True)
+    
+    def save_json(self, filename: str, data: Any) -> bool:
+        """
+        Save data to a JSON file.
+        
+        Args:
+            filename: Name of the file (without extension)
+            data: Data to save
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            file_path = self.data_dir / f"{filename}.json"
+            with open(file_path, 'w', encoding='utf-8') as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+            return True
+        except Exception as e:
+            print(f"Error saving JSON file {filename}: {e}")
+            return False
+    
+    def load_json(self, filename: str, default: Any = None) -> Any:
+        """
+        Load data from a JSON file.
+        
+        Args:
+            filename: Name of the file (without extension)
+            default: Default value if file doesn't exist
+            
+        Returns:
+            Loaded data or default value
+        """
+        try:
+            file_path = self.data_dir / f"{filename}.json"
+            if file_path.exists():
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            return default
+        except Exception as e:
+            print(f"Error loading JSON file {filename}: {e}")
+            return default
+
+
+# Export classes
+__all__ = ['Paginator', 'DataManager']

@@ -10,7 +10,7 @@ from discord.ui import Button, View, Select
 from utils.core.formatting import create_embed
 from .card_renderer import get_level_scheme
 
-logger = logging.getLogger('turkoyto.ticket_views')
+logger = logging.getLogger(__name__)
 
 def get_ticket_level_colors():
     """Kart renderer ile aynı 20 seviye rengini döndürür (Discord renk objesi olarak)."""
@@ -245,91 +245,240 @@ class TicketModal(discord.ui.Modal, title="Destek Talebi Formu"):
             description = self.aciklama.value
             contact_info = self.iletisim.value if self.iletisim.value else "Belirtilmedi"
             
-            # Create a ticket
-            cog = interaction.client.get_cog("TurkOyto")
-            if not cog:
-                raise ValueError("TurkOyto cog not found. Please contact an administrator.")
-                
-            if not hasattr(cog, 'create_ticket'):
-                raise ValueError("create_ticket method not found. Please contact an administrator.")
-                
+            # Use the new ticket system instead of TurkOyto cog
+            from cogs.ticket import TicketModal
+            
             # Defer the response to avoid timeouts during ticket creation
             await interaction.response.defer(ephemeral=True)
             
-            # Add category_id to the ticket creation parameters if it's available
-            kwargs = {
-                "interaction": interaction,
-                "subject": subject,
-                "description": description,
-                "contact_info": contact_info
-            }
-            
-            # Add category_id to kwargs if available
-            if hasattr(self, 'category_id') and self.category_id:
-                kwargs["category_id"] = self.category_id
-            
-            # Create the ticket with timeout handling
             try:
-                # Wrap ticket creation in wait_for to prevent indefinite hang
-                ticket_creation_task = asyncio.create_task(cog.create_ticket(**kwargs))
-                ticket_channel = await asyncio.wait_for(ticket_creation_task, timeout=30.0)  # 30 second timeout
+                # Create a new ticket using the updated ticket system
+                ticket_modal = TicketModal("default", interaction.guild.id, interaction.client, "tr")
                 
-                # Send confirmation message after ticket creation
-                if ticket_channel:
-                    services_embed = ServicesView.get_services_embed()
-                    services_view = ServicesView()
-                    
-                    try:
-                        await ticket_channel.send(embed=services_embed, view=services_view)
-                    except Exception as e:
-                        logger.error(f"Error sending services view to ticket channel: {e}")
-                        # Continue anyway - the ticket is already created
-                    
+                # Simulate form submission with the collected data
+                # Create a mock interaction for the ticket modal
+                from utils.database import get_async_db
+                
+                mongo_db = get_async_db()
+                settings = await mongo_db.ticket_settings.find_one({"guild_id": interaction.guild.id})
+                
+                if not settings or not settings.get("category_id"):
                     await interaction.followup.send(
                         embed=create_embed(
-                            description=f"✅ Destek talebiniz oluşturuldu: {ticket_channel.mention}",
-                            color=discord.Color.green()
-                        ),
-                        ephemeral=True
-                    )
-                else:
-                    await interaction.followup.send(
-                        embed=create_embed(
-                            description="❌ Destek talebi oluşturulurken bir hata oluştu. Lütfen daha sonra tekrar deneyin.",
+                            description="❌ Ticket sistemi yapılandırılmamış. Lütfen bir yöneticiyle iletişime geçin.",
                             color=discord.Color.red()
                         ),
                         ephemeral=True
                     )
+                    return
+                
+                category_id = settings.get("category_id")
+                category = interaction.guild.get_channel(category_id)
+                if not category:
+                    await interaction.followup.send(
+                        embed=create_embed(
+                            description="❌ Ticket kategorisi bulunamadı.",
+                            color=discord.Color.red()
+                        ),
+                        ephemeral=True
+                    )
+                    return
+                
+                # Check max tickets per user
+                max_tickets = settings.get("max_tickets_per_user", 5)
+                user_tickets = [ch for ch in category.channels if str(interaction.user.id) in ch.name]
+                
+                if len(user_tickets) >= max_tickets:
+                    await interaction.followup.send(
+                        embed=create_embed(
+                            description=f"❌ Zaten {len(user_tickets)} açık ticket'ınız var! Maksimum izin verilen: {max_tickets}",
+                            color=discord.Color.red()
+                        ),
+                        ephemeral=True
+                    )
+                    return
+                
+                # Get user's ticket count for numbering
+                all_user_tickets = await mongo_db.tickets.count_documents({
+                    "guild_id": interaction.guild.id,
+                    "user_id": interaction.user.id
+                })
+                ticket_number = all_user_tickets + 1
+                
+                # Create ticket channel
+                overwrites = {
+                    interaction.guild.default_role: discord.PermissionOverwrite(read_messages=False),
+                    interaction.user: discord.PermissionOverwrite(read_messages=True, send_messages=True),
+                    interaction.guild.me: discord.PermissionOverwrite(read_messages=True, send_messages=True)
+                }
+                
+                # Add support roles
+                support_roles = settings.get("support_roles", [])
+                for role_id in support_roles:
+                    role = interaction.guild.get_role(role_id)
+                    if role:
+                        overwrites[role] = discord.PermissionOverwrite(read_messages=True, send_messages=True)
+                
+                # Create channel name
+                naming_format = settings.get("ticket_naming_format", "ticket-{username}-{ticketnumber}")
+                channel_name = naming_format.format(
+                    username=interaction.user.name,
+                    discriminator=interaction.user.discriminator,
+                    userid=interaction.user.id,
+                    ticketnumber=ticket_number
+                ).lower().replace(" ", "-")
+                
+                ticket_channel = await category.create_text_channel(
+                    name=channel_name,
+                    overwrites=overwrites
+                )
+                
+                # Create ticket embed
+                embed = discord.Embed(
+                    color=discord.Color.blue(),
+                    timestamp=discord.utils.utcnow()
+                )
+
+                # Set author with member's ticket format and ticket number
+                embed.set_author(
+                    name=f"{interaction.user.display_name}'s Ticket #{ticket_number}",
+                    icon_url=interaction.user.display_avatar.url
+                )
+
+                # Add description with contact message
+                embed.description = "En kısa sürede sizinle iletişime geçeceğiz."
+
+                # Add user info with single backticks (moved to top)
+                embed.add_field(
+                    name="👤 Kullanıcı",
+                    value=f"`{interaction.user.name}#{interaction.user.discriminator}`",
+                    inline=True
+                )
+
+                embed.add_field(
+                    name="🆔 Kullanıcı ID",
+                    value=f"`{interaction.user.id}`",
+                    inline=True
+                )
+
+                embed.add_field(
+                    name="🎫 Ticket Sayısı",
+                    value=f"`{ticket_number}`",
+                    inline=True
+                )
+                
+                # Add form fields to embed with code blocks
+                embed.add_field(
+                    name="📝 Konu",
+                    value=f"```\n{subject}\n```",
+                    inline=False
+                )
+                
+                embed.add_field(
+                    name="📝 Açıklama",
+                    value=f"```\n{description}\n```",
+                    inline=False
+                )
+                
+                embed.add_field(
+                    name="📞 İletişim Bilgisi",
+                    value=f"```\n{contact_info}\n```",
+                    inline=False
+                )
+                
+                # Generate images if enabled
+                ticket_image_path = None
+                level_card_path = None
+                
+                enable_ticket_images = settings.get("enable_ticket_images", True)
+                enable_level_cards = settings.get("enable_level_cards", True)
+                
+                files = []
+                
+                if enable_level_cards:
+                    try:
+                        from utils.community.turkoyto.card_renderer import create_level_card_for_ticket
+                        level_card_path = await create_level_card_for_ticket(interaction.user, interaction.guild, interaction.client)
+                        if level_card_path and os.path.exists(level_card_path):
+                            files.append(discord.File(level_card_path, filename="level_card.png"))
+                            embed.set_image(url="attachment://level_card.png")
+                    except Exception as e:
+                        logger.error(f"Error creating level card: {e}")
+                
+                if enable_ticket_images:
+                    try:
+                        from utils.community.turkoyto.card_renderer import create_ticket_card
+                        ticket_image_path = await create_ticket_card(interaction.guild, interaction.client)
+                        if ticket_image_path and os.path.exists(ticket_image_path):
+                            files.append(discord.File(ticket_image_path, filename="ticket_image.png"))
+                            embed.set_thumbnail(url="attachment://ticket_image.png")
+                    except Exception as e:
+                        logger.error(f"Error creating ticket image: {e}")
+                
+                # Create ticket control view
+                from cogs.ticket import TicketControlView
+                view = TicketControlView("tr")
+                
+                # Send ticket message
+                if files:
+                    await ticket_channel.send(embed=embed, view=view, files=files)
+                else:
+                    await ticket_channel.send(embed=embed, view=view)
+                
+                # Save ticket to database
+                await mongo_db.tickets.insert_one({
+                    "guild_id": interaction.guild.id,
+                    "user_id": interaction.user.id,
+                    "channel_id": ticket_channel.id,
+                    "ticket_number": ticket_number,
+                    "status": "open",
+                    "created_at": discord.utils.utcnow()
+                })
+                
+                # Clean up image files
+                for path in [ticket_image_path, level_card_path]:
+                    if path and os.path.exists(path):
+                        try:
+                            os.remove(path)
+                        except Exception as e:
+                            logger.error(f"Error removing file {path}: {e}")
+                
+                # Log ticket creation
+                log_channel_id = settings.get("log_channel_id")
+                if log_channel_id:
+                    log_channel = interaction.guild.get_channel(log_channel_id)
+                    if log_channel:
+                        log_embed = discord.Embed(
+                            title="🎫 Yeni Ticket Oluşturuldu",
+                            color=discord.Color.green(),
+                            timestamp=discord.utils.utcnow()
+                        )
+                        log_embed.add_field(name="Kullanıcı", value=interaction.user.mention, inline=True)
+                        log_embed.add_field(name="Kanal", value=ticket_channel.mention, inline=True)
+                        log_embed.add_field(name="Ticket #", value=str(ticket_number), inline=True)
+                        await log_channel.send(embed=log_embed)
+                
+                await interaction.followup.send(
+                    embed=create_embed(
+                        description=f"✅ Destek talebiniz oluşturuldu: {ticket_channel.mention}",
+                        color=discord.Color.green()
+                    ),
+                    ephemeral=True
+                )
                     
-            except asyncio.TimeoutError:
-                logger.error("Ticket creation timed out after 30 seconds")
+            except Exception as e:
+                logger.error(f"Error creating ticket: {e}")
                 await interaction.followup.send(
                     embed=create_embed(
-                        description="⏱️ Destek talebi oluşturma işlemi zaman aşımına uğradı. Lütfen daha sonra tekrar deneyin.",
+                        description="❌ Destek talebi oluşturulurken bir hata oluştu. Lütfen daha sonra tekrar deneyin.",
                         color=discord.Color.red()
                     ),
                     ephemeral=True
                 )
-                # Cancel the task to prevent it from continuing in background
-                if not ticket_creation_task.done():
-                    ticket_creation_task.cancel()
             
-        except ValueError as ve:
-            # Handle expected errors
-            logger.warning(f"Ticket creation validation error: {ve}")
-            try:
-                await interaction.followup.send(
-                    embed=create_embed(
-                        description=f"❌ {str(ve)}",
-                        color=discord.Color.red()
-                    ),
-                    ephemeral=True
-                )
-            except:
-                logger.error("Failed to send validation error message")
         except Exception as e:
             # Handle unexpected errors
-            logger.error(f"Error creating ticket: {e}", exc_info=True)
+            logger.error(f"Error in ticket modal submission: {e}", exc_info=True)
             
             error_message = "❌ Destek talebi oluşturulurken bir hata oluştu, lütfen daha sonra tekrar deneyin."
             
@@ -376,18 +525,14 @@ class TicketManagementView(discord.ui.View):
         
         # Update ticket status in database
         try:
-            cog = interaction.client.get_cog("TurkOyto")
-            if cog and hasattr(cog, 'mongo_db'):
-                try:
-                    await cog.mongo_db["turkoyto_tickets"].update_one(
-                        {"user_id": self.user_id, "active_tickets.channel_id": self.channel_id},
-                        {"$set": {"active_tickets.$.status": "closed", "active_tickets.$.closed_at": datetime.datetime.now()}}
-                    )
-                except (TypeError, AttributeError):
-                    cog.mongo_db["turkoyto_tickets"].update_one(
-                        {"user_id": self.user_id, "active_tickets.channel_id": self.channel_id},
-                        {"$set": {"active_tickets.$.status": "closed", "active_tickets.$.closed_at": datetime.datetime.now()}}
-                    )
+            from utils.database import get_async_db
+            mongo_db = get_async_db()
+            
+            # Update ticket status
+            await mongo_db.tickets.update_one(
+                {"channel_id": self.channel_id},
+                {"$set": {"status": "closed", "closed_at": discord.utils.utcnow()}}
+            )
         except Exception as e:
             logger.error(f"Error updating ticket status: {e}")
             
