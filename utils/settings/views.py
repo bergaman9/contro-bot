@@ -458,6 +458,9 @@ class MainSettingsView(discord.ui.View):
 
     @discord.ui.button(label="📝 Registration System", style=discord.ButtonStyle.secondary, row=2)
     async def registration_system(self, interaction: discord.Interaction, button: discord.ui.Button):
+        # Import the full registration settings view
+        from utils.settings.register_views import RegisterSettingsView
+        
         embed = discord.Embed(
             title="📝 Registration System" if self.language == "en" else "📝 Kayıt Sistemi",
             description="Configure user registration system for your server." if self.language == "en" else "Sunucunuz için kullanıcı kayıt sistemini yapılandırın.",
@@ -468,28 +471,32 @@ class MainSettingsView(discord.ui.View):
             value=(
                 "• User registration with button\n"
                 "• Automatic role assignment\n"
-                "• Profile management\n"
-                "• Game account linking"
+                "• Age-based roles\n"
+                "• Custom welcome messages\n"
+                "• Registration statistics\n"
+                "• Multi-language support"
             ) if self.language == "en" else (
                 "• Buton ile kullanıcı kaydı\n"
                 "• Otomatik rol ataması\n"
-                "• Profil yönetimi\n"
-                "• Oyun hesabı bağlama"
+                "• Yaş bazlı roller\n"
+                "• Özel karşılama mesajları\n"
+                "• Kayıt istatistikleri\n"
+                "• Çok dil desteği"
             ),
             inline=False
         )
         embed.add_field(
             name="⚙️ Setup" if self.language == "en" else "⚙️ Kurulum",
             value=(
-                "Use the **Send Registration Embed** button below to create a registration panel in any channel."
+                "Use the buttons below to configure all aspects of the registration system."
             ) if self.language == "en" else (
-                "Herhangi bir kanala kayıt paneli oluşturmak için aşağıdaki **Kayıt Embed'i Gönder** butonunu kullanın."
+                "Kayıt sisteminin tüm yönlerini yapılandırmak için aşağıdaki butonları kullanın."
             ),
             inline=False
         )
         
-        # Create a simple view with just the registration embed button
-        view = RegistrationSystemView(self.bot, self.language)
+        # Show the full registration settings view
+        view = RegisterSettingsView(self.bot, interaction.guild.id)
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
 
