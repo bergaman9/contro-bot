@@ -251,7 +251,7 @@ class RegisterSettingsView(discord.ui.View):
     async def view_settings_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         """View all registration settings"""
         try:
-            settings = self.mongo_db["register"].find_one({"guild_id": interaction.guild.id}) or {}
+            settings = await self.mongo_db["register"].find_one({"guild_id": interaction.guild.id}) or {}
             
             embed = discord.Embed(
                 title="🔍 Kayıt Sistemi Ayarları",
@@ -328,7 +328,7 @@ class MessageFormatView(discord.ui.View):
     async def embed_format_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Set message format to embed"""
         try:
-            self.mongo_db["register"].update_one(
+            await self.mongo_db["register"].update_one(
                 {"guild_id": self.guild_id},
                 {"$set": {"message_format": "embed"}},
                 upsert=True
@@ -350,7 +350,7 @@ class MessageFormatView(discord.ui.View):
     async def plain_format_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Set message format to plain text"""
         try:
-            self.mongo_db["register"].update_one(
+            await self.mongo_db["register"].update_one(
                 {"guild_id": self.guild_id},
                 {"$set": {"message_format": "plain"}},
                 upsert=True
@@ -419,7 +419,7 @@ class AgeRolesView(discord.ui.View):
     async def clear_age_roles_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Clear all age roles"""
         try:
-            self.mongo_db["register"].update_one(
+            await self.mongo_db["register"].update_one(
                 {"guild_id": self.guild_id},
                 {"$unset": {"age_roles": ""}},
                 upsert=True
@@ -438,7 +438,7 @@ class AgeRolesView(discord.ui.View):
             )
 
 class AgeRoleSettingView(discord.ui.View):
-    """View for setting a specific age role"""
+    """View for setting a specific age role with pagination"""
     
     def __init__(self, bot, guild_id, age_range, timeout=180):
         super().__init__(timeout=timeout)
@@ -446,42 +446,128 @@ class AgeRoleSettingView(discord.ui.View):
         self.guild_id = guild_id
         self.age_range = age_range
         self.mongo_db = get_async_db()
+        self.current_page = 0
         
-        # Add role select dropdown
-        self.add_item(AgeRoleSelect(bot, guild_id, age_range))
+        # Get all roles
+        guild = bot.get_guild(guild_id)
+        self.all_roles = []
+        if guild:
+            self.all_roles = [role for role in guild.roles 
+                            if not role.is_bot_managed() and not role.is_premium_subscriber() and role.name != "@everyone"]
+        
+        self.roles_per_page = 20
+        self.total_pages = max(1, (len(self.all_roles) + self.roles_per_page - 1) // self.roles_per_page)
+        
+        self.update_components()
+    
+    def update_components(self):
+        """Update view components based on current page"""
+        self.clear_items()
+        
+        # Add age role select dropdown for current page
+        if self.all_roles:
+            self.add_item(AgeRoleSelect(self.bot, self.guild_id, self.age_range, 
+                                      self.all_roles, self.current_page, self.roles_per_page))
+        
+        # Add pagination buttons if needed
+        if self.total_pages > 1:
+            # Previous page button
+            prev_button = discord.ui.Button(
+                label="◀️ Önceki",
+                style=discord.ButtonStyle.secondary,
+                disabled=self.current_page == 0,
+                row=1
+            )
+            prev_button.callback = self.previous_page
+            self.add_item(prev_button)
+            
+            # Page info button
+            page_button = discord.ui.Button(
+                label=f"Sayfa {self.current_page + 1}/{self.total_pages}",
+                style=discord.ButtonStyle.secondary,
+                disabled=True,
+                row=1
+            )
+            self.add_item(page_button)
+            
+            # Next page button
+            next_button = discord.ui.Button(
+                label="Sonraki ▶️",
+                style=discord.ButtonStyle.secondary,
+                disabled=self.current_page >= self.total_pages - 1,
+                row=1
+            )
+            next_button.callback = self.next_page
+            self.add_item(next_button)
+    
+    async def previous_page(self, interaction: discord.Interaction):
+        """Go to previous page"""
+        if self.current_page > 0:
+            self.current_page -= 1
+            self.update_components()
+            
+            embed = discord.Embed(
+                title=f"👤 {self.age_range} Yaş Rolü Seçimi",
+                description=f"Sayfa {self.current_page + 1}/{self.total_pages} - Toplam {len(self.all_roles)} rol",
+                color=discord.Color.blue()
+            )
+            
+            await interaction.response.edit_message(embed=embed, view=self)
+    
+    async def next_page(self, interaction: discord.Interaction):
+        """Go to next page"""
+        if self.current_page < self.total_pages - 1:
+            self.current_page += 1
+            self.update_components()
+            
+            embed = discord.Embed(
+                title=f"👤 {self.age_range} Yaş Rolü Seçimi",
+                description=f"Sayfa {self.current_page + 1}/{self.total_pages} - Toplam {len(self.all_roles)} rol",
+                color=discord.Color.blue()
+            )
+            
+            await interaction.response.edit_message(embed=embed, view=self)
 
 class AgeRoleSelect(discord.ui.Select):
-    """Role selection dropdown for age roles"""
+    """Role selection dropdown for age roles with pagination support"""
     
-    def __init__(self, bot, guild_id, age_range):
+    def __init__(self, bot, guild_id, age_range, all_roles=None, current_page=0, roles_per_page=20):
         self.bot = bot
         self.guild_id = guild_id
         self.age_range = age_range
         self.mongo_db = get_async_db()
         
-        # Get roles from guild
-        guild = bot.get_guild(guild_id)
         options = []
         
-        if guild:
-            for role in guild.roles[:24]:  # Discord limit of 25 options
-                if not role.is_bot_managed() and not role.is_premium_subscriber() and role.name != "@everyone":
-                    options.append(discord.SelectOption(
-                        label=role.name,
-                        value=str(role.id),
-                        description=f"Pozisyon: {role.position}",
-                        emoji="🎭"
-                    ))
+        if all_roles:
+            # Calculate start and end indices for current page
+            start_idx = current_page * roles_per_page
+            end_idx = min(start_idx + roles_per_page, len(all_roles))
+            page_roles = all_roles[start_idx:end_idx]
+            
+            # Create options for current page
+            for role in page_roles:
+                # Truncate long role names
+                role_name = role.name
+                if len(role_name) > 80:
+                    role_name = role_name[:77] + "..."
+                
+                options.append(discord.SelectOption(
+                    label=role_name,
+                    value=str(role.id),
+                    description=f"Pozisyon: {role.position} | Üye sayısı: {len(role.members)}",
+                    emoji="🎭"
+                ))
         
         if not options:
             options.append(discord.SelectOption(
-                label="Rol bulunamadı",
+                label="Bu sayfada rol bulunamadı",
                 value="none",
-                description="Bu sunucuda uygun rol bulunamadı"
+                description="Başka sayfalara bakın veya rol oluşturun"
             ))
             
         super().__init__(
-            placeholder=f"{age_range} yaş grubu için rol seçin...",
+            placeholder=f"{age_range} yaş grubu için rol seçin... (Sayfa {current_page + 1})",
             options=options,
             min_values=1,
             max_values=1
@@ -526,7 +612,7 @@ class AgeRoleSelect(discord.ui.Select):
             )
 
 class RoleSettingView(discord.ui.View):
-    """View for role setting with both dropdown and manual ID input"""
+    """View for role setting with pagination"""
     
     def __init__(self, bot, guild_id, setting_key, setting_name, timeout=180):
         super().__init__(timeout=timeout)
@@ -535,43 +621,129 @@ class RoleSettingView(discord.ui.View):
         self.setting_key = setting_key
         self.setting_name = setting_name
         self.mongo_db = get_async_db()
+        self.current_page = 0
         
-        # Add role select dropdown
-        self.add_item(RoleSelect(bot, guild_id, setting_key, setting_name))
+        # Get all roles
+        guild = bot.get_guild(guild_id)
+        self.all_roles = []
+        if guild:
+            self.all_roles = [role for role in guild.roles 
+                            if not role.is_bot_managed() and not role.is_premium_subscriber() and role.name != "@everyone"]
+        
+        self.roles_per_page = 20
+        self.total_pages = max(1, (len(self.all_roles) + self.roles_per_page - 1) // self.roles_per_page)
+        
+        self.update_components()
+    
+    def update_components(self):
+        """Update view components based on current page"""
+        self.clear_items()
+        
+        # Add role select dropdown for current page
+        if self.all_roles:
+            self.add_item(RoleSelect(self.bot, self.guild_id, self.setting_key, self.setting_name, 
+                                   self.all_roles, self.current_page, self.roles_per_page))
+        
+        # Add pagination buttons if needed
+        if self.total_pages > 1:
+            # Previous page button
+            prev_button = discord.ui.Button(
+                label="◀️ Önceki",
+                style=discord.ButtonStyle.secondary,
+                disabled=self.current_page == 0,
+                row=1
+            )
+            prev_button.callback = self.previous_page
+            self.add_item(prev_button)
+            
+            # Page info button
+            page_button = discord.ui.Button(
+                label=f"Sayfa {self.current_page + 1}/{self.total_pages}",
+                style=discord.ButtonStyle.secondary,
+                disabled=True,
+                row=1
+            )
+            self.add_item(page_button)
+            
+            # Next page button
+            next_button = discord.ui.Button(
+                label="Sonraki ▶️",
+                style=discord.ButtonStyle.secondary,
+                disabled=self.current_page >= self.total_pages - 1,
+                row=1
+            )
+            next_button.callback = self.next_page
+            self.add_item(next_button)
+    
+    async def previous_page(self, interaction: discord.Interaction):
+        """Go to previous page"""
+        if self.current_page > 0:
+            self.current_page -= 1
+            self.update_components()
+            
+            embed = discord.Embed(
+                title=f"🎭 {self.setting_name} Seçimi",
+                description=f"Sayfa {self.current_page + 1}/{self.total_pages} - Toplam {len(self.all_roles)} rol",
+                color=discord.Color.blue()
+            )
+            
+            await interaction.response.edit_message(embed=embed, view=self)
+    
+    async def next_page(self, interaction: discord.Interaction):
+        """Go to next page"""
+        if self.current_page < self.total_pages - 1:
+            self.current_page += 1
+            self.update_components()
+            
+            embed = discord.Embed(
+                title=f"🎭 {self.setting_name} Seçimi",
+                description=f"Sayfa {self.current_page + 1}/{self.total_pages} - Toplam {len(self.all_roles)} rol",
+                color=discord.Color.blue()
+            )
+            
+            await interaction.response.edit_message(embed=embed, view=self)
 
 class RoleSelect(discord.ui.Select):
-    """Role selection dropdown"""
+    """Role selection dropdown with pagination support"""
     
-    def __init__(self, bot, guild_id, setting_key, setting_name):
+    def __init__(self, bot, guild_id, setting_key, setting_name, all_roles=None, current_page=0, roles_per_page=20):
         self.bot = bot
         self.guild_id = guild_id
         self.setting_key = setting_key
         self.setting_name = setting_name
         self.mongo_db = get_async_db()
         
-        # Get roles from guild
-        guild = bot.get_guild(guild_id)
         options = []
         
-        if guild:
-            for role in guild.roles[:24]:  # Discord limit of 25 options
-                if not role.is_bot_managed() and not role.is_premium_subscriber() and role.name != "@everyone":
-                    options.append(discord.SelectOption(
-                        label=role.name,
-                        value=str(role.id),
-                        description=f"Pozisyon: {role.position}",
-                        emoji="🎭"
-                    ))
+        if all_roles:
+            # Calculate start and end indices for current page
+            start_idx = current_page * roles_per_page
+            end_idx = min(start_idx + roles_per_page, len(all_roles))
+            page_roles = all_roles[start_idx:end_idx]
+            
+            # Create options for current page
+            for role in page_roles:
+                # Truncate long role names
+                role_name = role.name
+                if len(role_name) > 80:
+                    role_name = role_name[:77] + "..."
+                
+                options.append(discord.SelectOption(
+                    label=role_name,
+                    value=str(role.id),
+                    description=f"Pozisyon: {role.position} | Üye sayısı: {len(role.members)}",
+                    emoji="🎭"
+                ))
         
         if not options:
             options.append(discord.SelectOption(
-                label="Rol bulunamadı",
+                label="Bu sayfada rol bulunamadı",
                 value="none",
-                description="Bu sunucuda uygun rol bulunamadı"
+                description="Başka sayfalara bakın veya rol oluşturun"
             ))
             
         super().__init__(
-            placeholder=f"{setting_name} seçin...",
+            placeholder=f"{setting_name} seçin... (Sayfa {current_page + 1})",
             options=options,
             min_values=1,
             max_values=1
@@ -795,8 +967,9 @@ class MessageSettingModal(discord.ui.Modal):
         self.setting_key = setting_key
         self.mongo_db = get_async_db()
         
-        # Get current value
-        settings = self.mongo_db["register"].find_one({"guild_id": guild_id}) or {}
+        # Get current value - Note: This should be called from an async context
+        # For now, we'll use a default value and load current value in the callback
+        settings = {}
         current_value = settings.get(setting_key, DEFAULT_WELCOME_MESSAGE if setting_key == "welcome_message" else "")
         
         self.text_input = discord.ui.TextInput(
@@ -839,8 +1012,9 @@ class ButtonTextModal(discord.ui.Modal, title="Buton Metni Düzenle"):
         self.guild_id = guild_id
         self.mongo_db = get_async_db()
         
-        # Get current values
-        settings = self.mongo_db["register"].find_one({"guild_id": guild_id}) or {}
+        # Get current values - Note: This should be called from an async context
+        # For now, we'll use default values and load current values in the callback
+        settings = {}
         
         self.button_title = discord.ui.TextInput(
             label="Buton Başlığı",
