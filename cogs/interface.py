@@ -129,11 +129,20 @@ class UserProfileView(discord.ui.View):
         self.bot = bot
         self.user_id = user_id
         self.guild_id = guild_id
-        self.db = initialize_async_mongodb()
+        self.db = None
     
     async def get_user_data(self):
         """Get user data from database"""
-        return await self.db.user_profiles.find_one({"user_id": str(self.user_id), "guild_id": str(self.guild_id)})
+        if self.db is None:
+            self.db = await initialize_async_mongodb()
+            
+        if self.db is not None:
+            try:
+                user_data = await self.db.user_profiles.find_one({"user_id": str(self.user_id), "guild_id": str(self.guild_id)})
+                return user_data
+            except Exception as e:
+                logger.error(f"Error getting user data: {e}")
+        return None
     
     async def save_user_data(self, data):
         """Save user data to database"""

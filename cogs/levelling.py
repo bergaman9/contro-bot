@@ -38,7 +38,7 @@ class Levelling(commands.Cog):
         """Setup database connections"""
         try:
             # Get async database from bot if available
-            if hasattr(self.bot, 'async_db') and self.bot.async_db:
+            if hasattr(self.bot, 'async_db') and self.bot.async_db is not None:
                 self.mongo_db = self.bot.async_db
                 logger.info("Using bot's async database connection")
                 # Update XP manager immediately if we have the DB

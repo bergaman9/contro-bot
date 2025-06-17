@@ -110,55 +110,6 @@ class SupportView(discord.ui.View):
         self.add_item(discord.ui.Button(label="Vote Bot", url="https://top.gg/bot/869041978467201280/vote"))
         self.add_item(discord.ui.Button(label="Share Idea", style=discord.ButtonStyle.green, custom_id="idea_button"))
 
-class VersionButtonView(discord.ui.View):
-    def __init__(self, bot):
-        super().__init__(timeout=120)
-        self.message = None
-        self.add_item(discord.ui.Button(label="Support Server", url="https://discord.gg/ynGqvsYah", style=discord.ButtonStyle.url))
-        self.add_item(discord.ui.Button(label="Invite Bot",
-                                        url=f"https://discord.com/api/oauth2/authorize?client_id={bot.application_id}&permissions=8&scope=bot",
-                                        style=discord.ButtonStyle.url))
-
-    async def send_initial_message(self, ctx, bot):
-        self.embed_text = """
-        * Welcomer Messages with Image \n - `welcomer_set` `welcomer_remove`
-        \n* Partner System \n - `partner_add` `partner_remove`
-        \n* Game Stats \n - `topgames` `playing`
-        \n* Dropdown Roles \n - `dropdown_roles`
-        \n* Advanced Logging System \n - `set_log_channel` `remove_log_channel`
-        \n* New Fun Commands 
-        \n* Reminders \n - `alarm` `reminder`
-        \n* Custom Give Roles \n - `give_roles` `give_roles_remove` `give_roles_settings`
-        """
-
-        self.embed = discord.Embed(title="Contro Bot Version v1.1",
-                              description="You can see the new features on v1.1 of the bot below",
-                              color=discord.Color.pink())
-        self.embed.add_field(name="New Features", value=self.embed_text, inline=False)
-        self.embed.set_thumbnail(url=bot.user.avatar.url)
-        self.message = await ctx.send(embed=self.embed, view=self)
-
-    @discord.ui.button(label="v1.0", style=discord.ButtonStyle.blurple)
-    async def version_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.on_button_clicked(interaction)
-
-    async def on_button_clicked(self, interaction: discord.Interaction):
-        # Ephemeral mesaj gönderin
-        self.embed = discord.Embed(title="Contro Bot Version v1.0",
-                              description="This bot is v1.0 version and so many features will be added in the future.",
-                              color=discord.Color.pink())
-        self.embed.add_field(name="**Added in v1.0:**",
-                        value="- Partner System \n- New Fun Commands \n- Logging System")
-        self.embed.add_field(name="**Planned features:**",
-                        value="- Temporary Voice and Text Channels \n- Text and Voice Level System \n- Advanced Logging System \n- Web Dashboard \n- Translation to TR, ENG, GER")
-
-        await interaction.response.send_message(embed=self.embed, ephemeral=True)
-
-    async def on_timeout(self):
-        """Timeout bittiğinde bu fonksiyon çağrılır."""
-        if self.message:
-            await self.message.edit(view=None)
-
 class Utility(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -747,23 +698,13 @@ class Utility(commands.Cog):
     )
     async def set_status_role(self, ctx, custom_status: str, role: discord.Role):
         # Get the status_roles collection from the database
-
-        cleaned_custom_status = [item.strip() for item in custom_status.split(",")]
-
+        cleaned_custom_status = custom_status.strip().lower()
         collection = self.mongo_db["status_roles"]
-        # Update or insert the document that matches the guild id
+        
+        # Update the status_role mapping
         collection.update_one({"guild_id": ctx.guild.id},
                               {"$set": {"custom_status": cleaned_custom_status, "role_id": role.id}}, upsert=True)
         await ctx.send(f"Status role set to {role.mention} for custom status '{custom_status}'.")
-
-    @commands.hybrid_command(name="reset_nicknames", description="Resets everyone's nickname.")
-    @commands.has_permissions(manage_guild=True)
-    async def reset_nicknames(self, ctx):
-        async for member in ctx.guild.fetch_members(limit=5000):
-            if member.nick:
-                await member.edit(nick=None)
-                await ctx.send(f"{member.mention}'s nickname has been reset.")
-        await ctx.send("All nicknames have been reset.")
 
     @app_commands.command(name="mass_unban", description="Mass unban people banned from the server.")
     @commands.has_permissions(manage_guild=True)
@@ -1212,12 +1153,6 @@ class Config(commands.Cog):
         """Provides links to the bot's support server, invite link, and other helpful resources."""
         embed = discord.Embed(title=f"Do you need help {ctx.author.name}?", description="You can join bot's support server: \nhttps://discord.gg/ynGqvsYxah", color=discord.Color.pink())
         await ctx.send(embed=embed, view=SupportView(self.bot))
-
-    @commands.hybrid_command(name="version", description="Shows the current bot version and planned features.")
-    async def version(self, ctx):
-        """Displays information about the bot's current version and planned features."""
-        view = VersionButtonView(self.bot)
-        await view.send_initial_message(ctx, self.bot)
 
     @commands.Cog.listener()
     async def on_interaction(self, interaction: discord.Interaction):
