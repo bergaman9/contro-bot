@@ -310,7 +310,7 @@ class ServerSetup(commands.Cog):
     # endregion
 
     # region Main Setup Command
-    @app_commands.command(name="setup", description="Kapsamlı sunucu kurulum ve yönetim paneli")
+    @app_commands.command(name="server_utility", description="Kapsamlı sunucu kurulum ve yönetim paneli")
     async def setup_panel(self, interaction: discord.Interaction):
         """Ana kurulum panelini açar"""
         embed = discord.Embed(
@@ -547,7 +547,7 @@ class ServerSetup(commands.Cog):
         import re
         
         file_path = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+            os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
             "utils", "community", "turkoyto", "xp_manager.py"
         )
         

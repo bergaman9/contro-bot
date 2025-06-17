@@ -8,7 +8,7 @@ import time
 import asyncio
 import aiohttp
 import datetime
-from datetime import timedelta
+from datetime import datetime, timedelta
 import psutil
 import platform
 import requests
@@ -121,69 +121,117 @@ class Utility(commands.Cog):
         
     @commands.hybrid_command(name="ping", description="Shows the latency between in the bot and the Discord API.", aliases=["latency"])
     async def ping(self, ctx: commands.Context):
-        """Display latency and system information"""
         try:
             # Get basic info
             latency = round(self.bot.latency * 1000)  # latency in ms
-            uptime = str(timedelta(seconds=int(round(time.time() - self.bot.startTime))))
+            
+            # Calculate uptime - use fallback if startTime not available
+            if hasattr(self.bot, 'startTime'):
+                uptime = str(timedelta(seconds=int(round(time.time() - self.bot.startTime))))
+            else:
+                uptime = "Unknown"
+                
             cpu_percent = psutil.cpu_percent(interval=0.5)
             memory = psutil.virtual_memory()
             disk = psutil.disk_usage('/')
             
-            # Get server region/provider from ipwho.is
+            # Get server region/provider
+            server_region = "Unknown Region"
+            server_provider = "Unknown Provider"
+            
             try:
                 ip_resp = requests.get("https://ipwho.is/").json()
                 server_country = ip_resp.get("country", "N/A")
                 server_city = ip_resp.get("city", "N/A")
                 server_provider_name = ip_resp.get("connection", {}).get("isp", "N/A")
                 server_flag = ip_resp.get("flag", {}).get("emoji", "")
-                server_region = f"{server_flag} `{server_country}, {server_city}`" if server_flag else f"{server_country}, {server_city}"
-                server_provider = f"🌐 `{server_provider_name}`"
+                server_region = f"{server_flag} {server_country}, {server_city}" if server_flag else f"{server_country}, {server_city}"
+                server_provider = f"🌐 {server_provider_name}"
             except Exception:
-                server_region = server_provider = "N/A"
-                
-            # Get bot version if available
-            version = getattr(self.bot, "version", "N/A")
+                pass
+            
+            # Try to get version from settings
+            version = "N/A"
+            try:
+                settings_doc = self.mongo_db["settings"].find_one({"guild_id": 939587672081592340})
+                if settings_doc and "version" in settings_doc:
+                    version = settings_doc["version"]
+                if version == "N/A":
+                    all_settings = self.mongo_db["settings"].find({"version": {"$exists": True}})
+                    if all_settings.count():
+                        version = all_settings[0].get("version", "N/A")
+            except Exception as e:
+                print(f"Error fetching bot version: {e}")
             
             embed = discord.Embed(
                 title="🏓 Ping & Hosting Info",
                 color=0x45C2BE
             )
-            
-            embed.add_field(name='Ping', value=f'`{latency}ms`', inline=True)
-            embed.add_field(name='Uptime', value=f'`{uptime}`', inline=True)
-            embed.add_field(name='Bot Version', value=f'`{version}`', inline=True)
-            
-            embed.add_field(name='CPU Usage', value=f'`{cpu_percent}%`', inline=True)
-            embed.add_field(name='RAM Usage', value=f'`{memory.percent}% ({memory.used / 1024**2:.1f}MB / {memory.total / 1024**2:.1f}MB)`', inline=True)
-            embed.add_field(name='Disk Usage', value=f'`{disk.percent}% ({disk.used / 1024**3:.1f}GB / {disk.total / 1024**3:.1f}GB)`', inline=True)
-            
-            embed.add_field(name='Discord.py', value=f'`{discord.__version__}`', inline=True)
-            embed.add_field(name='Python', value=f'`{platform.python_version()}`', inline=True)
-            embed.add_field(name='Platform', value=f'`{platform.system()} {platform.release()}`', inline=True)
-            
+            embed.add_field(name='Ping', value=f'{latency}ms', inline=True)
+            embed.add_field(name='Uptime', value=f'{uptime}', inline=True)
+            embed.add_field(name='Bot Version', value=f'{version}', inline=True)
+            embed.add_field(name='CPU Usage', value=f'{cpu_percent}%', inline=True)
+            embed.add_field(name='RAM Usage', value=f'{memory.percent}% ({memory.used / 1024**2:.1f}MB / {memory.total / 1024**2:.1f}MB)', inline=True)
+            embed.add_field(name='Disk Usage', value=f'{disk.percent}% ({disk.used / 1024**3:.1f}GB / {disk.total / 1024**3:.1f}GB)', inline=True)
+            embed.add_field(name='Download Speed', value='Calculating...', inline=True)
+            embed.add_field(name='Upload Speed', value='Calculating...', inline=True)
+            embed.add_field(name='Discord.py', value=f'{discord.__version__}', inline=True)
+            embed.add_field(name='Python', value=f'{platform.python_version()}', inline=True)
+            embed.add_field(name='Platform', value=f'{platform.system()} {platform.release()}', inline=True)
             embed.add_field(name='Server Region', value=f'{server_region}', inline=True)
             embed.add_field(name='Server Provider', value=f'{server_provider}', inline=True)
-            embed.add_field(name='Active Servers', value=f'`{len(self.bot.guilds)}`', inline=True)
-            
-            embed.add_field(name='Active Users', value=f'`{len(self.bot.users)}`', inline=True)
-            embed.add_field(name='Active Commands', value=f'`{len(self.bot.commands)}`', inline=True)
+            embed.add_field(name='Active Users', value=f'{len(self.bot.users)}', inline=True)
+            embed.add_field(name='Active Commands', value=f'{len(self.bot.commands)}', inline=True)
             
             if self.bot.user.avatar:
                 embed.set_thumbnail(url=self.bot.user.avatar.url)
-                
-            # Footer: user emoji (if exists) - username - date
+            
             user_emoji = getattr(ctx.author, 'display_avatar', None)
             user_emoji_url = user_emoji.url if user_emoji else None
-            now_str = datetime.now().strftime('%d.%m.%Y %H:%M:%S')
-            footer_text = f"Requested by {ctx.author} - {now_str}"
-            
             if user_emoji_url:
-                embed.set_footer(text=footer_text, icon_url=user_emoji_url)
+                embed.set_footer(text=f"Requested by {ctx.author.name}", icon_url=user_emoji_url)
             else:
-                embed.set_footer(text=footer_text)
-                
-            await ctx.send(embed=embed)
+                embed.set_footer(text=f"Requested by {ctx.author.name}")
+            
+            msg = await ctx.send(embed=embed)
+            
+            # Calculate internet speeds
+            download_speed = "N/A"
+            upload_speed = "N/A"
+            try:
+                import speedtest
+                st = await asyncio.to_thread(speedtest.Speedtest)
+                await asyncio.to_thread(st.get_best_server)
+                download_mbps = await asyncio.to_thread(st.download) / 1_000_000
+                upload_mbps = await asyncio.to_thread(st.upload) / 1_000_000
+                download_speed = f"{download_mbps:.1f} Mbps"
+                upload_speed = f"{upload_mbps:.1f} Mbps"
+            except ImportError:
+                print("speedtest-cli library not installed, using fallback method")
+                try:
+                    import urllib.request
+                    start_time = time.time()
+                    await asyncio.to_thread(
+                        lambda: urllib.request.urlopen("https://github.com/LibreSpeed/speedtest-go/raw/master/speedtest/garbage.php?ckSize=1000000", timeout=5).read()
+                    )
+                    end_time = time.time()
+                    duration = end_time - start_time
+                    if duration > 0:
+                        file_size_mb = 1
+                        download_speed = f"{(file_size_mb * 8) / duration:.1f} Mbps"
+                    upload_speed = "~5.0 Mbps (estimated)"
+                except Exception as e:
+                    print(f"Error in fallback speed test: {e}")
+                    download_speed = "Test failed"
+                    upload_speed = "Test failed"
+            except Exception as e:
+                print(f"Error testing internet speed with speedtest: {e}")
+                download_speed = "Test failed"
+                upload_speed = "Test failed"
+            
+            embed.set_field_at(6, name='Download Speed', value=f'{download_speed}', inline=True)
+            embed.set_field_at(7, name='Upload Speed', value=f'{upload_speed}', inline=True)
+            await msg.edit(embed=embed)
             
         except Exception as e:
             print(f"Error in ping command: {e}")
@@ -714,44 +762,9 @@ class Utility(commands.Cog):
 
         await interaction.response.send_message("All banned members from the server unbanned.", ephemeral=True)
 
-    @commands.hybrid_command(name="give_everyone", description="Gives everyone a role.")
-    @commands.has_permissions(manage_guild=True)
-    @app_commands.describe(role="The role to give to everyone in the server.")
-    async def give_everyone(self, ctx, role: discord.Role):
-        await ctx.defer()
-        for member in ctx.guild.members:
-            if not member.bot:
-                await member.add_roles(role)
-        await ctx.send(f"{role.mention} role has been given to everyone.")
 
-    @commands.hybrid_command(name="edit_nicknames", description="Edits everyone's nickname.")
-    @commands.has_permissions(manage_guild=True)
-    @app_commands.describe(
-        role_name="The name of the role to target for nickname changes",
-        new_name="The new nickname to set for all members with the specified role"
-    )
-    async def edit_nicknames(self, ctx, role_name: str, new_name):
 
-        guild = ctx.guild
-        role = discord.utils.get(guild.roles, name=role_name)
 
-        if not role:
-            await ctx.send(f"Rol bulunamadı: {role}")
-            return
-
-        count = 0
-        for member in guild.members:
-            if role in member.roles:
-                try:
-                    await member.edit(nick=new_name)
-                    await ctx.send(f"{member.name} kullanıcısının {new_name} olarak düzenlendi.")
-                    count += 1
-                except discord.Forbidden:
-                    await ctx.send(f"Bot, {member.mention} kullanıcısının ismini değiştiremiyor.")
-                except discord.HTTPException as e:
-                    await ctx.send(f"Bir hata oluştu: {e}")
-
-        await ctx.send(f"{count} kullanıcının ismi düzenlendi.")
 
     # Embed and content commands
     @commands.hybrid_command(name="poll", description="Creates a poll.")

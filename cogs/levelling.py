@@ -19,12 +19,18 @@ class Levelling(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.mongo_db = None
-        self.setup_database()
-        
         self.voice_time_tracker = {}  # Track users in voice channels
         
-        # Initialize the XP manager
-        self.xp_manager = XPManager()
+        # Initialize the XP manager first
+        try:
+            self.xp_manager = XPManager()
+            logger.info("XP Manager initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize XP Manager: {e}")
+            self.xp_manager = None
+        
+        # Setup database after XP manager is initialized
+        self.setup_database()
         
         # Start checking voice activity
         self.check_voice_activity.start()
@@ -42,12 +48,12 @@ class Levelling(commands.Cog):
                 self.mongo_db = self.bot.async_db
                 logger.info("Using bot's async database connection")
                 # Update XP manager immediately if we have the DB
-                if self.xp_manager:
+                if hasattr(self, 'xp_manager') and self.xp_manager:
                     self.xp_manager.set_mongo_db(self.mongo_db)
             else:
-                # Schedule database initialization for when bot is ready
-                asyncio.create_task(self.delayed_database_setup())
-                logger.info("Scheduled delayed database setup")
+                # Initialize XP manager without database initially
+                logger.info("Database connection not available yet, will set up later")
+                
         except Exception as e:
             logger.error(f"Error setting up database: {e}")
 
@@ -63,7 +69,8 @@ class Levelling(commands.Cog):
             else:
                 # Try to initialize directly
                 try:
-                    self.mongo_db = await initialize_async_mongodb()
+                    from utils.database.db_manager import db_manager
+                    self.mongo_db = await db_manager.get_database()
                     if self.mongo_db is not None:
                         logger.info("Initialized MongoDB connection directly")
                     else:
@@ -72,7 +79,7 @@ class Levelling(commands.Cog):
                     logger.error(f"Error initializing MongoDB: {e}")
             
             # Update XP manager with database
-            if self.mongo_db is not None and self.xp_manager:
+            if self.mongo_db is not None and hasattr(self, 'xp_manager') and self.xp_manager:
                 self.xp_manager.set_mongo_db(self.mongo_db)
                 logger.info("Updated XP manager with database connection")
                 
@@ -89,7 +96,8 @@ class Levelling(commands.Cog):
             else:
                 # Try to initialize
                 try:
-                    self.mongo_db = await initialize_async_mongodb()
+                    from utils.database.db_manager import db_manager
+                    self.mongo_db = await db_manager.get_database()
                     if self.mongo_db is not None:
                         logger.info("Database connection established for Levelling")
                     else:
@@ -98,7 +106,7 @@ class Levelling(commands.Cog):
                     logger.error(f"Error ensuring database: {e}")
             
             # Update XP manager if we got a connection
-            if self.mongo_db is not None and self.xp_manager:
+            if self.mongo_db is not None and hasattr(self, 'xp_manager') and self.xp_manager:
                 self.xp_manager.set_mongo_db(self.mongo_db)
                 
         return self.mongo_db

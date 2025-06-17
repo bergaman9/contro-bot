@@ -72,127 +72,396 @@ class LanguageSelectView(discord.ui.View):
         await interaction.response.send_message(embed=embed, view=MainSettingsView(self.bot, language), ephemeral=True)
 
 class MainSettingsView(discord.ui.View):
-    def __init__(self, bot, language="en"):
+    def __init__(self, bot, guild_id):
         super().__init__(timeout=300)
         self.bot = bot
-        self.language = language
+        self.guild_id = guild_id
 
     @discord.ui.button(label="🔧 Feature Management", style=discord.ButtonStyle.success, row=0)
     async def feature_management(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if self.language == "tr":
-            message = "Özellik yönetimi panelini açıyorum:"
-        else:
-            message = "Opening feature management panel:"
+        view = FeatureManagementView(self.bot, self.guild_id)
         
-        await interaction.response.send_message(message, view=FeatureManagementView(self.bot, self.language), ephemeral=True)
-
-    @discord.ui.button(label="🏠 Server Settings", style=discord.ButtonStyle.primary, row=0)
-    async def server_settings(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if self.language == "tr":
-            message = "Temel sunucu ayarlarını seçin:"
-        else:
-            message = "Choose server settings:"
+        # Get current feature status
+        mongo_db = get_async_db()
+        features = await mongo_db.feature_toggles.find_one({"guild_id": self.guild_id}) or {}
         
-        await interaction.response.send_message(message, view=ServerSettingsView(self.bot, self.language), ephemeral=True)
+        embed = discord.Embed(
+            title="🔧 Feature Management",
+            description="Toggle server features on/off. Disabled features will not function.",
+            color=discord.Color.blue()
+        )
+        
+        # Show current feature status
+        feature_status = []
+        default_features = {
+            "welcome_system": True,
+            "leveling_system": True,
+            "starboard_system": False,
+            "auto_moderation": True,
+            "logging_system": True,
+            "ticket_system": True,
+            "community_features": True,
+            "temp_channels": True
+        }
+        
+        for feature, default in default_features.items():
+            is_enabled = features.get(feature, default)
+            status = "🟢 Enabled" if is_enabled else "🔴 Disabled"
+            feature_name = feature.replace("_", " ").title()
+            feature_status.append(f"**{feature_name}**: {status}")
+        
+        embed.add_field(
+            name="Current Status",
+            value="\n".join(feature_status[:4]),
+            inline=True
+        )
+        embed.add_field(
+            name="\u200b",
+            value="\n".join(feature_status[4:]),
+            inline=True
+        )
+        
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
-    @discord.ui.button(label="👋 Welcome/Goodbye", style=discord.ButtonStyle.secondary, row=0)
+    @discord.ui.button(label="👋 Welcome System", style=discord.ButtonStyle.primary, row=0)
     async def welcome_goodbye(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if self.language == "tr":
-            message = "Karşılama ve vedalaşma ayarlarını seçin:"
-        else:
-            message = "Choose welcome/goodbye settings:"
+        view = WelcomeGoodbyeView(self.bot, self.guild_id)
         
-        await interaction.response.send_message(message, view=WelcomeGoodbyeView(self.bot, self.language), ephemeral=True)
+        # Get current settings
+        mongo_db = get_async_db()
+        welcome_settings = await mongo_db.welcomer.find_one({"guild_id": self.guild_id}) or {}
+        goodbye_settings = await mongo_db.byebye.find_one({"guild_id": self.guild_id}) or {}
+        
+        embed = discord.Embed(
+            title="👋 Welcome/Goodbye System",
+            description="Configure welcome and goodbye messages for your server.",
+            color=discord.Color.blue()
+        )
+        
+        # Welcome info
+        welcome_channel_id = welcome_settings.get("welcome_channel_id")
+        welcome_channel = f"<#{welcome_channel_id}>" if welcome_channel_id else "Not configured"
+        welcome_enabled = welcome_settings.get("enabled", False)
+        
+        # Goodbye info
+        goodbye_channel_id = goodbye_settings.get("byebye_channel_id")
+        goodbye_channel = f"<#{goodbye_channel_id}>" if goodbye_channel_id else "Not configured"
+        goodbye_enabled = goodbye_settings.get("enabled", False)
+        
+        embed.add_field(
+            name="🎉 Welcome System",
+            value=f"**Status**: {'🟢 Enabled' if welcome_enabled else '🔴 Disabled'}\n**Channel**: {welcome_channel}",
+            inline=True
+        )
+        
+        embed.add_field(
+            name="👋 Goodbye System",
+            value=f"**Status**: {'🟢 Enabled' if goodbye_enabled else '🔴 Disabled'}\n**Channel**: {goodbye_channel}",
+            inline=True
+        )
+        
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
-    @discord.ui.button(label="🛡️ Moderation", style=discord.ButtonStyle.secondary, row=0)
+    @discord.ui.button(label="🛡️ Moderation", style=discord.ButtonStyle.primary, row=0)
     async def moderation(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if self.language == "tr":
-            message = "Moderasyon ayarlarını seçin:"
-        else:
-            message = "Choose moderation settings:"
+        view = ModerationView(self.bot, self.guild_id)
         
-        await interaction.response.send_message(message, view=ModerationView(self.bot, self.language), ephemeral=True)
+        mongo_db = get_async_db()
+        mod_settings = await mongo_db.moderation.find_one({"guild_id": self.guild_id}) or {}
+        
+        embed = discord.Embed(
+            title="🛡️ Moderation Settings",
+            description="Configure auto-moderation and security features.",
+            color=discord.Color.blue()
+        )
+        
+        # Auto roles
+        auto_roles = mod_settings.get("auto_roles", [])
+        auto_roles_text = f"{len(auto_roles)} roles configured" if auto_roles else "Not configured"
+        
+        # Word filter
+        word_filter = mod_settings.get("word_filter", {})
+        filter_enabled = word_filter.get("enabled", False)
+        filtered_words = len(word_filter.get("words", []))
+        
+        embed.add_field(
+            name="🤖 Auto Roles",
+            value=auto_roles_text,
+            inline=True
+        )
+        
+        embed.add_field(
+            name="🔒 Word Filter",
+            value=f"**Status**: {'🟢 Enabled' if filter_enabled else '🔴 Disabled'}\n**Words**: {filtered_words} words",
+            inline=True
+        )
+        
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+
+    @discord.ui.button(label="💫 Leveling System", style=discord.ButtonStyle.primary, row=0)
+    async def leveling_system(self, interaction: discord.Interaction, button: discord.ui.Button):
+        view = LevellingSettingsView(self.bot, interaction)
+        
+        # Get current settings
+        settings = await view.get_current_settings(self.guild_id)
+        
+        embed = discord.Embed(
+            title="💫 Leveling System",
+            description="Configure XP and leveling features for your server.",
+            color=discord.Color.blue()
+        )
+        
+        # System status
+        system_enabled = settings.get("enabled", True)
+        message_xp = settings.get("message_xp_enabled", True)
+        voice_xp = settings.get("voice_xp_enabled", True)
+        notifications = settings.get("level_up_notifications", True)
+        
+        embed.add_field(
+            name="System Status",
+            value=f"**Enabled**: {'🟢 Yes' if system_enabled else '🔴 No'}\n"
+                  f"**Message XP**: {'🟢 Yes' if message_xp else '🔴 No'}\n"
+                  f"**Voice XP**: {'🟢 Yes' if voice_xp else '🔴 No'}",
+            inline=True
+        )
+        
+        embed.add_field(
+            name="Settings",
+            value=f"**Level Up Notifications**: {'🟢 Yes' if notifications else '🔴 No'}\n"
+                  f"**Message Multiplier**: {settings.get('message_xp_multiplier', 1.0)}x\n"
+                  f"**Voice Multiplier**: {settings.get('voice_xp_multiplier', 1.0)}x",
+            inline=True
+        )
+        
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
     @discord.ui.button(label="📊 Logging", style=discord.ButtonStyle.secondary, row=1)
     async def logging(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if self.language == "tr":
-            message = "Log ayarlarını seçin:"
-        else:
-            message = "Choose logging settings:"
+        from utils.settings.logging_views import LoggingSettingsView
         
-        await interaction.response.send_message(message, view=LoggingView(self.bot, self.language), ephemeral=True)
+        view = LoggingSettingsView(self.bot, interaction.guild_id)
+        await view.initialize()
+        
+        embed = discord.Embed(
+            title="📊 Logging Settings",
+            description="Configure event logging for your server.",
+            color=discord.Color.blue()
+        )
+        
+        channel_text = f"<#{view.log_channel_id}>" if view.log_channel_id else "Not configured"
+        
+        # Count active log types
+        active_logs = sum(1 for setting, enabled in view.settings.items() if enabled)
+        total_logs = len(view.settings)
+        
+        embed.add_field(
+            name="Configuration",
+            value=f"**Log Channel**: {channel_text}\n**Active Logs**: {active_logs}/{total_logs}",
+            inline=False
+        )
+        
+        # Show some active log types
+        active_types = [k.replace("_", " ").title() for k, v in list(view.settings.items())[:5] if v]
+        if active_types:
+            embed.add_field(
+                name="Active Log Types",
+                value="• " + "\n• ".join(active_types) + (f"\n• And {active_logs - 5} more..." if active_logs > 5 else ""),
+                inline=False
+            )
+        
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
     @discord.ui.button(label="🎫 Ticket System", style=discord.ButtonStyle.secondary, row=1)
     async def ticket_system(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if self.language == "tr":
-            message = "Ticket sistemi ayarlarını seçin:"
-        else:
-            message = "Choose ticket system settings:"
+        view = TicketSystemView(self.bot, self.guild_id)
+        await view.initialize()
         
-        await interaction.response.send_message(message, view=TicketSystemView(self.bot, self.language), ephemeral=True)
+        embed = discord.Embed(
+            title="🎫 Ticket System",
+            description="Configure support ticket system for your server.",
+            color=discord.Color.blue()
+        )
+        
+        # Format settings display
+        category = f"<#{view.ticket_category_id}>" if view.ticket_category_id else "Not set"
+        log_channel = f"<#{view.log_channel_id}>" if view.log_channel_id else "Not set"
+        archive_category = f"<#{view.archive_category_id}>" if view.archive_category_id else "Not set"
+        staff_role = f"<@&{view.staff_role_id}>" if view.staff_role_id else "Not set"
+        
+        embed.add_field(
+            name="Current Configuration",
+            value=f"**Ticket Category**: {category}\n"
+                  f"**Log Channel**: {log_channel}\n"
+                  f"**Archive Category**: {archive_category}\n"
+                  f"**Staff Role**: {staff_role}",
+            inline=False
+        )
+        
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
     @discord.ui.button(label="👑 Role Management", style=discord.ButtonStyle.secondary, row=1)
     async def role_management(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if self.language == "tr":
-            message = "Rol yönetimi ayarlarını seçin:"
-        else:
-            message = "Choose role management settings:"
+        view = RoleManagementView(self.bot, self.guild_id)
         
-        await interaction.response.send_message(message, view=RoleManagementView(self.bot, self.language), ephemeral=True)    @discord.ui.button(label="⭐ Starboard", style=discord.ButtonStyle.success, row=1)
+        mongo_db = get_async_db()
+        role_settings = await mongo_db.role_management.find_one({"guild_id": self.guild_id}) or {}
+        
+        embed = discord.Embed(
+            title="👑 Role Management",
+            description="Configure self-assignable roles and role messages.",
+            color=discord.Color.blue()
+        )
+        
+        # Self roles
+        self_roles = role_settings.get("self_roles", [])
+        self_roles_text = f"{len(self_roles)} roles available" if self_roles else "Not configured"
+        
+        # Register channel
+        register_channel_id = role_settings.get("register_channel_id")
+        register_channel = f"<#{register_channel_id}>" if register_channel_id else "Not configured"
+        
+        embed.add_field(
+            name="Configuration",
+            value=f"**Self-Assignable Roles**: {self_roles_text}\n**Register Channel**: {register_channel}",
+            inline=False
+        )
+        
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+    
+    @discord.ui.button(label="⭐ Starboard", style=discord.ButtonStyle.secondary, row=1)
     async def starboard(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if self.language == "tr":
-            message = "Starboard ayarlarını seçin:"
-        else:
-            message = "Choose starboard settings:"
+        view = StarboardView(self.bot, self.guild_id)
         
-        await interaction.response.send_message(message, view=StarboardView(self.bot, self.language), ephemeral=True)
+        mongo_db = get_async_db()
+        starboard_settings = await mongo_db.starboard.find_one({"guild_id": self.guild_id}) or {}
+        
+        embed = discord.Embed(
+            title="⭐ Starboard System",
+            description="Configure starboard settings for highlighting popular messages.",
+            color=discord.Color.gold()
+        )
+        
+        # Get current settings
+        starboard_channel_id = starboard_settings.get("starboard_channel")
+        starboard_channel = f"<#{starboard_channel_id}>" if starboard_channel_id else "Not configured"
+        threshold = starboard_settings.get("threshold", 3)
+        enabled = starboard_settings.get("enabled", False)
+        
+        embed.add_field(
+            name="Configuration",
+            value=f"**Status**: {'🟢 Enabled' if enabled else '🔴 Disabled'}\n"
+                  f"**Starboard Channel**: {starboard_channel}\n"
+                  f"**Star Threshold**: {threshold} ⭐",
+            inline=False
+        )
+        
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
-    @discord.ui.button(label="🎮 Temp Channels", style=discord.ButtonStyle.success, row=2)
+    @discord.ui.button(label="🎮 Temp Channels", style=discord.ButtonStyle.secondary, row=2)
     async def temp_channels(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if self.language == "tr":
-            message = "Geçici kanal ayarlarını seçin:"
-        else:
-            message = "Choose temporary channels settings:"
+        from utils.settings.temp_channels_view import TempChannelsView
         
-        # Import the temp channels view
-        try:
-            from cogs.temp_channels import TempChannelsView, TempChannelsManager
-            manager = TempChannelsManager(self.bot)
-            view = TempChannelsView(self.bot, manager)
-            
-            embed = discord.Embed(
-                title="🎮 Geçici Sesli Kanal Sistemi" if self.language == "tr" else "🎮 Temporary Voice Channels System",
-                description=(
-                    "Sunucunuz için geçici sesli kanal sistemini yapılandırın.\n\n"
-                    "**Nasıl Çalışır:**\n"
-                    "• Kullanıcılar belirli bir kanala katıldığında otomatik olarak kendi özel kanalları oluşturulur\n"
-                    "• Kanal boşaldığında otomatik olarak silinir\n"
-                    "• Oyun adlarına göre özel emojiler eklenebilir\n"
-                    "• Kanal adı formatı özelleştirilebilir"
-                ) if self.language == "tr" else (
-                    "Configure the temporary voice channels system for your server.\n\n"
-                    "**How it works:**\n"
-                    "• When users join a specific channel, their own private channels are automatically created\n"
-                    "• Channels are automatically deleted when empty\n"
-                    "• Special emojis can be added based on game names\n"
-                    "• Channel name format can be customized"
-                ),
-                color=discord.Color.purple()
-            )
-            
-            await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
-            
-        except Exception as e:
-            await interaction.response.send_message(
-                f"Geçici kanal sistemini yüklerken hata oluştu: {str(e)}" if self.language == "tr" else f"Error loading temp channels system: {str(e)}", 
-                ephemeral=True
-            )
+        view = TempChannelsView(self.bot, self.guild_id)
+        
+        mongo_db = get_async_db()
+        temp_settings = await mongo_db.temp_channels.find_one({"guild_id": self.guild_id}) or {}
+        
+        embed = discord.Embed(
+            title="🎮 Temporary Voice Channels",
+            description="Configure auto-created voice channels for your server members.",
+            color=discord.Color.purple()
+        )
+        
+        # Get current settings
+        hub_channel_id = temp_settings.get("hub_channel_id")
+        hub_channel = f"<#{hub_channel_id}>" if hub_channel_id else "Not configured"
+        category_id = temp_settings.get("category_id")
+        category = f"<#{category_id}>" if category_id else "Auto-create"
+        enabled = bool(hub_channel_id)
+        
+        embed.add_field(
+            name="Configuration",
+            value=f"**Status**: {'🟢 Enabled' if enabled else '🔴 Disabled'}\n"
+                  f"**Hub Channel**: {hub_channel}\n"
+                  f"**Category**: {category}",
+            inline=False
+        )
+        
+        embed.add_field(
+            name="How it works",
+            value="• Users join the hub channel\n"
+                  "• A private channel is created for them\n"
+                  "• Channel is deleted when empty\n"
+                  "• Game emojis and custom formats supported",
+            inline=False
+        )
+        
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+    
+    @discord.ui.button(label="🎨 Server Settings", style=discord.ButtonStyle.secondary, row=2)
+    async def server_settings(self, interaction: discord.Interaction, button: discord.ui.Button):
+        view = ServerSettingsView(self.bot, self.guild_id)
+        
+        mongo_db = get_async_db()
+        server_settings = await mongo_db.server_settings.find_one({"server_id": self.guild_id}) or {}
+        
+        embed = discord.Embed(
+            title="🎨 Server Settings",
+            description="Configure basic server settings and defaults.",
+            color=discord.Color.blurple()
+        )
+        
+        # Get current settings
+        embed_color = server_settings.get("embed_color", "0x3498db")
+        report_channel_id = server_settings.get("report_channel_id")
+        report_channel = f"<#{report_channel_id}>" if report_channel_id else "Not configured"
+        
+        embed.add_field(
+            name="Current Settings",
+            value=f"**Embed Color**: {embed_color}\n"
+                  f"**Report Channel**: {report_channel}",
+            inline=False
+        )
+        
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+    
+    @discord.ui.button(label="📄 Registration", style=discord.ButtonStyle.secondary, row=2)
+    async def registration(self, interaction: discord.Interaction, button: discord.ui.Button):
+        from utils.settings.register_views import RegisterSettingsView
+        
+        view = RegisterSettingsView(self.bot, self.guild_id)
+        
+        mongo_db = get_async_db()
+        register_settings = await mongo_db.register_settings.find_one({"guild_id": self.guild_id}) or {}
+        
+        embed = discord.Embed(
+            title="📄 Registration System",
+            description="Configure member registration and verification settings.",
+            color=discord.Color.green()
+        )
+        
+        # Get current settings
+        register_channel_id = register_settings.get("register_channel_id")
+        register_channel = f"<#{register_channel_id}>" if register_channel_id else "Not configured"
+        register_role_id = register_settings.get("register_role_id")
+        register_role = f"<@&{register_role_id}>" if register_role_id else "Not configured"
+        enabled = register_settings.get("enabled", False)
+        
+        embed.add_field(
+            name="Configuration",
+            value=f"**Status**: {'🟢 Enabled' if enabled else '🔴 Disabled'}\n"
+                  f"**Register Channel**: {register_channel}\n"
+                  f"**Registered Role**: {register_role}",
+            inline=False
+        )
+        
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
 class FeatureManagementView(discord.ui.View):
-    def __init__(self, bot, language="en"):
+    def __init__(self, bot, guild_id):
         super().__init__(timeout=300)
         self.bot = bot
-        self.language = language
+        self.guild_id = guild_id
 
     @discord.ui.button(label="📊 View Feature Status", style=discord.ButtonStyle.primary, row=0)
     async def view_feature_status(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -232,7 +501,7 @@ class FeatureManagementView(discord.ui.View):
 
     async def show_feature_status(self, interaction):
         mongo_db = get_async_db()
-        features = await mongo_db.feature_toggles.find_one({"guild_id": interaction.guild.id}) or {}
+        features = await mongo_db.feature_toggles.find_one({"guild_id": self.guild_id}) or {}
         
         # Default feature states
         default_features = {
@@ -246,43 +515,30 @@ class FeatureManagementView(discord.ui.View):
             "temp_channels": True
         }
         
-        title = "🔧 Feature Status Overview" if self.language == "en" else "🔧 Özellik Durumu Genel Bakış"
-        embed = discord.Embed(title=title, color=discord.Color.blue())
+        embed = discord.Embed(title="🔧 Feature Status Overview", color=discord.Color.blue())
         
         feature_names = {
-            "welcome_system": ("👋 Welcome System", "👋 Karşılama Sistemi"),
-            "leveling_system": ("💫 Leveling System", "💫 Seviye Sistemi"),
-            "starboard_system": ("⭐ Starboard System", "⭐ Starboard Sistemi"),
-            "auto_moderation": ("🛡️ Auto Moderation", "🛡️ Otomatik Moderasyon"),
-            "logging_system": ("📊 Logging System", "📊 Log Sistemi"),
-            "ticket_system": ("🎫 Ticket System", "🎫 Ticket Sistemi"),
-            "community_features": ("🎮 Community Features", "🎮 Topluluk Özellikleri"),
-            "temp_channels": ("🎮 Temp Channels", "🎮 Geçici Kanallar")
+            "welcome_system": "👋 Welcome System",
+            "leveling_system": "💫 Leveling System",
+            "starboard_system": "⭐ Starboard System",
+            "auto_moderation": "🛡️ Auto Moderation",
+            "logging_system": "📊 Logging System",
+            "ticket_system": "🎫 Ticket System",
+            "community_features": "🎮 Community Features",
+            "temp_channels": "🎮 Temp Channels"
         }
         
-        for feature_key, (name_en, name_tr) in feature_names.items():
+        for feature_key, name in feature_names.items():
             is_enabled = features.get(feature_key, default_features.get(feature_key, True))
-            name = name_tr if self.language == "tr" else name_en
             status = "🟢 Enabled" if is_enabled else "🔴 Disabled"
-            if self.language == "tr":
-                status = "🟢 Aktif" if is_enabled else "🔴 Devre Dışı"
-            
             embed.add_field(name=name, value=status, inline=True)
         
-        description = (
-            "Click the buttons below to toggle features on/off. "
-            "Disabled features will not function and their commands will be unavailable."
-        ) if self.language == "en" else (
-            "Özellikleri açmak/kapatmak için aşağıdaki butonları kullanın. "
-            "Kapatılan özellikler çalışmayacak ve komutları kullanılamayacaktır."
-        )
-        
-        embed.description = description
+        embed.description = "Click the buttons below to toggle features on/off. Disabled features will not function and their commands will be unavailable."
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
     async def toggle_feature(self, interaction, feature_key, feature_name_en, feature_name_tr):
         mongo_db = get_async_db()
-        features = await mongo_db.feature_toggles.find_one({"guild_id": interaction.guild.id}) or {}
+        features = await mongo_db.feature_toggles.find_one({"guild_id": self.guild_id}) or {}
         
         # Get current state (default to True if not set)
         current_state = features.get(feature_key, True)
@@ -290,24 +546,23 @@ class FeatureManagementView(discord.ui.View):
         
         # Update in database
         await mongo_db.feature_toggles.update_one(
-            {"guild_id": interaction.guild.id},
+            {"guild_id": self.guild_id},
             {"$set": {feature_key: new_state}},
             upsert=True
         )
         
         # Prepare response message
-        feature_name = feature_name_tr if self.language == "tr" else feature_name_en
         if new_state:
-            status = "enabled" if self.language == "en" else "aktifleştirildi"
+            status = "enabled"
             color = discord.Color.green()
             emoji = "🟢"
         else:
-            status = "disabled" if self.language == "en" else "devre dışı bırakıldı"
+            status = "disabled"
             color = discord.Color.red()
             emoji = "🔴"
         
-        title = f"{emoji} {feature_name} {status.title()}"
-        description = f"{feature_name} has been {status}." if self.language == "en" else f"{feature_name} {status}."
+        title = f"{emoji} {feature_name_en} {status.title()}"
+        description = f"{feature_name_en} has been {status}."
         
         embed = discord.Embed(title=title, description=description, color=color)
         
@@ -369,10 +624,10 @@ class ConfirmResetView(discord.ui.View):
 
 # Server Settings View
 class ServerSettingsView(discord.ui.View):
-    def __init__(self, bot, language="en"):
+    def __init__(self, bot, guild_id):
         super().__init__(timeout=300)
         self.bot = bot
-        self.language = language
+        self.guild_id = guild_id
 
     @discord.ui.button(label="🎨 Set Embed Color", style=discord.ButtonStyle.primary)
     async def set_embed_color(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -423,10 +678,10 @@ class ServerSettingsView(discord.ui.View):
 
 # Welcome/Goodbye View
 class WelcomeGoodbyeView(discord.ui.View):
-    def __init__(self, bot, language="en"):
+    def __init__(self, bot, guild_id):
         super().__init__(timeout=300)
         self.bot = bot
-        self.language = language
+        self.guild_id = guild_id
 
     @discord.ui.button(label="🎉 Configure Welcome", style=discord.ButtonStyle.primary)
     async def configure_welcome(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -583,10 +838,10 @@ class GoodbyeConfigView(discord.ui.View):
 
 # Moderation View
 class ModerationView(discord.ui.View):
-    def __init__(self, bot, language="en"):
+    def __init__(self, bot, guild_id):
         super().__init__(timeout=300)
         self.bot = bot
-        self.language = language
+        self.guild_id = guild_id
 
     @discord.ui.button(label="🤖 Auto Roles", style=discord.ButtonStyle.primary)
     async def auto_roles(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -1078,10 +1333,23 @@ class SetSpecificLoggingChannelModal(discord.ui.Modal):
 
 # Ticket System View
 class TicketSystemView(discord.ui.View):
-    def __init__(self, bot, language="en"):
+    def __init__(self, bot, guild_id):
         super().__init__(timeout=300)
         self.bot = bot
-        self.language = language
+        self.guild_id = guild_id
+        self.ticket_category_id = None
+        self.log_channel_id = None
+        self.archive_category_id = None
+        self.staff_role_id = None
+        
+    async def initialize(self):
+        """Load current ticket settings"""
+        mongo_db = get_async_db()
+        settings = await mongo_db.ticket_settings.find_one({"guild_id": self.guild_id}) or {}
+        self.ticket_category_id = settings.get("category_id")
+        self.log_channel_id = settings.get("log_channel_id")
+        self.archive_category_id = settings.get("archive_category_id")
+        self.staff_role_id = settings.get("staff_role_id")
 
     @discord.ui.button(label="📂 Set Ticket Category", style=discord.ButtonStyle.primary)
     async def set_ticket_category(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -1142,10 +1410,10 @@ class TicketSystemView(discord.ui.View):
 
 # Role Management View
 class RoleManagementView(discord.ui.View):
-    def __init__(self, bot, language="en"):
+    def __init__(self, bot, guild_id):
         super().__init__(timeout=300)
         self.bot = bot
-        self.language = language
+        self.guild_id = guild_id
 
     @discord.ui.button(label="🎭 Create Role Message", style=discord.ButtonStyle.primary)
     async def create_role_message(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -1213,10 +1481,10 @@ class RoleManagementView(discord.ui.View):
 
 # Starboard View
 class StarboardView(discord.ui.View):
-    def __init__(self, bot, language="en"):
+    def __init__(self, bot, guild_id):
         super().__init__(timeout=300)
         self.bot = bot
-        self.language = language
+        self.guild_id = guild_id
 
     @discord.ui.button(label="⭐ Setup Starboard", style=discord.ButtonStyle.primary)
     async def setup_starboard(self, interaction: discord.Interaction, button: discord.ui.Button):

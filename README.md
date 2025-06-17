@@ -1,6 +1,6 @@
 # 🤖 CONTRO - Advanced Discord Bot Management System
 
-[![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)](https://github.com/bergaman9/contro-bot)
+[![Version](https://img.shields.io/badge/version-1.1.1-blue.svg)](https://github.com/bergaman9/contro-bot)
 [![Python](https://img.shields.io/badge/python-3.10+-green.svg)](https://python.org)
 [![MongoDB](https://img.shields.io/badge/database-MongoDB-47A248.svg)](https://mongodb.com)
 [![Discord.py](https://img.shields.io/badge/discord.py-2.3.2-7289DA.svg)](https://discordpy.readthedocs.io/)
@@ -255,32 +255,39 @@ sudo systemctl enable contro-bot
 sudo systemctl start contro-bot
 ```
 
-## 🔧 Recent Fixes & Improvements
+## 🔧 Recent Updates & Improvements (v1.1.1)
 
-### ✅ **Indentation Error Fixed:**
-- **XP Manager Created** - Resolved IndentationError preventing spin and levelling cogs from loading
-- **Missing File Added** - Created utils/community/turkoyto/xp_manager.py with proper structure
-- **Cog Loading Fixed** - All 17 cogs now load successfully without errors
+### ✅ **Centralized Database Management:**
+- **Single Database Manager** - Unified database connection handling through DatabaseManager singleton
+- **Async MongoDB Support** - Full async/await support with motor for better performance
+- **Connection Pooling** - Optimized connection management with proper pooling
+- **Automatic Retry Logic** - Built-in retry mechanisms for better reliability
+- **Legacy Support** - Sync database connections for backward compatibility
 
-### ✅ **Database Issues Resolved:**
-- **Fixed truth value testing** - Proper null checking for database connections
-- **Improved error handling** - Better database initialization with fallback options
-- **Connection stability** - Enhanced MongoDB connection management
+### ✅ **Settings System Overhaul:**
+- **Full English UI** - Complete English translation of all settings interfaces
+- **Unified Command** - Single `/settings` command with comprehensive button-based navigation
+- **Real-time Status Display** - See current configuration status in embed messages
+- **All Features Accessible** - Every bot feature configurable through the settings panel
+- **No Extra Commands** - Removed redundant settings commands for cleaner interface
 
-### ✅ **Command Registration Fixed:**
-- **Removed duplicate commands** - Fixed CommandAlreadyRegistered errors
-- **Clean cog loading** - Proper handling of existing cog instances
-- **Improved setup process** - Better initialization sequence
+### ✅ **Enhanced Feature Management:**
+- **Feature Toggle Dashboard** - Visual status display of all features at a glance
+- **Granular Control** - Enable/disable individual features per server
+- **Persistent Configuration** - Settings saved in MongoDB and persist across restarts
+- **Reset Functionality** - Easy reset to default configurations
 
-### ✅ **Enhanced Settings System:**
-- **Unified settings interface** - Single `/settings` command for all configuration
-- **Better error handling** - Comprehensive error messages and logging
-- **Improved user experience** - Cleaner UI with better feedback
+### ✅ **Code Cleanup & Organization:**
+- **Removed Duplicate Commands** - Fixed all command registration conflicts
+- **Clean Root Directory** - Removed unnecessary files for cleaner project structure
+- **Fixed Bot Settings Cog** - Resolved loading issues with proper command structure
+- **Improved Error Handling** - Better error messages and fallback mechanisms
 
-### ✅ **Template System:**
-- **JSON-based Templates** - Flexible server template storage
-- **Discord Template Import** - Import official Discord templates
-- **Format Variables** - Dynamic content with server-specific mentions
+### ✅ **Performance Optimizations:**
+- **Reduced Database Calls** - Centralized connection eliminates redundant connections
+- **Better Resource Management** - Proper connection pooling and cleanup
+- **Async Operations** - Full async support for non-blocking operations
+- **Memory Efficiency** - Singleton pattern reduces memory overhead
 
 ## 📁 Project Structure
 

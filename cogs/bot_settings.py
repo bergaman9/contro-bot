@@ -196,25 +196,26 @@ class ChangelogChannelSelect(discord.ui.ChannelSelect):
 
 
 class BotSettings(commands.Cog):
-    @commands.group(name='settings')
-    async def settings(self, ctx):
-        """Bot ayar komutları grubu"""
-        if ctx.invoked_subcommand is None:
-            await ctx.send_help(ctx.command)
-    """🤖 Bot Ayarları Sistemi
+    """🤖 Bot Settings System
     
-    Bot'un genel davranışını ve ayarlarını yapılandırmak için kapsamlı bir sistem:
-    • 🔧 Prefix ayarları
-    • 🎭 Bot görünümü
-    • 📊 Performans seçenekleri
-    • 👑 Gizli geliştirici seçenekleri
-    • 📝 Sürüm bilgileri ve güncellemeler
+    Comprehensive system for configuring bot behavior and settings:
+    • 🔧 Prefix settings
+    • 🎭 Bot appearance
+    • 📊 Performance options
+    • 👑 Developer options
+    • 📝 Version info and updates
     """
     
     def __init__(self, bot):
         self.bot = bot
         self.mongo_db = initialize_mongodb()
         self.versions_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'versions.json')
+    
+    @commands.group(name='botsettings')
+    async def botsettings(self, ctx):
+        """Bot settings command group"""
+        if ctx.invoked_subcommand is None:
+            await ctx.send_help(ctx.command)
 
     # Changelog için yardımcı fonksiyon
     def get_versions_data(self):
@@ -259,23 +260,22 @@ class BotSettings(commands.Cog):
 
     
     # Önceki server_panel komutunu yeniden adlandır
-    @settings.command(name="server", description="Sunucu ayarlarını aç")
+    @botsettings.command(name="server", description="Sunucu ayarlarını aç")
     @commands.has_permissions(administrator=True)
     async def settings_panel(self, ctx):
         """Sunucu ayarları panelini açar"""
         # Sunucu ayarları için settings modulu fonksiyonunu çağır
         settings_cog = self.bot.get_cog('Settings')
         if settings_cog:
-            await settings_cog.server_settings_panel(ctx)
+            await settings_cog.open_settings_panel(ctx)
         else:
             await ctx.send(embed=create_embed("\u274c Sunucu ayarları modülü yüklenemedi.", discord.Color.red()))
             
-    # Changelog grup komutu
-    @settings.group(name="changelogs", description="Sürüm bilgileri ve güncellemeler")
+    # Changelog komutu
+    @botsettings.command(name="changelog", description="Show version history and updates")
     @commands.has_permissions(administrator=True)
     async def changelogs(self, ctx):
-        if ctx.invoked_subcommand is None:
-            await self.changelog(ctx)
+        await self.changelog(ctx)
     
     # Changelog alt komutu
     @changelogs.command(name="show", description="Tüm sürümler için changelog'u göster")

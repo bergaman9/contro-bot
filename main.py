@@ -23,6 +23,7 @@ from api.ping_api import app, initialize_api
 from api import initialize_all_apis
 from utils.database import initialize_async_mongodb, get_async_db, close_async_mongodb, DummyAsyncDatabase
 from utils.community.turkoyto.ticket_views import TicketButton, ServicesView
+from utils.database.db_manager import db_manager
 
 # Setup logging early
 setup_logging()
@@ -433,32 +434,34 @@ async def main():
     # Set up error handlers
     setup_error_handlers(bot)
     
-    # Initialize MongoDB connection with better error handling
+    # Initialize MongoDB connection with better error handling using centralized manager
     try:
         # Add timeout to database initialization
-        db = await asyncio.wait_for(initialize_async_mongodb(), timeout=60.0)
-        if isinstance(db, DummyAsyncDatabase):
-            logger.warning("Using fallback database mode - some features may not work correctly")
-            print_colored("⚠️ MongoDB connection failed - using fallback mode", "yellow", "bold")
-            print_colored("Some features may not work correctly", "yellow")
-        else:
-            logger.info("MongoDB connected successfully")
-            print_colored("✅ MongoDB connected successfully", "green")
+        db = await asyncio.wait_for(db_manager.initialize(), timeout=60.0)
+        logger.info("MongoDB connected successfully")
+        print_colored("✅ MongoDB connected successfully", "green")
+        
+        # Set the database on bot instance for cogs to access
+        bot.async_db = db
+        bot.db_manager = db_manager
+        
     except asyncio.TimeoutError:
         logger.error("MongoDB connection timed out after 60 seconds")
         print_colored("⚠️ MongoDB connection timed out - using fallback mode", "yellow", "bold")
         print_colored("Some features may not work correctly", "yellow")
         # Set fallback database
         db = DummyAsyncDatabase()
+        bot.async_db = db
+        bot.db_manager = None
+        
     except Exception as e:
         logger.error(f"Failed to initialize MongoDB: {e}", exc_info=True)
         print_colored(f"⚠️ MongoDB connection error: {e}", "yellow", "bold")
         print_colored("Continuing with fallback database mode - some features may not work correctly", "yellow")
         # Set fallback database
         db = DummyAsyncDatabase()
-    
-    # Set the database on bot instance for cogs to access
-    bot.async_db = db
+        bot.async_db = db
+        bot.db_manager = None
     
     # Function to start the API server in a separate thread
     def start_api_server():

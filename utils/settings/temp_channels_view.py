@@ -2,6 +2,8 @@ import discord
 from typing import Dict, List, Optional, Union
 import logging
 import asyncio
+from discord import ui
+from utils.database.connection import get_async_db
 
 # Configure logger
 logger = logging.getLogger('temp_channels_settings')
@@ -9,8 +11,8 @@ logger = logging.getLogger('temp_channels_settings')
 class TempChannelsView(discord.ui.View):
     """Interactive view for configuring temporary voice channels settings"""
     
-    def __init__(self, bot, guild_id, timeout=180):
-        super().__init__(timeout=timeout)
+    def __init__(self, bot, guild_id):
+        super().__init__(timeout=300)
         self.bot = bot
         self.guild_id = guild_id
         self.message = None
@@ -28,16 +30,12 @@ class TempChannelsView(discord.ui.View):
     async def load_config(self):
         """Load temp channels configuration from database"""
         try:
-            # This would be replaced with actual DB interaction
-            self.config = {
-                "enabled": True,
-                "creator_channel_id": None,
-                "category_id": None,
-                "channel_name_format": "{user}'nin kanalı",
-                "game_emojis_enabled": True,
-                "user_limit": 0,
-                "inactive_timeout": 60  # in seconds
-            }
+            mongo_db = get_async_db()
+            config_data = await mongo_db.temp_channels.find_one({"guild_id": self.guild_id})
+            if config_data:
+                self.config = config_data
+            else:
+                self.config = None
         except Exception as e:
             logger.error(f"Error loading temp channels config: {e}")
             self.config = None
@@ -67,7 +65,7 @@ class TempChannelsView(discord.ui.View):
                     f"**Durum:** {'Aktif ✅' if self.config.get('enabled', False) else 'Devre Dışı ❌'}\n"
                     f"**Oluşturucu Kanal:** {creator_channel}\n"
                     f"**Kategori:** {category}\n"
-                    f"**Kanal İsim Formatı:** `{self.config.get('channel_name_format', '{user} kanalı')}`\n"
+                    f"**Kanal İsim Formatı:** `{self.config.get('name_format', '{username} kanalı')}`\n"
                     f"**Oyun Emojileri:** {'Aktif ✅' if self.config.get('game_emojis_enabled', True) else 'Devre Dışı ❌'}\n"
                     f"**Kullanıcı Limiti:** {self.config.get('user_limit', 0)} (0 = limitsiz)\n"
                     f"**Hareketsizlik Zaman Aşımı:** {self.config.get('inactive_timeout', 60)} saniye"
@@ -91,227 +89,157 @@ class TempChannelsView(discord.ui.View):
         
         return embed
     
-    @discord.ui.button(label="Sistemi Aç/Kapat", style=discord.ButtonStyle.primary, emoji="🔄", row=0)
-    async def toggle_system(self, interaction: discord.Interaction, button: discord.ui.Button):
-        """Toggle the temporary channels system on/off"""
-        if not self.config:
-            return await interaction.response.send_message("❌ Ayarlar yüklenemedi.", ephemeral=True)
-            
-        # Toggle the enabled state
-        self.config["enabled"] = not self.config.get("enabled", False)
+    @discord.ui.button(label="🎯 Set Hub Channel", style=discord.ButtonStyle.primary)
+    async def set_hub_channel(self, interaction: discord.Interaction, button: discord.ui.Button):
+        modal = SetHubChannelModal()
+        await interaction.response.send_modal(modal)
+        await modal.wait()
         
-        # Update database would go here
-        
-        # Update the embed
-        embed = self.create_settings_embed()
-        await interaction.response.edit_message(embed=embed, view=self)
-    
-    @discord.ui.button(label="Oluşturucu Kanal", style=discord.ButtonStyle.primary, emoji="🎯", row=0)
-    async def set_creator_channel(self, interaction: discord.Interaction, button: discord.ui.Button):
-        """Set the creator channel"""
-        await interaction.response.send_modal(SetCreatorChannelModal(self))
-    
-    @discord.ui.button(label="Kategori Ayarla", style=discord.ButtonStyle.primary, emoji="📁", row=1)
+        if modal.channel_id.value:
+            try:
+                channel_id = int(modal.channel_id.value)
+                channel = interaction.guild.get_channel(channel_id)
+                
+                if not channel or not isinstance(channel, discord.VoiceChannel):
+                    await interaction.followup.send("❌ Invalid voice channel ID.", ephemeral=True)
+                    return
+                
+                mongo_db = get_async_db()
+                await mongo_db.temp_channels.update_one(
+                    {"guild_id": self.guild_id},
+                    {"$set": {"hub_channel_id": channel_id}},
+                    upsert=True
+                )
+                
+                embed = discord.Embed(
+                    title="✅ Hub Channel Set",
+                    description=f"Hub channel has been set to {channel.mention}",
+                    color=discord.Color.green()
+                )
+                await interaction.followup.send(embed=embed, ephemeral=True)
+                
+            except ValueError:
+                await interaction.followup.send("❌ Please enter a valid channel ID.", ephemeral=True)
+
+    @discord.ui.button(label="📁 Set Category", style=discord.ButtonStyle.secondary)
     async def set_category(self, interaction: discord.Interaction, button: discord.ui.Button):
-        """Set the category for temp channels"""
-        await interaction.response.send_modal(SetCategoryModal(self))
-    
-    @discord.ui.button(label="İsim Formatı", style=discord.ButtonStyle.primary, emoji="✏️", row=1)
+        modal = SetCategoryModal()
+        await interaction.response.send_modal(modal)
+        await modal.wait()
+        
+        if modal.category_id.value:
+            try:
+                category_id = int(modal.category_id.value)
+                category = interaction.guild.get_channel(category_id)
+                
+                if not category or not isinstance(category, discord.CategoryChannel):
+                    await interaction.followup.send("❌ Invalid category ID.", ephemeral=True)
+                    return
+                
+                mongo_db = get_async_db()
+                await mongo_db.temp_channels.update_one(
+                    {"guild_id": self.guild_id},
+                    {"$set": {"category_id": category_id}},
+                    upsert=True
+                )
+                
+                embed = discord.Embed(
+                    title="✅ Category Set",
+                    description=f"Temp channels will be created in {category.name}",
+                    color=discord.Color.green()
+                )
+                await interaction.followup.send(embed=embed, ephemeral=True)
+                
+            except ValueError:
+                await interaction.followup.send("❌ Please enter a valid category ID.", ephemeral=True)
+
+    @discord.ui.button(label="📝 Channel Name Format", style=discord.ButtonStyle.secondary)
     async def set_name_format(self, interaction: discord.Interaction, button: discord.ui.Button):
-        """Set the channel name format"""
-        await interaction.response.send_modal(SetNameFormatModal(self))
-    
-    @discord.ui.button(label="Kanalları Listele", style=discord.ButtonStyle.secondary, emoji="📋", row=2)
-    async def list_channels(self, interaction: discord.Interaction, button: discord.ui.Button):
-        """List all temporary channels"""
-        # This would get actual channel data from the bot
+        modal = SetNameFormatModal()
+        await interaction.response.send_modal(modal)
+        await modal.wait()
+        
+        if modal.name_format.value:
+            mongo_db = get_async_db()
+            await mongo_db.temp_channels.update_one(
+                {"guild_id": self.guild_id},
+                {"$set": {"name_format": modal.name_format.value}},
+                upsert=True
+            )
+            
+            embed = discord.Embed(
+                title="✅ Name Format Updated",
+                description=f"Channel name format set to: `{modal.name_format.value}`",
+                color=discord.Color.green()
+            )
+            await interaction.followup.send(embed=embed, ephemeral=True)
+
+    @discord.ui.button(label="🎮 Game Emojis", style=discord.ButtonStyle.secondary)
+    async def configure_game_emojis(self, interaction: discord.Interaction, button: discord.ui.Button):
         embed = discord.Embed(
-            title="🔊 Geçici Kanallar",
-            description="Aşağıda sunucudaki tüm geçici kanalları görebilirsiniz.",
+            title="🎮 Game Emoji Configuration",
+            description="Game emojis are automatically added based on the game being played.\n\n"
+                        "**Supported Games:**\n"
+                        "• Valorant - ⚡\n"
+                        "• CS:GO/CS2 - 🔫\n"
+                        "• League of Legends - ⚔️\n"
+                        "• Minecraft - 🎮\n"
+                        "• Fortnite - 🏗️\n"
+                        "• Among Us - 🔪\n"
+                        "• GTA V - 🚗\n"
+                        "• And many more!",
             color=discord.Color.blue()
         )
-        
-        # Placeholder data
-        temp_channels_data = [
-            {"name": "Örnek Kanal 1", "owner": "Kullanıcı1", "members": 3},
-            {"name": "Örnek Kanal 2", "owner": "Kullanıcı2", "members": 1},
-        ]
-        
-        if temp_channels_data:
-            channels_text = ""
-            for i, channel in enumerate(temp_channels_data, 1):
-                channels_text += f"{i}. **{channel['name']}** - Sahibi: {channel['owner']} - Üyeler: {channel['members']}\n"
-            
-            embed.add_field(name="Aktif Kanallar", value=channels_text, inline=False)
-        else:
-            embed.add_field(name="Aktif Kanallar", value="Şu anda aktif geçici kanal bulunmuyor.", inline=False)
-        
         await interaction.response.send_message(embed=embed, ephemeral=True)
-    
-    @discord.ui.button(label="Gelişmiş Ayarlar", style=discord.ButtonStyle.secondary, emoji="⚙️", row=2)
-    async def advanced_settings(self, interaction: discord.Interaction, button: discord.ui.Button):
-        """Show advanced settings"""
-        # Create a new view for advanced settings
-        view = TempChannelsAdvancedView(self)
+
+    @discord.ui.button(label="🗑️ Disable System", style=discord.ButtonStyle.danger)
+    async def disable_system(self, interaction: discord.Interaction, button: discord.ui.Button):
+        mongo_db = get_async_db()
+        await mongo_db.temp_channels.delete_one({"guild_id": self.guild_id})
         
         embed = discord.Embed(
-            title="⚙️ Geçici Kanal Gelişmiş Ayarları",
-            description="Aşağıdaki butonları kullanarak gelişmiş ayarları yapılandırabilirsiniz.",
-            color=discord.Color.blue()
+            title="🗑️ System Disabled",
+            description="Temporary voice channels system has been disabled.",
+            color=discord.Color.red()
         )
-        
-        if self.config:
-            embed.add_field(
-                name="Gelişmiş Ayarlar",
-                value=(
-                    f"**Oyun Emojileri:** {'Aktif ✅' if self.config.get('game_emojis_enabled', True) else 'Devre Dışı ❌'}\n"
-                    f"**Kullanıcı Limiti:** {self.config.get('user_limit', 0)} (0 = limitsiz)\n"
-                    f"**Hareketsizlik Zaman Aşımı:** {self.config.get('inactive_timeout', 60)} saniye"
-                ),
-                inline=False
-            )
-        
-        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
-    
-    @discord.ui.button(label="İptal", style=discord.ButtonStyle.danger, emoji="❌", row=3)
-    async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
-        """Cancel the temp channels settings view"""
-        await interaction.response.defer()
-        try:
-            await interaction.message.delete()
-        except:
-            pass
-        self.stop()
+        await interaction.response.send_message(embed=embed, ephemeral=True)
 
 
-class SetCreatorChannelModal(discord.ui.Modal, title="Oluşturucu Kanal Ayarla"):
-    """Modal for setting the creator channel"""
-    
+class SetHubChannelModal(discord.ui.Modal, title="Set Hub Channel"):
     channel_id = discord.ui.TextInput(
-        label="Kanal ID",
-        placeholder="Kanal ID'sini girin",
-        required=True,
-        style=discord.TextStyle.short
+        label="Voice Channel ID",
+        placeholder="Enter the voice channel ID",
+        required=True
     )
-    
-    def __init__(self, parent_view):
-        super().__init__()
-        self.parent_view = parent_view
-    
+
     async def on_submit(self, interaction: discord.Interaction):
-        """Handle the modal submission"""
-        try:
-            channel_id = int(self.channel_id.value)
-            channel = interaction.guild.get_channel(channel_id)
-            
-            if not channel or not isinstance(channel, discord.VoiceChannel):
-                return await interaction.response.send_message(
-                    "❌ Geçerli bir ses kanalı ID'si girin.",
-                    ephemeral=True
-                )
-            
-            # Update the config
-            self.parent_view.config["creator_channel_id"] = channel_id
-            
-            # Update database would go here
-            
-            # Update the embed
-            embed = self.parent_view.create_settings_embed()
-            await interaction.response.edit_message(embed=embed, view=self.parent_view)
-        except ValueError:
-            await interaction.response.send_message(
-                "❌ Geçerli bir kanal ID'si girin.",
-                ephemeral=True
-            )
-        except Exception as e:
-            logger.error(f"Error setting creator channel: {e}")
-            await interaction.response.send_message(
-                f"❌ Bir hata oluştu: {str(e)}",
-                ephemeral=True
-            )
+        # Acknowledge the modal submission
+        await interaction.response.defer()
 
 
-class SetCategoryModal(discord.ui.Modal, title="Kategori Ayarla"):
-    """Modal for setting the category"""
-    
+class SetCategoryModal(discord.ui.Modal, title="Set Category"):
     category_id = discord.ui.TextInput(
-        label="Kategori ID",
-        placeholder="Kategori ID'sini girin",
-        required=True,
-        style=discord.TextStyle.short
+        label="Category ID",
+        placeholder="Enter the category ID (leave empty for auto-create)",
+        required=False
     )
-    
-    def __init__(self, parent_view):
-        super().__init__()
-        self.parent_view = parent_view
-    
+
     async def on_submit(self, interaction: discord.Interaction):
-        """Handle the modal submission"""
-        try:
-            category_id = int(self.category_id.value)
-            category = interaction.guild.get_channel(category_id)
-            
-            if not category or not isinstance(category, discord.CategoryChannel):
-                return await interaction.response.send_message(
-                    "❌ Geçerli bir kategori ID'si girin.",
-                    ephemeral=True
-                )
-            
-            # Update the config
-            self.parent_view.config["category_id"] = category_id
-            
-            # Update database would go here
-            
-            # Update the embed
-            embed = self.parent_view.create_settings_embed()
-            await interaction.response.edit_message(embed=embed, view=self.parent_view)
-        except ValueError:
-            await interaction.response.send_message(
-                "❌ Geçerli bir kategori ID'si girin.",
-                ephemeral=True
-            )
-        except Exception as e:
-            logger.error(f"Error setting category: {e}")
-            await interaction.response.send_message(
-                f"❌ Bir hata oluştu: {str(e)}",
-                ephemeral=True
-            )
+        # Acknowledge the modal submission
+        await interaction.response.defer()
 
 
-class SetNameFormatModal(discord.ui.Modal, title="İsim Formatı Ayarla"):
-    """Modal for setting the channel name format"""
-    
+class SetNameFormatModal(discord.ui.Modal, title="Set Name Format"):
     name_format = discord.ui.TextInput(
-        label="İsim Formatı",
-        placeholder="{user} kanalı",
-        required=True,
-        style=discord.TextStyle.short,
-        default="{user} kanalı"
+        label="Channel Name Format",
+        placeholder="Use {username} for the user's name",
+        default="{username}'s Channel",
+        required=True
     )
-    
-    def __init__(self, parent_view):
-        super().__init__()
-        if parent_view.config and parent_view.config.get("channel_name_format"):
-            self.name_format.default = parent_view.config["channel_name_format"]
-        self.parent_view = parent_view
-    
+
     async def on_submit(self, interaction: discord.Interaction):
-        """Handle the modal submission"""
-        try:
-            # Update the config
-            self.parent_view.config["channel_name_format"] = self.name_format.value
-            
-            # Update database would go here
-            
-            # Update the embed
-            embed = self.parent_view.create_settings_embed()
-            await interaction.response.edit_message(embed=embed, view=self.parent_view)
-        except Exception as e:
-            logger.error(f"Error setting name format: {e}")
-            await interaction.response.send_message(
-                f"❌ Bir hata oluştu: {str(e)}",
-                ephemeral=True
-            )
+        # Acknowledge the modal submission
+        await interaction.response.defer()
 
 
 class TempChannelsAdvancedView(discord.ui.View):
