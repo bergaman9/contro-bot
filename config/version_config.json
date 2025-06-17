@@ -1,4 +1,5 @@
 {
+  "version": "1.0.0",
   "auto_increment": true,
   "version_format": "semantic",
   "track_git_commits": true,

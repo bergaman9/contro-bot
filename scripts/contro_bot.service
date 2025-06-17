@@ -1,0 +1,28 @@
+[Unit]
+Description=Contro Bot Discord Bot
+After=network.target
+Wants=network-online.target
+
+[Service]
+User=bergaman
+Group=bergaman
+WorkingDirectory=/home/bergaman/Desktop/contro-bot
+ExecStart=/usr/bin/python3 /home/bergaman/Desktop/contro-bot/main.py
+
+# Restart settings
+Restart=always
+RestartSec=10
+
+# Output handling
+StandardOutput=append:/home/bergaman/Desktop/contro-bot/logs/contro_bot.log
+StandardError=append:/home/bergaman/Desktop/contro-bot/logs/contro_bot_error.log
+
+# Resource limitations and security
+LimitNOFILE=4096
+MemoryMax=1G
+CPUQuota=85%
+TimeoutStartSec=30
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target 
