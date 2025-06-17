@@ -722,3 +722,13 @@ class TicketClosedView(discord.ui.View):
 class TicketCloseView(TicketClosedView):
     def __init__(self, channel_id, user_id, ticket_number):
         super().__init__(channel_id, user_id, ticket_number)
+
+    async def get_user_data(self):
+        """Get user data from database"""
+        try:
+            self.db = await initialize_async_mongodb()
+            user_data = await self.db.user_profiles.find_one({"user_id": str(self.user_id), "guild_id": str(self.guild_id)})
+            return user_data
+        except Exception as e:
+            logger.error(f"Error getting user data: {e}")
+            return None

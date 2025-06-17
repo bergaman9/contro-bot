@@ -6,6 +6,7 @@ import dotenv
 import asyncio
 import motor.motor_asyncio
 import pymongo
+import time
 
 # Motor kütüphanesi, MongoDB için asenkron işlemler sağlar
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -57,7 +58,7 @@ class AsyncMongoManager:
         self.db_name: str = "contro"
         self.is_connected: bool = False
         self.connection_attempts: int = 0
-        self.max_retries: int = 3
+        self.max_retries: int = 5
         
     async def initialize(self, connection_string: Optional[str] = None) -> Optional["AsyncDatabase"]:
         """Initialize async MongoDB connection"""
@@ -78,18 +79,43 @@ class AsyncMongoManager:
             
             self.connection_string = connection_string
               # Create Motor AsyncIOMotorClient with optimal settings
-            self.client = AsyncIOMotorClient(
-                connection_string,
-                serverSelectionTimeoutMS=2000,   # Reduce timeout for faster failure detection
-                connectTimeoutMS=2000,           # Reduce timeout for faster failure detection
-                socketTimeoutMS=10000,           # 10s socket timeout (reduced)
-                maxIdleTimeMS=30000,             # Keep connections alive shorter
-                retryWrites=True,                # Enable retry for write operations
-                maxPoolSize=10,                  # Reduced connection pool size
-                waitQueueTimeoutMS=5000,         # Wait for connection from pool (reduced)
-                retryReads=True,                 # Enable retry for read operations
-                heartbeatFrequencyMS=20000,      # Heart beat frequency (increased)
-            )
+            if "+srv" in connection_string:
+                logger.info("MongoDB Atlas SRV connection detected, configuring SSL/TLS")
+                
+                # SSL/TLS için ek ayarlar - PyMongo'nun yeni versiyonlarıyla uyumlu
+                ssl_options = {
+                    'tls': True, # ssl yerine tls kullanılıyor yeni versiyonlarda
+                    'tlsAllowInvalidCertificates': True,
+                }
+                
+                # Motor AsyncIOMotorClient ile optimal ayarlar
+                self.client = AsyncIOMotorClient(
+                    connection_string,
+                    serverSelectionTimeoutMS=30000,   # Increased timeout for server selection
+                    connectTimeoutMS=30000,           # Increased timeout for initial connection
+                    socketTimeoutMS=60000,            # Increased socket timeout to 60s
+                    maxIdleTimeMS=90000,              # Keep connections alive longer
+                    retryWrites=True,                 # Enable retry for write operations
+                    maxPoolSize=10,                   # Reduced connection pool size
+                    waitQueueTimeoutMS=20000,         # Increased wait for connection from pool
+                    retryReads=True,                  # Enable retry for read operations
+                    heartbeatFrequencyMS=60000,       # Heart beat frequency (increased)
+                    **ssl_options                     # SSL/TLS options for Atlas
+                )
+            else:
+                # Yerel veya özel MongoDB için standart bağlantı
+                self.client = AsyncIOMotorClient(
+                    connection_string,
+                    serverSelectionTimeoutMS=30000,   # Increased timeout for server selection
+                    connectTimeoutMS=30000,           # Increased timeout for initial connection
+                    socketTimeoutMS=60000,            # Increased socket timeout to 60s
+                    maxIdleTimeMS=90000,              # Keep connections alive longer
+                    retryWrites=True,                 # Enable retry for write operations
+                    maxPoolSize=10,                   # Reduced connection pool size
+                    waitQueueTimeoutMS=20000,         # Increased wait for connection from pool
+                    retryReads=True,                  # Enable retry for read operations
+                    heartbeatFrequencyMS=60000,       # Heart beat frequency (increased)
+                )
             
             # Get database name
             self.db_name = os.getenv('DB', 'contro')
@@ -111,7 +137,7 @@ class AsyncMongoManager:
             logger.error(f"MongoDB connection error: {e}")
               # Retry logic
             if self.connection_attempts < self.max_retries:
-                retry_delay = min(1 + self.connection_attempts, 5)  # Faster retry, max 5 seconds
+                retry_delay = min(5 + self.connection_attempts * 2, 15)  # Increased retry delay, max 15 seconds
                 logger.info(f"Retrying MongoDB connection in {retry_delay} seconds (attempt {self.connection_attempts}/{self.max_retries})...")
                 await asyncio.sleep(retry_delay)
                 return await self.initialize(connection_string)
@@ -136,12 +162,22 @@ class AsyncMongoManager:
             logger.info(f"MongoDB server version: {server_info.get('version', 'unknown')}")
         except ServerSelectionTimeoutError as e:
             logger.error(f"MongoDB connection timed out - server may be down: {e}")
+            # Log connection details for debugging (mask sensitive info)
+            conn_str = self._mask_uri(self.connection_string)
+            logger.error(f"Connection details: {conn_str}, Options: {self.client.options}")
             raise
         except ConnectionFailure as e:
             logger.error(f"MongoDB connection failed: {e}")
+            # Log connection details
+            conn_str = self._mask_uri(self.connection_string)
+            logger.error(f"Connection details: {conn_str}, Options: {self.client.options}")
             raise
         except Exception as e:
             logger.error(f"MongoDB connection test failed: {e}")
+            logger.error(f"Exception type: {type(e).__name__}")
+            # Print traceback for better debugging
+            import traceback
+            logger.error(traceback.format_exc())
             raise
     
     def _mask_uri(self, uri: str) -> str:
@@ -226,37 +262,72 @@ def get_async_client() -> Optional[AsyncIOMotorClient]:
 # Sync MongoDB functions for backward compatibility
 def initialize_mongodb() -> Any:
     """Synchronous MongoDB initialization (legacy, for backward compatibility)"""
-    try:
-        connection_string = os.getenv('MONGO_DB') or os.getenv('MONGODB_URI')
-        
-        if not connection_string:
-            connection_string = "mongodb://localhost:27017/"
-            logger.warning("MongoDB URI not found in environment variables! Using default connection.")
-        
-        # Create sync MongoDB client
-        client = MongoClient(
-            connection_string,
-            serverSelectionTimeoutMS=5000,
-            connectTimeoutMS=5000,
-            socketTimeoutMS=60000,
-            maxIdleTimeMS=90000,
-            retryWrites=True,
-            maxPoolSize=50,
-            waitQueueTimeoutMS=10000
-        )
-        
-        db_name = os.getenv('DB', 'contro')
-        db = client[db_name]
-        
-        # Test connection
-        client.admin.command('ping')
-        logger.info(f"Sync MongoDB connected successfully to database: {db_name}")
-        
-        return db
-    except Exception as e:
-        logger.error(f"Failed to connect to sync MongoDB: {e}", exc_info=True)
-        # Return a functional fallback object
-        return DummySyncDatabase()
+    max_retries = 5
+    retry_delay = 5
+    attempt = 0
+    
+    while attempt < max_retries:
+        attempt += 1
+        try:
+            connection_string = os.getenv('MONGO_DB') or os.getenv('MONGODB_URI')
+            
+            if not connection_string:
+                connection_string = "mongodb://localhost:27017/"
+                logger.warning("MongoDB URI not found in environment variables! Using default connection.")
+            
+            # Check if this is an Atlas connection (srv connection string)
+            if "+srv" in connection_string:
+                logger.info("MongoDB Atlas SRV connection detected for sync connection, configuring SSL/TLS")
+                
+                # Additional SSL/TLS settings for modern pymongo versions
+                client = MongoClient(
+                    connection_string,
+                    serverSelectionTimeoutMS=60000,    # Increased from 5000 (60 seconds)
+                    connectTimeoutMS=60000,            # Increased from 5000 (60 seconds)
+                    socketTimeoutMS=120000,            # Increased from 60000 (120 seconds)
+                    maxIdleTimeMS=180000,              # Increased from 90000 (180 seconds)
+                    retryWrites=True,                  # Keep as is
+                    maxPoolSize=50,                    # Keep as is
+                    waitQueueTimeoutMS=30000,          # Increased from 10000 (30 seconds)
+                    tls=True,                          # Modern pymongo uses tls instead of ssl
+                    tlsAllowInvalidCertificates=True,  # Bypass certificate validation issues
+                    retryReads=True                    # Added for better reliability
+                )
+            else:
+                # Standard connection for local or custom MongoDB
+                client = MongoClient(
+                    connection_string,
+                    serverSelectionTimeoutMS=60000,    # Increased (60 seconds)
+                    connectTimeoutMS=60000,            # Increased (60 seconds)
+                    socketTimeoutMS=120000,            # Increased (120 seconds)
+                    maxIdleTimeMS=180000,              # Increased (180 seconds)
+                    retryWrites=True,
+                    maxPoolSize=50,
+                    waitQueueTimeoutMS=30000,          # Increased (30 seconds)
+                    retryReads=True
+                )
+            
+            db_name = os.getenv('DB', 'contro')
+            db = client[db_name]
+            
+            # Test connection - with shorter timeout to fail faster
+            client.admin.command('ping', serverSelectionTimeoutMS=30000)
+            logger.info(f"Sync MongoDB connected successfully to database: {db_name}")
+            
+            return db
+            
+        except Exception as e:
+            logger.error(f"Failed to connect to sync MongoDB (attempt {attempt}/{max_retries}): {e}")
+            
+            if attempt < max_retries:
+                logger.info(f"Retrying connection in {retry_delay} seconds...")
+                time.sleep(retry_delay)
+                # Increase delay for next attempt, but not more than 15 seconds
+                retry_delay = min(retry_delay + 2, 15)
+            else:
+                logger.error("Maximum sync MongoDB connection attempts reached, using fallback")
+                # Return a functional fallback object
+                return DummySyncDatabase()
 
 async def close_async_mongodb():
     """Close async MongoDB connection"""
@@ -386,6 +457,12 @@ class DummySyncCollection:
 
 def is_async_client(client_or_db) -> bool:
     """Check if a client or database is an async instance"""
+    if hasattr(motor.motor_asyncio, 'AsyncIOMotorDatabase'):
+        AsyncDatabase = motor.motor_asyncio.AsyncIOMotorDatabase
+    else:
+        # Fallback to basic type check that will still work
+        return 'AsyncIOMotor' in str(type(client_or_db))
+        
     return isinstance(client_or_db, (AsyncIOMotorClient, AsyncDatabase))
 
 # Legacy alias for backward compatibility

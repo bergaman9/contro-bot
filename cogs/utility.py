@@ -448,9 +448,10 @@ class Utility(commands.Cog):
         paginator = Paginator(embed_list=embeds)
         await paginator.send_initial_message(ctx)
 
-    @commands.hybrid_command(name="advertisements", description="Detects and lists all custom activities that are discord invites or suspicious links.")
+    @commands.hybrid_command(name="detect_advertisements", description="Detects and lists all custom activities that are discord invites or suspicious links.")
     @commands.has_permissions(manage_guild=True)
     async def advertisements(self, ctx):
+        """Detects and lists all custom activities in the server that are Discord invites or suspicious links."""
         guild = ctx.guild
         found_advertisements = False
         suspicious_keywords = ["discord.gg/", "https://", "http://", "www.", ".com", ".net", ".org"]

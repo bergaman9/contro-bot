@@ -43,7 +43,7 @@ class Settings(commands.GroupCog, name="settings"):
         except Exception as e:
             logger.error(f"Error initializing database connection: {e}")
 
-    @commands.hybrid_group(name="settings", description="Sunucu ayarlarını yönet")
+    @commands.hybrid_group(name="settings_gui", description="Sunucu ayarlarını yönet")
     @commands.has_permissions(administrator=True)
     async def settings_group(self, ctx):
         """Server settings management commands"""

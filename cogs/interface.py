@@ -9,7 +9,7 @@ from typing import Dict, Optional, List, Union, Any
 import motor.motor_asyncio
 from pymongo import ReturnDocument
 
-from utils.database.connection import get_async_db, initialize_mongodb
+from utils.database.connection import get_async_db, initialize_async_mongodb
 from utils.core.formatting import create_embed
 from utils.steam import SteamAPI
 import os
@@ -129,7 +129,7 @@ class UserProfileView(discord.ui.View):
         self.bot = bot
         self.user_id = user_id
         self.guild_id = guild_id
-        self.db = initialize_mongodb()
+        self.db = initialize_async_mongodb()
     
     async def get_user_data(self):
         """Get user data from database"""
@@ -437,8 +437,9 @@ class Interface(commands.Cog):
     """
     
     def __init__(self, bot):
+        """Initialize the Interface cog"""
         self.bot = bot
-        self.db = initialize_mongodb()
+        self.db = None
         
         # Initialize the database schema if needed
         asyncio.create_task(self.setup_database())
@@ -446,6 +447,9 @@ class Interface(commands.Cog):
     async def setup_database(self):
         """Setup the database collections and indexes"""
         try:
+            # Initialize MongoDB asynchronously
+            self.db = await initialize_async_mongodb()
+            
             # Set unique index on user_id + guild_id
             await self.db.user_profiles.create_index(
                 [("user_id", 1), ("guild_id", 1)], 

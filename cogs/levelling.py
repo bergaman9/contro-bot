@@ -7,7 +7,7 @@ import asyncio
 from typing import Optional
 
 from utils.core.formatting import create_embed
-from utils.database.connection import initialize_mongodb
+from utils.database.connection import initialize_mongodb, initialize_async_mongodb
 from utils.community.turkoyto.xp_manager import XPManager, XP_VOICE_PER_MINUTE
 from utils.community.turkoyto.card_renderer import create_level_card, get_level_scheme, scheme_to_discord_color
 
@@ -63,7 +63,7 @@ class Levelling(commands.Cog):
             else:
                 # Try to initialize directly
                 try:
-                    self.mongo_db = initialize_mongodb()
+                    self.mongo_db = await initialize_async_mongodb()
                     if self.mongo_db is not None:
                         logger.info("Initialized MongoDB connection directly")
                     else:
@@ -89,7 +89,7 @@ class Levelling(commands.Cog):
             else:
                 # Try to initialize
                 try:
-                    self.mongo_db = initialize_mongodb()
+                    self.mongo_db = await initialize_async_mongodb()
                     if self.mongo_db is not None:
                         logger.info("Database connection established for Levelling")
                     else:
@@ -410,7 +410,7 @@ class Levelling(commands.Cog):
             if self.mongo_db is None:
                 logger.error("MongoDB is not initialized in Levelling cog")
                 # Try to re-initialize
-                self.mongo_db = initialize_mongodb()
+                self.mongo_db = await initialize_async_mongodb()
                 # Also update XP manager's connection
                 self.xp_manager.mongo_db = self.mongo_db
             

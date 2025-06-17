@@ -436,7 +436,7 @@ async def main():
     # Initialize MongoDB connection with better error handling
     try:
         # Add timeout to database initialization
-        db = await asyncio.wait_for(initialize_async_mongodb(), timeout=15.0)
+        db = await asyncio.wait_for(initialize_async_mongodb(), timeout=60.0)
         if isinstance(db, DummyAsyncDatabase):
             logger.warning("Using fallback database mode - some features may not work correctly")
             print_colored("⚠️ MongoDB connection failed - using fallback mode", "yellow", "bold")
@@ -445,7 +445,7 @@ async def main():
             logger.info("MongoDB connected successfully")
             print_colored("✅ MongoDB connected successfully", "green")
     except asyncio.TimeoutError:
-        logger.error("MongoDB connection timed out after 15 seconds")
+        logger.error("MongoDB connection timed out after 60 seconds")
         print_colored("⚠️ MongoDB connection timed out - using fallback mode", "yellow", "bold")
         print_colored("Some features may not work correctly", "yellow")
         # Set fallback database
