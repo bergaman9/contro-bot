@@ -167,6 +167,76 @@ class Utility(commands.Cog):
         # Add format file path
         self.format_file_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'format.json')
         self.format_variables = self.load_format_variables()
+        
+    @commands.hybrid_command(name="ping", description="Shows the latency between in the bot and the Discord API.", aliases=["latency"])
+    async def ping(self, ctx: commands.Context):
+        """Display latency and system information"""
+        try:
+            # Get basic info
+            latency = round(self.bot.latency * 1000)  # latency in ms
+            uptime = str(timedelta(seconds=int(round(time.time() - self.bot.startTime))))
+            cpu_percent = psutil.cpu_percent(interval=0.5)
+            memory = psutil.virtual_memory()
+            disk = psutil.disk_usage('/')
+            
+            # Get server region/provider from ipwho.is
+            try:
+                ip_resp = requests.get("https://ipwho.is/").json()
+                server_country = ip_resp.get("country", "N/A")
+                server_city = ip_resp.get("city", "N/A")
+                server_provider_name = ip_resp.get("connection", {}).get("isp", "N/A")
+                server_flag = ip_resp.get("flag", {}).get("emoji", "")
+                server_region = f"{server_flag} `{server_country}, {server_city}`" if server_flag else f"{server_country}, {server_city}"
+                server_provider = f"🌐 `{server_provider_name}`"
+            except Exception:
+                server_region = server_provider = "N/A"
+                
+            # Get bot version if available
+            version = getattr(self.bot, "version", "N/A")
+            
+            embed = discord.Embed(
+                title="🏓 Ping & Hosting Info",
+                color=0x45C2BE
+            )
+            
+            embed.add_field(name='Ping', value=f'`{latency}ms`', inline=True)
+            embed.add_field(name='Uptime', value=f'`{uptime}`', inline=True)
+            embed.add_field(name='Bot Version', value=f'`{version}`', inline=True)
+            
+            embed.add_field(name='CPU Usage', value=f'`{cpu_percent}%`', inline=True)
+            embed.add_field(name='RAM Usage', value=f'`{memory.percent}% ({memory.used / 1024**2:.1f}MB / {memory.total / 1024**2:.1f}MB)`', inline=True)
+            embed.add_field(name='Disk Usage', value=f'`{disk.percent}% ({disk.used / 1024**3:.1f}GB / {disk.total / 1024**3:.1f}GB)`', inline=True)
+            
+            embed.add_field(name='Discord.py', value=f'`{discord.__version__}`', inline=True)
+            embed.add_field(name='Python', value=f'`{platform.python_version()}`', inline=True)
+            embed.add_field(name='Platform', value=f'`{platform.system()} {platform.release()}`', inline=True)
+            
+            embed.add_field(name='Server Region', value=f'{server_region}', inline=True)
+            embed.add_field(name='Server Provider', value=f'{server_provider}', inline=True)
+            embed.add_field(name='Active Servers', value=f'`{len(self.bot.guilds)}`', inline=True)
+            
+            embed.add_field(name='Active Users', value=f'`{len(self.bot.users)}`', inline=True)
+            embed.add_field(name='Active Commands', value=f'`{len(self.bot.commands)}`', inline=True)
+            
+            if self.bot.user.avatar:
+                embed.set_thumbnail(url=self.bot.user.avatar.url)
+                
+            # Footer: user emoji (if exists) - username - date
+            user_emoji = getattr(ctx.author, 'display_avatar', None)
+            user_emoji_url = user_emoji.url if user_emoji else None
+            now_str = datetime.now().strftime('%d.%m.%Y %H:%M:%S')
+            footer_text = f"Requested by {ctx.author} - {now_str}"
+            
+            if user_emoji_url:
+                embed.set_footer(text=footer_text, icon_url=user_emoji_url)
+            else:
+                embed.set_footer(text=footer_text)
+                
+            await ctx.send(embed=embed)
+            
+        except Exception as e:
+            print(f"Error in ping command: {e}")
+            await ctx.send(embed=discord.Embed(description="An error occurred while getting server status.", color=discord.Color.red()))
 
     def load_format_variables(self):
         """Format değişkenlerini JSON dosyasından yükler, dosya yoksa boş sözlük döndürür"""
@@ -1097,76 +1167,6 @@ class Config(commands.Cog):
                 print("Command tree successfully synced")
         except Exception as e:
             print(f"Error syncing command tree: {e}")
-
-    @commands.hybrid_command(name="ping", description="Shows the latency between in the bot and the Discord API.", aliases=["latency"])
-    async def ping(self, ctx: commands.Context):
-        """Display latency and system information"""
-        try:
-            # Get basic info
-            latency = round(self.bot.latency * 1000)  # latency in ms
-            uptime = str(timedelta(seconds=int(round(time.time() - self.bot.startTime))))
-            cpu_percent = psutil.cpu_percent(interval=0.5)
-            memory = psutil.virtual_memory()
-            disk = psutil.disk_usage('/')
-            
-            # Get server region/provider from ipwho.is
-            try:
-                ip_resp = requests.get("https://ipwho.is/").json()
-                server_country = ip_resp.get("country", "N/A")
-                server_city = ip_resp.get("city", "N/A")
-                server_provider_name = ip_resp.get("connection", {}).get("isp", "N/A")
-                server_flag = ip_resp.get("flag", {}).get("emoji", "")
-                server_region = f"{server_flag} `{server_country}, {server_city}`" if server_flag else f"{server_country}, {server_city}"
-                server_provider = f"🌐 `{server_provider_name}`"
-            except Exception:
-                server_region = server_provider = "N/A"
-                
-            # Get bot version if available
-            version = getattr(self.bot, "version", "N/A")
-            
-            embed = discord.Embed(
-                title="🏓 Ping & Hosting Info",
-                color=0x45C2BE
-            )
-            
-            embed.add_field(name='Ping', value=f'`{latency}ms`', inline=True)
-            embed.add_field(name='Uptime', value=f'`{uptime}`', inline=True)
-            embed.add_field(name='Bot Version', value=f'`{version}`', inline=True)
-            
-            embed.add_field(name='CPU Usage', value=f'`{cpu_percent}%`', inline=True)
-            embed.add_field(name='RAM Usage', value=f'`{memory.percent}% ({memory.used / 1024**2:.1f}MB / {memory.total / 1024**2:.1f}MB)`', inline=True)
-            embed.add_field(name='Disk Usage', value=f'`{disk.percent}% ({disk.used / 1024**3:.1f}GB / {disk.total / 1024**3:.1f}GB)`', inline=True)
-            
-            embed.add_field(name='Discord.py', value=f'`{discord.__version__}`', inline=True)
-            embed.add_field(name='Python', value=f'`{platform.python_version()}`', inline=True)
-            embed.add_field(name='Platform', value=f'`{platform.system()} {platform.release()}`', inline=True)
-            
-            embed.add_field(name='Server Region', value=f'{server_region}', inline=True)
-            embed.add_field(name='Server Provider', value=f'{server_provider}', inline=True)
-            embed.add_field(name='Active Servers', value=f'`{len(self.bot.guilds)}`', inline=True)
-            
-            embed.add_field(name='Active Users', value=f'`{len(self.bot.users)}`', inline=True)
-            embed.add_field(name='Active Commands', value=f'`{len(self.bot.commands)}`', inline=True)
-            
-            if self.bot.user.avatar:
-                embed.set_thumbnail(url=self.bot.user.avatar.url)
-                
-            # Footer: user emoji (if exists) - username - date
-            user_emoji = getattr(ctx.author, 'display_avatar', None)
-            user_emoji_url = user_emoji.url if user_emoji else None
-            now_str = datetime.now().strftime('%d.%m.%Y %H:%M:%S')
-            footer_text = f"Requested by {ctx.author} - {now_str}"
-            
-            if user_emoji_url:
-                embed.set_footer(text=footer_text, icon_url=user_emoji_url)
-            else:
-                embed.set_footer(text=footer_text)
-                
-            await ctx.send(embed=embed)
-            
-        except Exception as e:
-            print(f"Error in ping command: {e}")
-            await ctx.send(embed=discord.Embed(description="An error occurred while getting server status.", color=discord.Color.red()))
 
     @commands.hybrid_command(name="contro_guilds", description="Shows a list of all servers the bot is in.")
     @commands.is_owner()
