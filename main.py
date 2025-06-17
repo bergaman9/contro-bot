@@ -519,9 +519,7 @@ async def main():
                     print_colored("⚠️ API server failed: Couldn't find available port", "red")
                     return
                 
-                # Log that we're starting
-                logger.info(f"Starting API server on port {port}...")
-                print_colored(f"Starting API server on port {port}...", "cyan")
+                # Log that we're starting (only once)
                 
                 # Start the Flask app with debugging disabled
                 try:
@@ -621,6 +619,14 @@ async def main():
                 logger.info("Registration views preloaded")
             except Exception as e:
                 logger.error(f"Error preloading registration views: {e}")
+            
+            # Import TurkOyto registration view
+            try:
+                from utils.community.turkoyto.registration_view import RegistrationButtonView
+                register_persistent_view(RegistrationButtonView())
+                logger.info("TurkOyto registration view preloaded")
+            except Exception as e:
+                logger.error(f"Error preloading TurkOyto registration view: {e}")
                     
             # Register all preloaded views with the bot
             for view in PERSISTENT_VIEWS:

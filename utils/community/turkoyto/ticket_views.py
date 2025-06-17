@@ -724,11 +724,271 @@ class TicketCloseView(TicketClosedView):
         super().__init__(channel_id, user_id, ticket_number)
 
     async def get_user_data(self):
-        """Get user data from database"""
+        """Get user data for the ticket"""
+        return {}
+
+
+class TicketCreateView(discord.ui.View):
+    """View for creating tickets with a button"""
+    
+    def __init__(self, bot):
+        super().__init__(timeout=None)
+        self.bot = bot
+        
+    @discord.ui.button(label="Create Ticket", emoji="🎫", style=discord.ButtonStyle.primary, custom_id="create_ticket_new")
+    async def create_ticket_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Handle ticket creation button click"""
+        await interaction.response.send_modal(TicketCreationModal(self.bot, interaction.guild.id))
+
+
+class TicketCreationModal(discord.ui.Modal, title="Create Support Ticket"):
+    """Modal for ticket creation with form fields"""
+    
+    def __init__(self, bot, guild_id=None):
+        super().__init__()
+        self.bot = bot
+        self.mongo_db = initialize_mongodb()
+        self.guild_id = guild_id
+        
+        # Add default fields first
+        self.add_default_fields()
+    
+    def add_default_fields(self):
+        """Add default or custom fields to the modal"""
+        # If we have guild_id, try to get custom questions
+        questions = self.get_default_questions()
+        
+        if self.guild_id:
+            try:
+                settings = self.mongo_db["tickets"].find_one({"guild_id": str(self.guild_id)}) or {}
+                custom_questions = settings.get("form_questions")
+                if custom_questions:
+                    questions = custom_questions
+            except Exception as e:
+                logger.error(f"Error loading custom questions: {e}")
+        
+        # Add fields based on questions (limit to 5 due to Discord limits)
+        for i, question in enumerate(questions[:5]):
+            style = discord.TextStyle.short if question.get("type") == "short" else discord.TextStyle.paragraph
+            field = discord.ui.TextInput(
+                label=question["question"],
+                placeholder=question.get("placeholder", "Type your answer here..."),
+                required=question.get("required", True),
+                style=style,
+                max_length=1000 if style == discord.TextStyle.paragraph else 200
+            )
+            self.add_item(field)
+    
+    def get_default_questions(self):
+        """Get default questions if none configured"""
+        return [
+            {
+                "question": "What is the reason for your ticket?",
+                "type": "short",
+                "required": True,
+                "placeholder": "Briefly describe your issue"
+            },
+            {
+                "question": "Please provide detailed information:",
+                "type": "paragraph", 
+                "required": True,
+                "placeholder": "Explain your issue in detail..."
+            }
+        ]
+    
+    async def on_submit(self, interaction: discord.Interaction):
+        """Handle form submission"""
         try:
-            self.db = await initialize_async_mongodb()
-            user_data = await self.db.user_profiles.find_one({"user_id": str(self.user_id), "guild_id": str(self.guild_id)})
-            return user_data
+            # Defer to prevent timeout
+            await interaction.response.defer(ephemeral=True)
+            
+            # Get ticket settings
+            ticket_config = self.mongo_db["tickets"].find_one({"guild_id": str(interaction.guild.id)})
+            if not ticket_config:
+                await interaction.followup.send(
+                    embed=create_embed("❌ Ticket system is not configured!", discord.Color.red()),
+                    ephemeral=True
+                )
+                return
+            
+            # Check for existing ticket
+            existing_ticket = discord.utils.get(
+                interaction.guild.channels,
+                name=f"ticket-{interaction.user.name.lower().replace(' ', '-')}",
+                type=discord.ChannelType.text
+            )
+            
+            if existing_ticket:
+                await interaction.followup.send(
+                    embed=create_embed(f"❌ You already have an open ticket: {existing_ticket.mention}", discord.Color.yellow()),
+                    ephemeral=True
+                )
+                return
+            
+            # Get category
+            category_id = ticket_config.get("category_id")
+            if not category_id:
+                await interaction.followup.send(
+                    embed=create_embed("❌ Ticket category not configured.", discord.Color.red()),
+                    ephemeral=True
+                )
+                return
+            
+            category = interaction.guild.get_channel(int(category_id))
+            if not category:
+                await interaction.followup.send(
+                    embed=create_embed("❌ Ticket category not found.", discord.Color.red()),
+                    ephemeral=True
+                )
+                return
+            
+            # Create channel with permissions
+            support_role_ids = ticket_config.get("support_roles", [])
+            overwrites = {
+                interaction.guild.default_role: discord.PermissionOverwrite(read_messages=False),
+                interaction.user: discord.PermissionOverwrite(
+                    read_messages=True,
+                    send_messages=True,
+                    attach_files=True,
+                    embed_links=True
+                ),
+                interaction.guild.me: discord.PermissionOverwrite(
+                    read_messages=True,
+                    send_messages=True,
+                    attach_files=True,
+                    embed_links=True,
+                    manage_messages=True,
+                    manage_channels=True
+                )
+            }
+            
+            # Add support roles
+            for role_id in support_role_ids:
+                role = interaction.guild.get_role(int(role_id))
+                if role:
+                    overwrites[role] = discord.PermissionOverwrite(
+                        read_messages=True,
+                        send_messages=True,
+                        attach_files=True,
+                        embed_links=True,
+                        manage_messages=True
+                    )
+            
+            # Create ticket channel
+            channel_name = f"ticket-{interaction.user.name.lower().replace(' ', '-')}"
+            ticket_channel = await interaction.guild.create_text_channel(
+                name=channel_name,
+                category=category,
+                overwrites=overwrites,
+                topic=f"Support ticket for {interaction.user.name} ({interaction.user.id})"
+            )
+            
+            # Create initial embed with form responses
+            embed = discord.Embed(
+                title=f"🎫 New Support Ticket",
+                description=f"Ticket created by {interaction.user.mention}",
+                color=discord.Color.blue(),
+                timestamp=datetime.datetime.now()
+            )
+            
+            # Add form responses to embed
+            for i, child in enumerate(self.children):
+                if isinstance(child, discord.ui.TextInput):
+                    embed.add_field(
+                        name=child.label,
+                        value=child.value[:1024],  # Limit to embed field limit
+                        inline=False
+                    )
+            
+            embed.set_footer(text=f"User ID: {interaction.user.id}")
+            
+            # Send initial message
+            await ticket_channel.send(embed=embed)
+            
+            # Generate and send level card
+            try:
+                from utils.community.turkoyto.card_renderer import render_level_card
+                from utils.community.turkoyto.xp_manager import XPManager
+                
+                xp_manager = XPManager()
+                user_data = await xp_manager.get_user_data(interaction.guild.id, interaction.user.id)
+                
+                if user_data:
+                    # Generate level card
+                    card_buffer = await render_level_card(
+                        user=interaction.user,
+                        guild=interaction.guild,
+                        xp_data=user_data,
+                        rank=user_data.get('rank', 0),
+                        background_type='dark'
+                    )
+                    
+                    if card_buffer:
+                        card_embed = discord.Embed(
+                            title="📊 User Level Information",
+                            description=f"Level card for {interaction.user.mention}",
+                            color=discord.Color.blue()
+                        )
+                        card_file = discord.File(card_buffer, filename=f"level_card_{interaction.user.id}.png")
+                        card_embed.set_image(url=f"attachment://level_card_{interaction.user.id}.png")
+                        
+                        await ticket_channel.send(embed=card_embed, file=card_file)
+            except Exception as e:
+                logger.error(f"Error generating level card for ticket: {e}")
+                # Continue even if level card fails
+            
+            # Add management buttons
+            management_view = TicketManagementView(
+                channel_id=ticket_channel.id,
+                user_id=interaction.user.id,
+                ticket_number=ticket_channel.name
+            )
+            
+            await ticket_channel.send(
+                embed=discord.Embed(
+                    description="🎫 **Ticket Controls**\nUse the button below to close this ticket when your issue is resolved.",
+                    color=discord.Color.blue()
+                ),
+                view=management_view
+            )
+            
+            # Ping support roles
+            if support_role_ids:
+                mentions = []
+                for role_id in support_role_ids:
+                    role = interaction.guild.get_role(int(role_id))
+                    if role:
+                        mentions.append(role.mention)
+                
+                if mentions:
+                    await ticket_channel.send(f"Support team: {', '.join(mentions)}")
+            
+            # Confirm to user
+            await interaction.followup.send(
+                embed=create_embed(f"✅ Your ticket has been created: {ticket_channel.mention}", discord.Color.green()),
+                ephemeral=True
+            )
+            
+            # Save ticket to database
+            ticket_data = {
+                "channel_id": ticket_channel.id,
+                "user_id": interaction.user.id,
+                "guild_id": interaction.guild.id,
+                "created_at": datetime.datetime.now(),
+                "status": "open",
+                "answers": {child.label: child.value for i, child in enumerate(self.children) if isinstance(child, discord.ui.TextInput)}
+            }
+            
+            self.mongo_db["active_tickets"].insert_one(ticket_data)
+            
+        except discord.Forbidden:
+            await interaction.followup.send(
+                embed=create_embed("❌ I don't have permission to create ticket channels.", discord.Color.red()),
+                ephemeral=True
+            )
         except Exception as e:
-            logger.error(f"Error getting user data: {e}")
-            return None
+            logger.error(f"Error creating ticket: {e}", exc_info=True)
+            await interaction.followup.send(
+                embed=create_embed(f"❌ An error occurred: {str(e)}", discord.Color.red()),
+                ephemeral=True
+            )

@@ -1,10 +1,11 @@
 import discord
 from discord.ui import Modal, TextInput, View, Button
 import logging
-from datetime import datetime
+import datetime
 import re
 
 from utils.formatting import create_embed
+from utils.database.db_manager import get_collection
 
 logger = logging.getLogger('turkoyto.views.registration')
 
@@ -422,3 +423,218 @@ class GameBuddyView(View):
             ephemeral=True
         )
         self.stop()
+
+class RegistrationButtonView(discord.ui.View):
+    """Persistent view for registration button"""
+    
+    def __init__(self):
+        super().__init__(timeout=None)
+        
+    @discord.ui.button(
+        label="Register",
+        style=discord.ButtonStyle.primary,
+        emoji="📝",
+        custom_id="register_button_persistent"
+    )
+    async def register_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Handle registration button click"""
+        # Get registration settings
+        settings = get_collection("register").find_one({"guild_id": interaction.guild.id}) or {}
+        fields = settings.get("fields", self.get_default_fields())
+        
+        # Create modal with custom fields
+        modal = RegistrationModal(fields, interaction.guild.id)
+        await interaction.response.send_modal(modal)
+    
+    def get_default_fields(self):
+        """Get default registration fields"""
+        return [
+            {"name": "name", "label": "Name", "type": "text", "enabled": True, "required": True},
+            {"name": "age", "label": "Age", "type": "number", "enabled": True, "required": True}
+        ]
+
+class RegistrationModal(discord.ui.Modal, title="Server Registration"):
+    """Dynamic registration modal based on configured fields"""
+    
+    def __init__(self, fields, guild_id):
+        super().__init__()
+        self.guild_id = guild_id
+        self.fields = fields
+        
+        # Add enabled fields to modal (limit to 5 due to Discord limits)
+        enabled_fields = [f for f in fields if f.get("enabled", True)][:5]
+        
+        for field in enabled_fields:
+            style = discord.TextStyle.short
+            if field.get("type") == "paragraph":
+                style = discord.TextStyle.paragraph
+                
+            text_input = discord.ui.TextInput(
+                label=field["label"],
+                placeholder=field.get("placeholder", f"Enter your {field['label'].lower()}"),
+                required=field.get("required", True),
+                style=style,
+                max_length=200 if style == discord.TextStyle.short else 1000
+            )
+            self.add_item(text_input)
+    
+    async def on_submit(self, interaction: discord.Interaction):
+        """Handle registration form submission"""
+        try:
+            await interaction.response.defer(ephemeral=True)
+            
+            # Get registration settings
+            settings = get_collection("register").find_one({"guild_id": self.guild_id}) or {}
+            
+            # Collect form data
+            form_data = {}
+            for i, field in enumerate(self.fields):
+                if field.get("enabled", True) and i < len(self.children):
+                    form_data[field["name"]] = self.children[i].value
+            
+            # Get configured roles
+            roles_to_add = settings.get("roles_to_add", [])
+            roles_to_remove = settings.get("roles_to_remove", [])
+            age_roles_enabled = settings.get("age_roles_enabled", False)
+            
+            # Process age if age field is enabled and age roles are configured
+            user_age = None
+            if "age" in form_data and age_roles_enabled:
+                try:
+                    user_age = int(form_data["age"])
+                except ValueError:
+                    pass
+            
+            # Apply role changes
+            member = interaction.user
+            added_roles = []
+            removed_roles = []
+            
+            # Remove roles
+            for role_id in roles_to_remove:
+                role = interaction.guild.get_role(int(role_id))
+                if role and role in member.roles:
+                    try:
+                        await member.remove_roles(role)
+                        removed_roles.append(role)
+                    except:
+                        pass
+            
+            # Add roles
+            for role_id in roles_to_add:
+                role = interaction.guild.get_role(int(role_id))
+                if role and role not in member.roles:
+                    try:
+                        await member.add_roles(role)
+                        added_roles.append(role)
+                    except:
+                        pass
+            
+            # Add age role if configured
+            if user_age and age_roles_enabled:
+                if user_age >= 18:
+                    adult_role_id = settings.get("adult_role_id")
+                    if adult_role_id:
+                        role = interaction.guild.get_role(int(adult_role_id))
+                        if role:
+                            await member.add_roles(role)
+                            added_roles.append(role)
+                else:
+                    minor_role_id = settings.get("minor_role_id")
+                    if minor_role_id:
+                        role = interaction.guild.get_role(int(minor_role_id))
+                        if role:
+                            await member.add_roles(role)
+                            added_roles.append(role)
+            
+            # Update nickname if enabled
+            if settings.get("nickname_update_enabled", False) and "name" in form_data:
+                name_format = settings.get("nickname_format", "{name}")
+                new_nickname = name_format.format(
+                    name=form_data.get("name", ""),
+                    age=form_data.get("age", ""),
+                    username=member.name
+                )
+                try:
+                    await member.edit(nick=new_nickname[:32])  # Discord nickname limit
+                except:
+                    pass
+            
+            # Save registration data
+            registration_data = {
+                "user_id": member.id,
+                "guild_id": self.guild_id,
+                "form_data": form_data,
+                "registered_at": datetime.datetime.now(),
+                "roles_added": [r.id for r in added_roles],
+                "roles_removed": [r.id for r in removed_roles]
+            }
+            
+            get_collection("registrations").insert_one(registration_data)
+            
+            # Send to log channel if configured
+            log_channel_id = settings.get("log_channel_id")
+            if log_channel_id:
+                log_channel = interaction.guild.get_channel(int(log_channel_id))
+                if log_channel:
+                    embed = discord.Embed(
+                        title="📝 New Registration",
+                        description=f"{member.mention} has completed registration",
+                        color=discord.Color.green(),
+                        timestamp=datetime.datetime.now()
+                    )
+                    
+                    # Add form data to embed
+                    for field_name, value in form_data.items():
+                        field_config = next((f for f in self.fields if f["name"] == field_name), None)
+                        if field_config:
+                            embed.add_field(
+                                name=field_config["label"],
+                                value=value[:1024],
+                                inline=True
+                            )
+                    
+                    # Add role changes
+                    if added_roles:
+                        embed.add_field(
+                            name="✅ Roles Added",
+                            value=", ".join([r.mention for r in added_roles]),
+                            inline=False
+                        )
+                    
+                    if removed_roles:
+                        embed.add_field(
+                            name="❌ Roles Removed",
+                            value=", ".join([r.mention for r in removed_roles]),
+                            inline=False
+                        )
+                    
+                    embed.set_footer(text=f"User ID: {member.id}")
+                    await log_channel.send(embed=embed)
+            
+            # Send success message
+            success_embed = discord.Embed(
+                title="✅ Registration Complete!",
+                description="You have been successfully registered.",
+                color=discord.Color.green()
+            )
+            
+            if added_roles:
+                success_embed.add_field(
+                    name="Roles Added",
+                    value=", ".join([r.mention for r in added_roles]),
+                    inline=False
+                )
+            
+            await interaction.followup.send(embed=success_embed, ephemeral=True)
+            
+        except Exception as e:
+            logger.error(f"Registration error: {e}", exc_info=True)
+            await interaction.followup.send(
+                embed=discord.Embed(
+                    title="❌ Registration Error",
+                    description="An error occurred during registration. Please try again later.",
+                    color=discord.Color.red()
+                ),
+                ephemeral=True
+            )

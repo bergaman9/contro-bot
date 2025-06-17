@@ -7,6 +7,7 @@ from utils.core.formatting import create_embed
 from utils.database.connection import get_async_db, ensure_async_db
 from utils.core.formatting import format_timestamp, format_number
 from utils.database.connection import initialize_mongodb
+import datetime
 
 # Setup logger
 logger = logging.getLogger(__name__)
@@ -77,7 +78,7 @@ class MainSettingsView(discord.ui.View):
         self.bot = bot
         self.guild_id = guild_id
 
-    @discord.ui.button(label="🔧 Feature Management", style=discord.ButtonStyle.success, row=0)
+    @discord.ui.button(label="Feature Management", emoji="🔧", style=discord.ButtonStyle.success, row=0)
     async def feature_management(self, interaction: discord.Interaction, button: discord.ui.Button):
         view = FeatureManagementView(self.bot, self.guild_id)
         
@@ -123,7 +124,7 @@ class MainSettingsView(discord.ui.View):
         
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
-    @discord.ui.button(label="👋 Welcome System", style=discord.ButtonStyle.primary, row=0)
+    @discord.ui.button(label="Welcome System", emoji="👋", style=discord.ButtonStyle.primary, row=0)
     async def welcome_goodbye(self, interaction: discord.Interaction, button: discord.ui.Button):
         view = WelcomeGoodbyeView(self.bot, self.guild_id)
         
@@ -162,7 +163,7 @@ class MainSettingsView(discord.ui.View):
         
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
-    @discord.ui.button(label="🛡️ Moderation", style=discord.ButtonStyle.primary, row=0)
+    @discord.ui.button(label="Moderation", emoji="🛡️", style=discord.ButtonStyle.primary, row=0)
     async def moderation(self, interaction: discord.Interaction, button: discord.ui.Button):
         view = ModerationView(self.bot, self.guild_id)
         
@@ -198,7 +199,7 @@ class MainSettingsView(discord.ui.View):
         
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
-    @discord.ui.button(label="💫 Leveling System", style=discord.ButtonStyle.primary, row=0)
+    @discord.ui.button(label="Leveling System", emoji="💫", style=discord.ButtonStyle.primary, row=0)
     async def leveling_system(self, interaction: discord.Interaction, button: discord.ui.Button):
         view = LevellingSettingsView(self.bot, interaction)
         
@@ -235,7 +236,7 @@ class MainSettingsView(discord.ui.View):
         
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
-    @discord.ui.button(label="📊 Logging", style=discord.ButtonStyle.secondary, row=1)
+    @discord.ui.button(label="Logging", emoji="📊", style=discord.ButtonStyle.secondary, row=1)
     async def logging(self, interaction: discord.Interaction, button: discord.ui.Button):
         from utils.settings.logging_views import LoggingSettingsView
         
@@ -271,7 +272,7 @@ class MainSettingsView(discord.ui.View):
         
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
-    @discord.ui.button(label="🎫 Ticket System", style=discord.ButtonStyle.secondary, row=1)
+    @discord.ui.button(label="Ticket System", emoji="🎫", style=discord.ButtonStyle.secondary, row=1)
     async def ticket_system(self, interaction: discord.Interaction, button: discord.ui.Button):
         view = TicketSystemView(self.bot, self.guild_id)
         await view.initialize()
@@ -299,7 +300,7 @@ class MainSettingsView(discord.ui.View):
         
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
-    @discord.ui.button(label="👑 Role Management", style=discord.ButtonStyle.secondary, row=1)
+    @discord.ui.button(label="Role Management", emoji="👑", style=discord.ButtonStyle.secondary, row=1)
     async def role_management(self, interaction: discord.Interaction, button: discord.ui.Button):
         view = RoleManagementView(self.bot, self.guild_id)
         
@@ -328,7 +329,7 @@ class MainSettingsView(discord.ui.View):
         
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
     
-    @discord.ui.button(label="⭐ Starboard", style=discord.ButtonStyle.secondary, row=1)
+    @discord.ui.button(label="Starboard", emoji="⭐", style=discord.ButtonStyle.secondary, row=1)
     async def starboard(self, interaction: discord.Interaction, button: discord.ui.Button):
         view = StarboardView(self.bot, self.guild_id)
         
@@ -357,7 +358,7 @@ class MainSettingsView(discord.ui.View):
         
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
-    @discord.ui.button(label="🎮 Temp Channels", style=discord.ButtonStyle.secondary, row=2)
+    @discord.ui.button(label="Temp Channels", emoji="🎮", style=discord.ButtonStyle.secondary, row=2)
     async def temp_channels(self, interaction: discord.Interaction, button: discord.ui.Button):
         from utils.settings.temp_channels_view import TempChannelsView
         
@@ -398,7 +399,7 @@ class MainSettingsView(discord.ui.View):
         
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
     
-    @discord.ui.button(label="🎨 Server Settings", style=discord.ButtonStyle.secondary, row=2)
+    @discord.ui.button(label="Server Settings", emoji="🎨", style=discord.ButtonStyle.secondary, row=2)
     async def server_settings(self, interaction: discord.Interaction, button: discord.ui.Button):
         view = ServerSettingsView(self.bot, self.guild_id)
         
@@ -425,7 +426,7 @@ class MainSettingsView(discord.ui.View):
         
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
     
-    @discord.ui.button(label="📄 Registration", style=discord.ButtonStyle.secondary, row=2)
+    @discord.ui.button(label="Registration", emoji="📄", style=discord.ButtonStyle.secondary, row=2)
     async def registration(self, interaction: discord.Interaction, button: discord.ui.Button):
         from utils.settings.register_views import RegisterSettingsView
         
@@ -1337,6 +1338,7 @@ class TicketSystemView(discord.ui.View):
         super().__init__(timeout=300)
         self.bot = bot
         self.guild_id = guild_id
+        self.mongo_db = initialize_mongodb()
         self.ticket_category_id = None
         self.log_channel_id = None
         self.archive_category_id = None
@@ -1351,26 +1353,72 @@ class TicketSystemView(discord.ui.View):
         self.archive_category_id = settings.get("archive_category_id")
         self.staff_role_id = settings.get("staff_role_id")
 
-    @discord.ui.button(label="📂 Set Ticket Category", style=discord.ButtonStyle.primary)
+    @discord.ui.button(label="Set Ticket Category", emoji="📂", style=discord.ButtonStyle.primary, row=0)
     async def set_ticket_category(self, interaction: discord.Interaction, button: discord.ui.Button):
-        modal = SetTicketCategoryModal(self.language)
-        await interaction.response.send_modal(modal)
+        await interaction.response.send_message(
+            embed=discord.Embed(
+                title="📂 Set Ticket Category",
+                description="To set the ticket category, use the `/ticket category` command.",
+                color=discord.Color.blue()
+            ),
+            ephemeral=True
+        )
 
-    @discord.ui.button(label="👥 Set Support Roles", style=discord.ButtonStyle.secondary)
+    @discord.ui.button(label="Set Support Roles", emoji="👥", style=discord.ButtonStyle.secondary, row=0)
     async def set_support_roles(self, interaction: discord.Interaction, button: discord.ui.Button):
-        modal = SetSupportRolesModal(self.language)
-        await interaction.response.send_modal(modal)
+        await interaction.response.send_message(
+            embed=discord.Embed(
+                title="👥 Set Support Roles",
+                description="To set support roles, use the `/ticket roles` command.",
+                color=discord.Color.blue()
+            ),
+            ephemeral=True
+        )
 
-    @discord.ui.button(label="📋 View Current Settings", style=discord.ButtonStyle.success)
+    @discord.ui.button(label="Send Ticket Message", emoji="📤", style=discord.ButtonStyle.success, row=0)
+    async def send_ticket_message(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Send ticket creation message to a channel"""
+        # Check if ticket system is configured
+        settings = self.mongo_db["tickets"].find_one({"guild_id": str(self.guild_id)})
+        if not settings or "category_id" not in settings:
+            return await interaction.response.send_message(
+                embed=create_embed("❌ Please configure the ticket system first!", discord.Color.red()),
+                ephemeral=True
+            )
+        
+        await interaction.response.send_message(
+            embed=discord.Embed(
+                title="📤 Send Ticket Message",
+                description="Choose the language and channel for the ticket message.",
+                color=discord.Color.blue()
+            ),
+            view=TicketMessageSendView(self.bot, self.guild_id),
+            ephemeral=True
+        )
+
+    @discord.ui.button(label="View Current Settings", emoji="📋", style=discord.ButtonStyle.primary, row=1)
     async def view_ticket_settings(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self.show_ticket_settings(interaction)
+    
+    @discord.ui.button(label="Configure Ticket Form", emoji="📝", style=discord.ButtonStyle.secondary, row=1)
+    async def configure_form(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Configure ticket form questions"""
+        await interaction.response.send_message(
+            embed=discord.Embed(
+                title="📝 Ticket Form Configuration",
+                description="Configure the questions asked when users create a ticket.",
+                color=discord.Color.blue()
+            ),
+            view=TicketFormConfigView(self.bot, self.guild_id),
+            ephemeral=True
+        )
 
     async def show_ticket_settings(self, interaction):
         mongo_db = get_async_db()
-        settings = await mongo_db.tickets.find_one({"guild_id": interaction.guild.id}) or {}
+        settings = await mongo_db.tickets.find_one({"guild_id": str(self.guild_id)}) or {}
         
         embed = discord.Embed(
-            title="🎫 Ticket System Settings" if self.language == "en" else "🎫 Ticket Sistemi Ayarları",
+            title="🎫 Ticket System Settings",
             color=discord.Color.blue()
         )
         
@@ -1415,33 +1463,45 @@ class RoleManagementView(discord.ui.View):
         self.bot = bot
         self.guild_id = guild_id
 
-    @discord.ui.button(label="🎭 Create Role Message", style=discord.ButtonStyle.primary)
+    @discord.ui.button(label="Create Role Message", emoji="🎭", style=discord.ButtonStyle.primary)
     async def create_role_message(self, interaction: discord.Interaction, button: discord.ui.Button):
-        modal = CreateRoleMessageModal(self.language)
-        await interaction.response.send_modal(modal)
+        await interaction.response.send_message(
+            embed=discord.Embed(
+                title="🎭 Create Role Message",
+                description="To create a role message, use the `/roles createmessage` command.",
+                color=discord.Color.blue()
+            ),
+            ephemeral=True
+        )
 
-    @discord.ui.button(label="📝 Set Register Channel", style=discord.ButtonStyle.secondary)
+    @discord.ui.button(label="Set Register Channel", emoji="📝", style=discord.ButtonStyle.secondary)
     async def set_register_channel(self, interaction: discord.Interaction, button: discord.ui.Button):
-        modal = SetRegisterChannelModal(self.language)
-        await interaction.response.send_modal(modal)
+        await interaction.response.send_message(
+            embed=discord.Embed(
+                title="📝 Set Register Channel",
+                description="To set the register channel, use the `/register channel` command.",
+                color=discord.Color.blue()
+            ),
+            ephemeral=True
+        )
 
-    @discord.ui.button(label="📋 View Current Settings", style=discord.ButtonStyle.success)
+    @discord.ui.button(label="View Current Settings", emoji="📋", style=discord.ButtonStyle.success)
     async def view_role_settings(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self.show_role_settings(interaction)
 
-    @discord.ui.button(label="🗑️ Remove Register Channel", style=discord.ButtonStyle.danger, row=1)
+    @discord.ui.button(label="Remove Register Channel", emoji="🗑️", style=discord.ButtonStyle.danger, row=1)
     async def remove_register_channel(self, interaction: discord.Interaction, button: discord.ui.Button):
         mongo_db = get_async_db()
         result = await mongo_db.register.update_one(
-            {"guild_id": interaction.guild.id},
+            {"guild_id": self.guild_id},
             {"$unset": {"channel_id": ""}}
         )
         
         if result.modified_count > 0:
-            message = "Registration channel has been removed." if self.language == "en" else "Kayıt kanalı kaldırıldı."
+            message = "Registration channel has been removed."
             color = discord.Color.green()
         else:
-            message = "Registration channel was not configured." if self.language == "en" else "Kayıt kanalı ayarlanmamıştı."
+            message = "Registration channel was not configured."
             color = discord.Color.yellow()
         
         await interaction.response.send_message(embed=create_embed(message, color), ephemeral=True)
@@ -1450,7 +1510,7 @@ class RoleManagementView(discord.ui.View):
         mongo_db = get_async_db()
         
         embed = discord.Embed(
-            title="👑 Role Management Settings" if self.language == "en" else "👑 Rol Yönetimi Ayarları",
+            title="👑 Role Management Settings",
             color=discord.Color.blue()
         )
         
@@ -1461,7 +1521,7 @@ class RoleManagementView(discord.ui.View):
             channel = interaction.guild.get_channel(channel_id)
             register_channel = channel.mention if channel else "Channel not found"
         else:
-            register_channel = "Not configured" if self.language == "en" else "Ayarlanmamış"
+            register_channel = "Not configured"
         
         embed.add_field(
             name="📝 Register Channel",
@@ -1488,8 +1548,18 @@ class StarboardView(discord.ui.View):
 
     @discord.ui.button(label="⭐ Setup Starboard", style=discord.ButtonStyle.primary)
     async def setup_starboard(self, interaction: discord.Interaction, button: discord.ui.Button):
-        modal = SetupStarboardModal(self.language)
-        await interaction.response.send_modal(modal)
+        # For now, send a simple message
+        await interaction.response.send_message(
+            embed=discord.Embed(
+                title="⭐ Setup Starboard",
+                description="To set up starboard, use the `/starboard setup` command with the following options:\n"
+                           "- Channel: The channel where starred messages will be posted\n"
+                           "- Threshold: Number of stars required (default: 3)\n"
+                           "- Emoji: The reaction emoji to use (default: ⭐)",
+                color=discord.Color.gold()
+            ),
+            ephemeral=True
+        )
 
     @discord.ui.button(label="📋 View Current Settings", style=discord.ButtonStyle.success)
     async def view_starboard_settings(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -1501,11 +1571,11 @@ class StarboardView(discord.ui.View):
 
     async def show_starboard_settings(self, interaction):
         mongo_db = get_async_db()
-        settings = await mongo_db.starboard.find_one({"guild_id": str(interaction.guild.id)}) or {}
+        settings = await mongo_db.starboard.find_one({"guild_id": str(self.guild_id)}) or {}
         
         embed = discord.Embed(
-            title="⭐ Starboard Settings" if self.language == "en" else "⭐ Starboard Ayarları",
-            color=discord.Color.blue()
+            title="⭐ Starboard Settings",
+            color=discord.Color.gold()
         )
         
         if settings:
@@ -1537,7 +1607,7 @@ class StarboardView(discord.ui.View):
         else:
             embed.add_field(
                 name="Status",
-                value="Not configured" if self.language == "en" else "Ayarlanmamış",
+                value="Not configured",
                 inline=False
             )
         
@@ -1545,13 +1615,13 @@ class StarboardView(discord.ui.View):
 
     async def remove_setting(self, interaction, collection_name, system_name):
         mongo_db = get_async_db()
-        result = await mongo_db[collection_name].delete_one({"guild_id": str(interaction.guild.id)})
+        result = await mongo_db[collection_name].delete_one({"guild_id": str(self.guild_id)})
         
         if result.deleted_count > 0:
-            message = f"{system_name} system has been removed." if self.language == "en" else f"{system_name} sistemi kaldırıldı."
+            message = f"{system_name} system has been removed."
             color = discord.Color.green()
         else:
-            message = f"{system_name} system was not configured." if self.language == "en" else f"{system_name} sistemi ayarlanmamıştı."
+            message = f"{system_name} system was not configured."
             color = discord.Color.yellow()
         
         await interaction.response.send_message(embed=create_embed(message, color), ephemeral=True)
@@ -1898,3 +1968,643 @@ class XPMultiplierModal(discord.ui.Modal, title="Set XP Multipliers"):
                 embed=create_embed(f"Error: {str(e)}", discord.Color.red()),
                 ephemeral=True
             )
+
+class TicketMessageSendView(discord.ui.View):
+    """View for sending ticket message with language selection"""
+    
+    def __init__(self, bot, guild_id, timeout=180):
+        super().__init__(timeout=timeout)
+        self.bot = bot
+        self.guild_id = guild_id
+        self.mongo_db = initialize_mongodb()
+        self.language = "en"
+        
+    @discord.ui.button(label="🇬🇧 English", style=discord.ButtonStyle.primary, row=0)
+    async def english_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Send English ticket message"""
+        self.language = "en"
+        await self.select_channel(interaction)
+    
+    @discord.ui.button(label="🇹🇷 Türkçe", style=discord.ButtonStyle.primary, row=0)
+    async def turkish_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Send Turkish ticket message"""
+        self.language = "tr"
+        await self.select_channel(interaction)
+    
+    async def select_channel(self, interaction: discord.Interaction):
+        """Show channel selection"""
+        from utils.settings.channel_selector import ChannelSelectView
+        
+        channels = [ch for ch in interaction.guild.text_channels if ch.permissions_for(interaction.guild.me).send_messages]
+        
+        async def send_ticket_message(inter: discord.Interaction, channel: discord.TextChannel):
+            """Send the ticket message to selected channel"""
+            try:
+                # Get settings
+                settings = self.mongo_db["tickets"].find_one({"guild_id": str(self.guild_id)}) or {}
+                
+                # Create embed based on language
+                if self.language == "en":
+                    embed = discord.Embed(
+                        title="🎫 Support Ticket System",
+                        description="Need help? Create a support ticket to get assistance from our staff team.",
+                        color=discord.Color.blue()
+                    )
+                    embed.add_field(
+                        name="📋 How to Create a Ticket",
+                        value="• Click the **Create Ticket** button below\n"
+                              "• Select the category that best describes your issue\n"
+                              "• Fill out the form with details about your request\n"
+                              "• Wait for a staff member to assist you",
+                        inline=False
+                    )
+                    embed.add_field(
+                        name="⚠️ Important Notes",
+                        value="• Only create tickets for genuine issues\n"
+                              "• Be patient - staff will respond as soon as possible\n"
+                              "• Provide as much detail as possible in your initial message",
+                        inline=False
+                    )
+                    button_label = "Create Ticket"
+                else:  # Turkish
+                    embed = discord.Embed(
+                        title="🎫 Destek Talep Sistemi",
+                        description="Yardıma mı ihtiyacınız var? Ekibimizden yardım almak için bir destek talebi oluşturun.",
+                        color=discord.Color.blue()
+                    )
+                    embed.add_field(
+                        name="📋 Nasıl Talep Oluşturulur",
+                        value="• Aşağıdaki **Talep Oluştur** butonuna tıklayın\n"
+                              "• Sorununuzu en iyi tanımlayan kategoriyi seçin\n"
+                              "• Talebinizle ilgili detayları forma doldurun\n"
+                              "• Bir yetkili size yardımcı oluncaya kadar bekleyin",
+                        inline=False
+                    )
+                    embed.add_field(
+                        name="⚠️ Önemli Notlar",
+                        value="• Sadece gerçek sorunlar için talep oluşturun\n"
+                              "• Sabırlı olun - yetkililer en kısa sürede yanıt verecektir\n"
+                              "• İlk mesajınızda mümkün olduğunca fazla detay verin",
+                        inline=False
+                    )
+                    button_label = "Talep Oluştur"
+                
+                embed.set_footer(text=f"Ticket System • {interaction.guild.name}")
+                embed.timestamp = datetime.datetime.now()
+                
+                # Create ticket button view
+                from utils.community.turkoyto.ticket_views import TicketCreateView
+                ticket_view = TicketCreateView(self.bot)
+                
+                # Send the message
+                await channel.send(embed=embed, view=ticket_view)
+                
+                await inter.response.send_message(
+                    embed=create_embed(f"✅ Ticket message sent to {channel.mention}!", discord.Color.green()),
+                    ephemeral=True
+                )
+                
+            except Exception as e:
+                logger.error(f"Error sending ticket message: {e}")
+                await inter.response.send_message(
+                    embed=create_embed(f"❌ Error: {str(e)}", discord.Color.red()),
+                    ephemeral=True
+                )
+        
+        view = ChannelSelectView(channels, send_ticket_message)
+        
+        await interaction.response.send_message(
+            embed=discord.Embed(
+                title="📍 Select Channel",
+                description="Select the channel where you want to send the ticket message.",
+                color=discord.Color.blue()
+            ),
+            view=view,
+            ephemeral=True
+        )
+
+
+class TicketFormConfigView(discord.ui.View):
+    """View for configuring ticket form questions"""
+    
+    def __init__(self, bot, guild_id, timeout=300):
+        super().__init__(timeout=timeout)
+        self.bot = bot
+        self.guild_id = guild_id
+        self.mongo_db = initialize_mongodb()
+        
+    @discord.ui.button(label="View Current Questions", emoji="📋", style=discord.ButtonStyle.primary, row=0)
+    async def view_questions(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """View current ticket form questions"""
+        settings = self.mongo_db["tickets"].find_one({"guild_id": str(self.guild_id)}) or {}
+        questions = settings.get("form_questions", self.get_default_questions())
+        
+        embed = discord.Embed(
+            title="📋 Current Ticket Form Questions",
+            description="These questions will be asked when users create a ticket:",
+            color=discord.Color.blue()
+        )
+        
+        for i, question in enumerate(questions, 1):
+            embed.add_field(
+                name=f"Question {i}",
+                value=f"**{question['question']}**\nType: {question['type']}\nRequired: {'Yes' if question.get('required', True) else 'No'}",
+                inline=False
+            )
+        
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+    
+    @discord.ui.button(label="Add Question", emoji="➕", style=discord.ButtonStyle.success, row=0)
+    async def add_question(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Add a new question"""
+        await interaction.response.send_modal(AddTicketQuestionModal(self.bot, self.guild_id))
+    
+    @discord.ui.button(label="Remove Question", emoji="➖", style=discord.ButtonStyle.danger, row=0)
+    async def remove_question(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Remove a question"""
+        settings = self.mongo_db["tickets"].find_one({"guild_id": str(self.guild_id)}) or {}
+        questions = settings.get("form_questions", self.get_default_questions())
+        
+
+class SetEmbedColorModal(discord.ui.Modal, title="Set Embed Color"):
+    def __init__(self, bot, guild_id):
+        super().__init__()
+        self.bot = bot
+        self.guild_id = guild_id
+        
+    color_input = discord.ui.TextInput(
+        label="Embed Color",
+        placeholder="Enter hex color (e.g., #3498db or 0x3498db)",
+        required=True,
+        max_length=10
+    )
+    
+    async def on_submit(self, interaction: discord.Interaction):
+        try:
+            color_value = self.color_input.value.strip()
+            
+            # Validate and convert color
+            if color_value.startswith('#'):
+                color_value = '0x' + color_value[1:]
+            elif not color_value.startswith('0x'):
+                color_value = '0x' + color_value
+            
+            # Test if it's a valid hex color
+            int(color_value, 16)
+            
+            # Save to database
+            mongo_db = initialize_mongodb()
+            mongo_db["server_settings"].update_one(
+                {"server_id": self.guild_id},
+                {"$set": {"embed_color": color_value}},
+                upsert=True
+            )
+            
+            await interaction.response.send_message(
+                embed=discord.Embed(
+                    description=f"✅ Embed color set to: **{color_value}**",
+                    color=int(color_value, 16)
+                ),
+                ephemeral=True
+            )
+            
+        except ValueError:
+            await interaction.response.send_message(
+                embed=discord.Embed(
+                    description="❌ Invalid color format! Use hex format like #3498db",
+                    color=discord.Color.red()
+                ),
+                ephemeral=True
+            )
+
+
+class SetReportChannelModal(discord.ui.Modal, title="Set Report Channel"):
+    def __init__(self, bot, guild_id):
+        super().__init__()
+        self.bot = bot
+        self.guild_id = guild_id
+        
+    channel_id = discord.ui.TextInput(
+        label="Channel ID",
+        placeholder="Enter the channel ID for reports",
+        required=True,
+        max_length=20
+    )
+    
+    async def on_submit(self, interaction: discord.Interaction):
+        try:
+            channel_id = int(self.channel_id.value.strip())
+            channel = interaction.guild.get_channel(channel_id)
+            
+            if not channel:
+                return await interaction.response.send_message(
+                    embed=discord.Embed(
+                        description="❌ Channel not found!",
+                        color=discord.Color.red()
+                    ),
+                    ephemeral=True
+                )
+            
+            # Save to database
+            mongo_db = initialize_mongodb()
+            mongo_db["server_settings"].update_one(
+                {"server_id": self.guild_id},
+                {"$set": {"report_channel_id": channel_id}},
+                upsert=True
+            )
+            
+            await interaction.response.send_message(
+                embed=discord.Embed(
+                    description=f"✅ Report channel set to: {channel.mention}",
+                    color=discord.Color.green()
+                ),
+                ephemeral=True
+            )
+            
+        except ValueError:
+            await interaction.response.send_message(
+                embed=discord.Embed(
+                    description="❌ Invalid channel ID!",
+                    color=discord.Color.red()
+                ),
+                ephemeral=True
+            )
+
+
+class SetWelcomeModal(discord.ui.Modal, title="Quick Welcome Setup"):
+    def __init__(self, bot, guild_id):
+        super().__init__()
+        self.bot = bot
+        self.guild_id = guild_id
+        
+    channel_id = discord.ui.TextInput(
+        label="Welcome Channel ID",
+        placeholder="Enter the channel ID for welcome messages",
+        required=True,
+        max_length=20
+    )
+    
+    message = discord.ui.TextInput(
+        label="Welcome Message",
+        placeholder="Use {user} for mention, {server} for server name",
+        default="Welcome {user} to {server}!",
+        required=True,
+        style=discord.TextStyle.paragraph,
+        max_length=2000
+    )
+    
+    async def on_submit(self, interaction: discord.Interaction):
+        try:
+            channel_id = int(self.channel_id.value.strip())
+            channel = interaction.guild.get_channel(channel_id)
+            
+            if not channel:
+                return await interaction.response.send_message(
+                    embed=discord.Embed(
+                        description="❌ Channel not found!",
+                        color=discord.Color.red()
+                    ),
+                    ephemeral=True
+                )
+            
+            # Save to database
+            mongo_db = initialize_mongodb()
+            mongo_db["welcomer"].update_one(
+                {"guild_id": self.guild_id},
+                {
+                    "$set": {
+                        "welcome_channel_id": channel_id,
+                        "welcome_message": self.message.value,
+                        "enabled": True
+                    }
+                },
+                upsert=True
+            )
+            
+            await interaction.response.send_message(
+                embed=discord.Embed(
+                    description=f"✅ Welcome system enabled!\n**Channel**: {channel.mention}",
+                    color=discord.Color.green()
+                ),
+                ephemeral=True
+            )
+            
+        except ValueError:
+            await interaction.response.send_message(
+                embed=discord.Embed(
+                    description="❌ Invalid channel ID!",
+                    color=discord.Color.red()
+                ),
+                ephemeral=True
+            )
+
+
+class SetGoodbyeModal(discord.ui.Modal, title="Quick Goodbye Setup"):
+    def __init__(self, bot, guild_id):
+        super().__init__()
+        self.bot = bot
+        self.guild_id = guild_id
+        
+    channel_id = discord.ui.TextInput(
+        label="Goodbye Channel ID",
+        placeholder="Enter the channel ID for goodbye messages",
+        required=True,
+        max_length=20
+    )
+    
+    message = discord.ui.TextInput(
+        label="Goodbye Message",
+        placeholder="Use {user} for username, {server} for server name",
+        default="Goodbye {user}, we'll miss you!",
+        required=True,
+        style=discord.TextStyle.paragraph,
+        max_length=2000
+    )
+    
+    async def on_submit(self, interaction: discord.Interaction):
+        try:
+            channel_id = int(self.channel_id.value.strip())
+            channel = interaction.guild.get_channel(channel_id)
+            
+            if not channel:
+                return await interaction.response.send_message(
+                    embed=discord.Embed(
+                        description="❌ Channel not found!",
+                        color=discord.Color.red()
+                    ),
+                    ephemeral=True
+                )
+            
+            # Save to database
+            mongo_db = initialize_mongodb()
+            mongo_db["byebye"].update_one(
+                {"guild_id": self.guild_id},
+                {
+                    "$set": {
+                        "byebye_channel_id": channel_id,
+                        "goodbye_message": self.message.value,
+                        "enabled": True
+                    }
+                },
+                upsert=True
+            )
+            
+            await interaction.response.send_message(
+                embed=discord.Embed(
+                    description=f"✅ Goodbye system enabled!\n**Channel**: {channel.mention}",
+                    color=discord.Color.green()
+                ),
+                ephemeral=True
+            )
+            
+        except ValueError:
+            await interaction.response.send_message(
+                embed=discord.Embed(
+                    description="❌ Invalid channel ID!",
+                    color=discord.Color.red()
+                ),
+                ephemeral=True
+            )
+
+
+class SetAutoRoleModal(discord.ui.Modal, title="Set Auto Roles"):
+    def __init__(self, bot, guild_id):
+        super().__init__()
+        self.bot = bot
+        self.guild_id = guild_id
+        
+    role_ids = discord.ui.TextInput(
+        label="Role IDs",
+        placeholder="Enter role IDs separated by commas (e.g., 123456, 789012)",
+        required=True,
+        style=discord.TextStyle.paragraph
+    )
+    
+    async def on_submit(self, interaction: discord.Interaction):
+        try:
+            # Parse role IDs
+            role_ids = [int(rid.strip()) for rid in self.role_ids.value.split(',')]
+            
+            # Validate roles
+            valid_roles = []
+            for role_id in role_ids:
+                role = interaction.guild.get_role(role_id)
+                if role:
+                    valid_roles.append(role_id)
+            
+            if not valid_roles:
+                return await interaction.response.send_message(
+                    embed=discord.Embed(
+                        description="❌ No valid roles found!",
+                        color=discord.Color.red()
+                    ),
+                    ephemeral=True
+                )
+            
+            # Save to database
+            mongo_db = initialize_mongodb()
+            mongo_db["moderation"].update_one(
+                {"guild_id": self.guild_id},
+                {"$set": {"auto_roles": valid_roles}},
+                upsert=True
+            )
+            
+            role_mentions = [f"<@&{rid}>" for rid in valid_roles]
+            await interaction.response.send_message(
+                embed=discord.Embed(
+                    description=f"✅ Auto roles set: {', '.join(role_mentions)}",
+                    color=discord.Color.green()
+                ),
+                ephemeral=True
+            )
+            
+        except ValueError:
+            await interaction.response.send_message(
+                embed=discord.Embed(
+                    description="❌ Invalid role ID format!",
+                    color=discord.Color.red()
+                ),
+                ephemeral=True
+            )
+
+
+class SetWordFilterModal(discord.ui.Modal, title="Set Word Filter"):
+    def __init__(self, bot, guild_id):
+        super().__init__()
+        self.bot = bot
+        self.guild_id = guild_id
+        
+    words = discord.ui.TextInput(
+        label="Filtered Words",
+        placeholder="Enter words to filter, separated by commas",
+        required=True,
+        style=discord.TextStyle.paragraph
+    )
+    
+    async def on_submit(self, interaction: discord.Interaction):
+        # Parse words
+        word_list = [word.strip().lower() for word in self.words.value.split(',') if word.strip()]
+        
+        if not word_list:
+            return await interaction.response.send_message(
+                embed=discord.Embed(
+                    description="❌ No valid words provided!",
+                    color=discord.Color.red()
+                ),
+                ephemeral=True
+            )
+        
+        # Save to database
+        mongo_db = initialize_mongodb()
+        mongo_db["moderation"].update_one(
+            {"guild_id": self.guild_id},
+            {
+                "$set": {
+                    "word_filter.enabled": True,
+                    "word_filter.words": word_list
+                }
+            },
+            upsert=True
+        )
+        
+        await interaction.response.send_message(
+            embed=discord.Embed(
+                description=f"✅ Word filter enabled with {len(word_list)} words",
+                color=discord.Color.green()
+            ),
+            ephemeral=True
+        )
+
+
+class SetLoggingChannelModal(discord.ui.Modal, title="Set Logging Channel"):
+    def __init__(self, bot, guild_id):
+        super().__init__()
+        self.bot = bot
+        self.guild_id = guild_id
+        
+    channel_id = discord.ui.TextInput(
+        label="Channel ID",
+        placeholder="Enter the channel ID for logs",
+        required=True,
+        max_length=20
+    )
+    
+    async def on_submit(self, interaction: discord.Interaction):
+        try:
+            channel_id = int(self.channel_id.value.strip())
+            channel = interaction.guild.get_channel(channel_id)
+            
+            if not channel:
+                return await interaction.response.send_message(
+                    embed=discord.Embed(
+                        description="❌ Channel not found!",
+                        color=discord.Color.red()
+                    ),
+                    ephemeral=True
+                )
+            
+            # Save to database
+            mongo_db = initialize_mongodb()
+            mongo_db["logger"].update_one(
+                {"guild_id": self.guild_id},
+                {"$set": {"log_channel_id": channel_id}},
+                upsert=True
+            )
+            
+            await interaction.response.send_message(
+                embed=discord.Embed(
+                    description=f"✅ Logging channel set to: {channel.mention}",
+                    color=discord.Color.green()
+                ),
+                ephemeral=True
+            )
+            
+        except ValueError:
+            await interaction.response.send_message(
+                embed=discord.Embed(
+                    description="❌ Invalid channel ID!",
+                    color=discord.Color.red()
+                ),
+                ephemeral=True
+            )
+
+
+class AddTicketQuestionModal(discord.ui.Modal, title="Add Ticket Question"):
+    def __init__(self, bot, guild_id):
+        super().__init__()
+        self.bot = bot
+        self.guild_id = guild_id
+        
+    question = discord.ui.TextInput(
+        label="Question",
+        placeholder="What question should users answer?",
+        required=True,
+        max_length=100
+    )
+    
+    question_type = discord.ui.TextInput(
+        label="Type (short/paragraph)",
+        placeholder="short or paragraph",
+        default="short",
+        required=True,
+        max_length=10
+    )
+    
+    async def on_submit(self, interaction: discord.Interaction):
+        try:
+            # Validate question type
+            q_type = self.question_type.value.lower()
+            if q_type not in ["short", "paragraph"]:
+                return await interaction.response.send_message(
+                    embed=discord.Embed(
+                        description="❌ Question type must be 'short' or 'paragraph'!",
+                        color=discord.Color.red()
+                    ),
+                    ephemeral=True
+                )
+            
+            # Get current questions
+            mongo_db = initialize_mongodb()
+            settings = mongo_db["tickets"].find_one({"guild_id": str(self.guild_id)}) or {}
+            questions = settings.get("form_questions", [])
+            
+            # Add new question (max 5)
+            if len(questions) >= 5:
+                return await interaction.response.send_message(
+                    embed=discord.Embed(
+                        description="❌ Maximum 5 questions allowed!",
+                        color=discord.Color.red()
+                    ),
+                    ephemeral=True
+                )
+            
+            questions.append({
+                "question": self.question.value,
+                "type": q_type,
+                "required": True
+            })
+            
+            # Save to database
+            mongo_db["tickets"].update_one(
+                {"guild_id": str(self.guild_id)},
+                {"$set": {"form_questions": questions}},
+                upsert=True
+            )
+            
+            await interaction.response.send_message(
+                embed=discord.Embed(
+                    description=f"✅ Question added! Total questions: {len(questions)}",
+                    color=discord.Color.green()
+                ),
+                ephemeral=True
+            )
+            
+        except Exception as e:
+            await interaction.response.send_message(
+                embed=discord.Embed(
+                    description=f"❌ Error: {str(e)}",
+                    color=discord.Color.red()
+                ),
+                ephemeral=True
+            )
+

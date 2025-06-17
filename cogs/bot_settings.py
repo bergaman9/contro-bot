@@ -278,7 +278,6 @@ class BotSettings(commands.Cog):
         await self.changelog(ctx)
     
     # Changelog alt komutu
-    @changelogs.command(name="show", description="Tüm sürümler için changelog'u göster")
     async def changelog(self, ctx):
         """Show bot changelog for all versions"""
         try:
@@ -313,8 +312,8 @@ class BotSettings(commands.Cog):
                 ephemeral=True
             )
     
-    # Roadmap alt komutu
-    @changelogs.command(name="roadmap", description="Gelecek özellikler ve planlanmış sürümleri göster")
+    # Roadmap komutu
+    @botsettings.command(name="roadmap", description="Show future features and planned releases")
     async def roadmap(self, ctx):
         """Show bot roadmap with upcoming features"""
         try:
@@ -336,8 +335,8 @@ class BotSettings(commands.Cog):
                 ephemeral=True
             )
     
-    # Send changelog alt komutu
-    @changelogs.command(name="send", description="Changelog'u belirli bir kanala gönder")
+    # Send changelog komutu  
+    @botsettings.command(name="send_changelog", description="Send changelog to a specific channel")
     @commands.has_permissions(administrator=True)
     async def send_changelog(self, ctx):
         """Send changelog to a channel"""
@@ -430,8 +429,8 @@ class BotSettings(commands.Cog):
                 ephemeral=True
             )
     
-    # Update version alt komutu
-    @changelogs.command(name="update_version", description="Mevcut bot sürümünü güncelle")
+    # Update version komutu
+    @botsettings.command(name="update_version", description="Update current bot version")
     @commands.is_owner()
     async def update_version(self, ctx, version: str = None):
         """Update current bot version"""
