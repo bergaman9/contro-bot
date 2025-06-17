@@ -14,6 +14,7 @@ import re
 import requests
 import threading
 from typing import Optional
+import json
 
 from utils.core.formatting import create_embed
 from utils.core.logger import logger, setup_logging, LOGS_DIR
@@ -412,6 +413,22 @@ async def main():
     bot.config_manager = config_manager
     bot.client_id = client_id
     bot.startTime = time.time()  # Set bot start time for uptime calculations
+    
+    # Load bot version from version_config.json
+    try:
+        version_config_path = os.path.join(os.getcwd(), 'config', 'version_config.json')
+        if os.path.exists(version_config_path):
+            with open(version_config_path, 'r') as f:
+                version_data = json.load(f)
+                bot.version = version_data.get('version', '1.0.0')
+                logger.info(f"Bot version loaded: {bot.version}")
+                print_colored(f"✅ Bot version: {bot.version}", "green")
+        else:
+            bot.version = '1.0.0'
+            logger.warning("Version config file not found, using default version")
+    except Exception as e:
+        bot.version = '1.0.0'
+        logger.error(f"Error loading version: {e}")
     
     # Set up error handlers
     setup_error_handlers(bot)
