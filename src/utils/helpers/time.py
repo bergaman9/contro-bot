@@ -2,6 +2,7 @@
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Union
 import time
+import re
 
 
 def get_utc_now() -> datetime:
@@ -26,25 +27,42 @@ def format_dt(dt: datetime, style: str = 'f') -> str:
 
 
 def parse_time_string(time_str: str) -> Optional[timedelta]:
-    """Parse time string like '1d2h30m' into timedelta."""
-    time_regex = r'(\d+)([dhms])'
-    total_seconds = 0
+    """
+    Parse a time string like '1d2h30m' into a timedelta.
     
-    units = {
-        's': 1,
-        'm': 60,
-        'h': 3600,
-        'd': 86400
-    }
+    Supported units:
+    - s/sec/second/seconds
+    - m/min/minute/minutes  
+    - h/hr/hour/hours
+    - d/day/days
+    - w/week/weeks
+    """
+    if not time_str:
+        return None
     
-    import re
-    matches = re.findall(time_regex, time_str.lower())
+    # Define regex pattern for time parsing
+    pattern = r'(\d+)\s*([smhdw]|sec|second|seconds|min|minute|minutes|hr|hour|hours|day|days|week|weeks)'
+    matches = re.findall(pattern, time_str.lower())
     
     if not matches:
         return None
     
-    for value, unit in matches:
-        total_seconds += int(value) * units.get(unit, 0)
+    total_seconds = 0
+    
+    for amount, unit in matches:
+        amount = int(amount)
+        
+        # Convert unit to seconds
+        if unit in ['s', 'sec', 'second', 'seconds']:
+            total_seconds += amount
+        elif unit in ['m', 'min', 'minute', 'minutes']:
+            total_seconds += amount * 60
+        elif unit in ['h', 'hr', 'hour', 'hours']:
+            total_seconds += amount * 3600
+        elif unit in ['d', 'day', 'days']:
+            total_seconds += amount * 86400
+        elif unit in ['w', 'week', 'weeks']:
+            total_seconds += amount * 604800
     
     return timedelta(seconds=total_seconds) if total_seconds > 0 else None
 

@@ -22,32 +22,24 @@ This document outlines the refactoring strategy for the Contro Discord bot to ac
   - [x] Text, time, and Discord helpers
 - [x] Base cog structure with example
 
-### 🚧 Phase 2: Command Migration (IN PROGRESS)
-Migrate existing commands to the new cog structure:
+### 🚧 Phase 2: File Migration & Command Implementation (IN PROGRESS)
 
-#### Admin Commands
-- [ ] Bot management (status, restart, etc.)
-- [ ] Server setup commands
-- [ ] Settings management
+#### File Migration Tasks (COMPLETED)
+- [x] Move `/api` → `/src/api/routes/`
+- [x] Move `/cogs/*.py` → appropriate `/src/cogs/` subdirectories
+- [x] Move `/config` → `/src/config/`
+- [x] Move `/data` → `/resources/data/`
+- [x] Move `/docs` → root level (keep as is)
+- [x] Move `/images` → `/resources/images/`
+- [x] Move `/logs` → root level (keep as is)
+- [x] Move `/utils` → merge with `/src/utils/`
 
-#### Moderation Commands
-- [ ] User actions (kick, ban, mute, warn)
-- [ ] Message management (purge, etc.)
-- [ ] Logging configuration
-
-#### Community Commands
-- [ ] Registration system
-- [ ] Welcome/goodbye messages
-- [ ] Leveling system
-
-#### Fun Commands
-- [ ] Games and entertainment
-- [ ] Random utilities
-
-#### Utility Commands
-- [ ] Information commands
-- [ ] Help system
-- [ ] Server statistics
+#### Command Migration Status
+- [x] Utility Commands - `/info` subcommands implemented
+- [x] Moderation Commands - Basic actions implemented (kick, ban, mute, warn, purge)
+- [ ] Community Commands  
+- [ ] Fun Commands
+- [ ] Admin Commands
 
 ### 📋 Phase 3: Feature Enhancement
 - [ ] Implement proper error handling
@@ -67,42 +59,48 @@ Migrate existing commands to the new cog structure:
 - [ ] Developer documentation
 - [ ] Deployment guide
 
-## Current Focus: Phase 2 - Command Migration
+## Current Task: Command Migration
 
-### Next Steps for Phase 2:
+### Next Commands to Implement:
 
-1. **Utility Commands** (/info subcommands)
-   - `/info user` - User information
-   - `/info server` - Server information  
-   - `/info bot` - Bot information
-   - `/info emoji` - Emoji information
-   - `/info role` - Role information
-
-2. **Moderation Commands**
-   - `/ban` - Ban a user
-   - `/kick` - Kick a user
-   - `/mute` - Mute a user
-   - `/unmute` - Unmute a user
-   - `/warn` - Warn a user
-   - `/warnings` - View warnings
-   - `/purge` - Delete messages
-
-3. **Welcome System**
+#### Community Commands
+1. **Welcome System** (`/src/cogs/community/welcome.py`)
    - Welcome message configuration
    - Goodbye message configuration
-   - Image generation
-   - Channel settings
+   - Image generation with customization
+   - Channel and role settings
 
-4. **Leveling System**
+2. **Leveling System** (`/src/cogs/community/leveling.py`)
    - XP gain on messages
-   - Level roles
-   - Leaderboard
+   - Level roles and rewards
+   - Leaderboard commands
    - Rank cards
 
-5. **Registration System**
-   - User registration
+3. **Registration System** (`/src/cogs/community/registration.py`)
+   - User registration flow
    - Role assignment
-   - Verification
+   - Verification system
+
+#### Fun Commands
+1. **Games** (`/src/cogs/fun/games.py`)
+   - Mini-games and entertainment
+   - Social commands
+
+2. **Giveaways** (`/src/cogs/fun/giveaways.py`)
+   - Giveaway creation and management
+   - Winner selection
+
+3. **Spin Wheel** (`/src/cogs/fun/spin.py`)
+   - Spin wheel with rewards
+
+#### Admin Commands
+1. **Bot Management** (`/src/cogs/admin/bot_management.py`)
+   - Bot status and configuration
+   - Performance monitoring
+
+2. **Server Setup** (`/src/cogs/admin/server_setup.py`)
+   - Initial server configuration
+   - Template application
 
 ## Architecture Benefits
 
@@ -112,13 +110,21 @@ Migrate existing commands to the new cog structure:
 4. **Maintainability**: Organized structure makes code easier to understand and modify
 5. **MongoDB Native**: Leverages MongoDB's document-based structure and operators
 
-## Notes
+## Migration Notes
 
-- Using MongoDB collections instead of SQL repositories
-- All database operations are async with Motor
-- Services handle business logic and logging
-- Cogs only handle Discord interaction logic
-- Clear error handling and logging throughout
+- All old cog files have been moved to their new locations
+- Original file structure preserved as backup in moved files
+- Import paths need to be updated in moved files
+- Configuration files centralized in `/src/config/`
+- Resources (images, data, fonts) organized under `/resources/`
+
+## Next Steps
+
+1. Update import paths in all moved cog files
+2. Implement remaining community commands
+3. Test migrated commands for functionality
+4. Add error handling and logging to new commands
+5. Create unit tests for critical components
 
 ## 🎯 Objectives
 

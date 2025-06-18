@@ -4,6 +4,8 @@ from .base import BaseService
 from ..database.collections import MemberCollection
 from ..database.models import Member
 import discord
+from datetime import datetime, timezone
+from bson import ObjectId
 
 
 class MemberService(BaseService):
@@ -60,10 +62,30 @@ class MemberService(BaseService):
     async def add_warning(self, guild_id: int, user_id: int, reason: str, moderator_id: int) -> bool:
         """Add a warning to member."""
         try:
-            success = await self.member_collection.add_warning(guild_id, user_id, reason, moderator_id)
-            if success:
-                self.log_info(f"Added warning to member {user_id} in guild {guild_id}: {reason}")
-            return success
+            warning = {
+                "reason": reason,
+                "moderator_id": moderator_id,
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            }
+            
+            result = await self.member_collection.collection.update_one(
+                {"guild_id": guild_id, "user_id": user_id},
+                {
+                    "$push": {"warnings": warning},
+                    "$setOnInsert": {
+                        "guild_id": guild_id,
+                        "user_id": user_id,
+                        "joined_at": datetime.now(timezone.utc),
+                        "xp": 0,
+                        "level": 0,
+                        "messages": 0,
+                        "voice_minutes": 0
+                    }
+                },
+                upsert=True
+            )
+            
+            return result.modified_count > 0 or result.upserted_id is not None
         except Exception as e:
             self.log_error(f"Error adding warning to member {user_id} in guild {guild_id}", exc_info=e)
             return False
