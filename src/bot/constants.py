@@ -1,13 +1,20 @@
 """Bot-wide constants and configuration values."""
+from typing import List, Dict
+import discord
 
 # Bot information
-BOT_VERSION = "2.0.0"
+BOT_VERSION = "3.0.0"
 BOT_NAME = "Contro"
 BOT_DESCRIPTION = "A powerful Discord bot for community management"
 
 # Default values
-DEFAULT_PREFIX = ">"
+DEFAULT_PREFIX = "!"
 DEFAULT_LANGUAGE = "en"
+
+# Owner IDs (add your Discord user IDs here)
+OWNER_IDS: List[int] = [
+    # 123456789012345678  # Example owner ID
+]
 
 # Limits
 MAX_PREFIX_LENGTH = 5
@@ -17,12 +24,12 @@ MAX_REASON_LENGTH = 512
 # Colors
 class Colors:
     """Discord embed colors."""
-    PRIMARY = 0x7289DA     # Discord Blurple
-    SUCCESS = 0x43B581     # Green
-    WARNING = 0xFAA61A     # Yellow/Orange
-    ERROR = 0xF04747       # Red
-    INFO = 0x5865F2        # New Discord Blurple
-    GOLD = 0xF1C40F        # Gold
+    PRIMARY = discord.Color.blue()
+    SUCCESS = discord.Color.green()
+    WARNING = discord.Color.orange()
+    ERROR = discord.Color.red()
+    INFO = discord.Color.blurple()
+    GOLD = discord.Color.gold()
     PURPLE = 0x9B59B6      # Purple
     
 # Emojis
@@ -73,13 +80,37 @@ API_PORT = 8000
 API_HOST = "0.0.0.0"
 
 # Feature flags
-FEATURES = {
-    "LEVELING": True,
-    "MODERATION": True,
-    "LOGGING": True,
-    "WELCOME": True,
-    "TICKETS": True,
-    "GIVEAWAYS": True,
-    "AUTOMOD": True,
-    "STARBOARD": True
+FEATURES = [
+    "leveling",
+    "welcome",
+    "logging", 
+    "moderation",
+    "tickets",
+    "giveaways",
+    "starboard",
+    "automod",
+    "temp_channels"
+]
+
+# Language Codes
+SUPPORTED_LANGUAGES = {
+    "en": "English",
+    "tr": "Türkçe"
+}
+
+# XP Settings
+class XPSettings:
+    """XP system settings."""
+    MIN_PER_MESSAGE = 15
+    MAX_PER_MESSAGE = 25
+    COOLDOWN = 60  # seconds
+    
+# Level Roles (example structure)
+LEVEL_ROLES: Dict[int, str] = {
+    5: "Beginner",
+    10: "Member",
+    20: "Active",
+    30: "Expert",
+    50: "Master",
+    100: "Legend"
 } 

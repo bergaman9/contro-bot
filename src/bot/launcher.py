@@ -1,173 +1,134 @@
-"""Bot launcher and initialization logic."""
-
+"""Bot launcher and initialization."""
 import os
 import sys
 import asyncio
+import logging
 from pathlib import Path
-from typing import Optional
-import argparse
 
 import discord
-from dotenv import load_dotenv
+from discord.ext import commands
 
 from .client import ControBot
-from ..utils.common.logger import setup_logger, setup_discord_logger
-from ..utils.common.errors import ConfigurationError
+from .constants import *
+from ..database.connection import DatabaseConnection
+from ..utils.common.logger import setup_logging
+
+# Add parent directory to path for imports
+sys.path.append(str(Path(__file__).parent.parent.parent))
+
+logger = logging.getLogger(__name__)
 
 
 class BotLauncher:
     """Handles bot initialization and startup."""
     
     def __init__(self):
-        self.bot: Optional[ControBot] = None
-        self.logger = None
+        """Initialize the launcher."""
+        self.bot = None
+        self.db = None
         
-    def setup_environment(self):
-        """Load environment variables and validate configuration."""
-        # Load .env file
-        env_path = Path(__file__).parent.parent.parent / ".env"
-        if env_path.exists():
-            load_dotenv(env_path)
-        else:
-            # Try to find .env in parent directories
-            current_path = Path.cwd()
-            while current_path != current_path.parent:
-                env_file = current_path / ".env"
-                if env_file.exists():
-                    load_dotenv(env_file)
-                    break
-                current_path = current_path.parent
+    async def setup_database(self):
+        """Setup database connection."""
+        # Get MongoDB connection string from environment
+        mongo_uri = os.getenv('MONGODB_URI')
+        if not mongo_uri:
+            raise ValueError("MONGODB_URI environment variable not set")
+        
+        # Create database connection
+        self.db = DatabaseConnection(
+            connection_string=mongo_uri,
+            database_name=os.getenv('MONGODB_DATABASE', 'contro_bot')
+        )
+        
+        # Connect to database
+        await self.db.connect()
+        
+        # Create indexes
+        await self.db.create_indexes()
+        
+        logger.info("Database setup complete")
+        
+    async def load_extensions(self):
+        """Load bot extensions/cogs."""
+        # Define cogs to load
+        cogs = [
+            'src.cogs.utility.ping',
+            # Add more cogs as they're created
+        ]
+        
+        for cog in cogs:
+            try:
+                self.bot.load_extension(cog)
+                logger.info(f"Loaded cog: {cog}")
+            except Exception as e:
+                logger.error(f"Failed to load cog {cog}: {e}")
                 
-        # Validate required environment variables
-        required_vars = ["DISCORD_TOKEN", "MONGODB_URI"]
-        missing_vars = [var for var in required_vars if not os.getenv(var)]
-        
-        if missing_vars:
-            raise ConfigurationError(
-                f"Missing required environment variables: {', '.join(missing_vars)}"
-            )
-            
-    def setup_logging(self, debug: bool = False):
-        """Configure logging for the bot."""
-        log_level = "DEBUG" if debug else os.getenv("LOG_LEVEL", "INFO")
-        
-        # Set up main logger
-        self.logger = setup_logger(
-            name="contro",
-            level=log_level,
-            log_dir=os.getenv("LOG_DIR", "logs")
-        )
-        
-        # Set up Discord.py logger
-        setup_discord_logger()
-        
-        self.logger.info("Logging configured successfully")
-        
-    def parse_arguments(self) -> argparse.Namespace:
-        """Parse command line arguments."""
-        parser = argparse.ArgumentParser(
-            description="Contro Discord Bot",
-            formatter_class=argparse.RawDescriptionHelpFormatter
-        )
-        
-        parser.add_argument(
-            "--debug",
-            action="store_true",
-            help="Enable debug logging"
-        )
-        
-        parser.add_argument(
-            "--sync-commands",
-            action="store_true",
-            help="Sync application commands on startup"
-        )
-        
-        parser.add_argument(
-            "--test",
-            action="store_true",
-            help="Run in test mode (limited functionality)"
-        )
-        
-        parser.add_argument(
-            "--prefix",
-            type=str,
-            help="Override default command prefix"
-        )
-        
-        return parser.parse_args()
-        
-    async def create_bot(self, args: argparse.Namespace) -> ControBot:
-        """Create and configure the bot instance."""
-        # Set up intents
-        intents = discord.Intents.all()
-        
-        # Get prefix
-        prefix = args.prefix or os.getenv("BOT_PREFIX", ">")
-        
-        # Create bot instance
-        bot = ControBot(
-            command_prefix=prefix,
-            intents=intents,
-            help_command=None,  # We'll use a custom help command
-            case_insensitive=True,
-            strip_after_prefix=True
-        )
-        
-        # Set additional attributes
-        bot.should_sync_commands = args.sync_commands
-        bot.test_mode = args.test
-        
-        return bot
-        
     async def start(self):
         """Start the bot."""
+        # Setup logging
+        setup_logging()
+        
+        logger.info("Starting ControBot...")
+        
+        # Load configuration
+        token = os.getenv('DISCORD_TOKEN')
+        if not token:
+            raise ValueError("DISCORD_TOKEN environment variable not set")
+        
+        # Create bot instance
+        intents = discord.Intents.default()
+        intents.message_content = True
+        intents.members = True
+        intents.guilds = True
+        
+        self.bot = ControBot(
+            intents=intents,
+            db=self.db
+        )
+        
+        # Setup database
+        await self.setup_database()
+        
+        # Pass database to bot
+        self.bot.db = self.db
+        
+        # Load extensions
+        await self.load_extensions()
+        
+        # Start the bot
         try:
-            # Parse arguments
-            args = self.parse_arguments()
-            
-            # Set up environment
-            self.setup_environment()
-            
-            # Set up logging
-            self.setup_logging(debug=args.debug)
-            
-            self.logger.info("Starting Contro Bot...")
-            
-            # Create bot
-            self.bot = await self.create_bot(args)
-            
-            # Get token
-            token = os.getenv("DISCORD_TOKEN")
-            if not token:
-                raise ConfigurationError("Discord token not found")
-                
-            # Start bot
             await self.bot.start(token)
-            
         except KeyboardInterrupt:
-            self.logger.info("Received keyboard interrupt, shutting down...")
+            logger.info("Received interrupt signal")
         except Exception as e:
-            if self.logger:
-                self.logger.error(f"Fatal error: {e}", exc_info=True)
-            else:
-                print(f"Fatal error: {e}")
-            sys.exit(1)
+            logger.error(f"Bot crashed: {e}", exc_info=True)
         finally:
-            if self.bot:
-                await self.bot.close()
-                
-    def run(self):
-        """Run the bot (blocking)."""
-        try:
-            asyncio.run(self.start())
-        except KeyboardInterrupt:
-            pass
+            await self.cleanup()
+            
+    async def cleanup(self):
+        """Cleanup resources."""
+        logger.info("Cleaning up...")
+        
+        if self.bot:
+            await self.bot.close()
+            
+        if self.db:
+            await self.db.disconnect()
+            
+        logger.info("Cleanup complete")
 
 
 def main():
-    """Entry point for the bot."""
+    """Main entry point."""
     launcher = BotLauncher()
-    launcher.run()
+    
+    try:
+        asyncio.run(launcher.start())
+    except KeyboardInterrupt:
+        print("\nBot stopped by user")
+    except Exception as e:
+        print(f"Fatal error: {e}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
