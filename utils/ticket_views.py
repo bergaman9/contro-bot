@@ -8,6 +8,7 @@ import asyncio
 from typing import Optional, List, Dict, Any
 from utils.database import get_async_db, ensure_async_db
 from utils.core.formatting import create_embed
+from utils.common import error_embed, success_embed, info_embed, warning_embed
 
 logger = logging.getLogger('ticket_views')
 
@@ -25,7 +26,13 @@ class TicketView(discord.ui.View):
             settings = await mongo_db.tickets.find_one({"guild_id": interaction.guild.id})
             
             if not settings:
-                await interaction.response.send_message("Ticket system is not configured for this server.", ephemeral=True)
+                await interaction.response.send_message(
+                    embed=error_embed(
+                        "Ticket sistemi bu sunucu için yapılandırılmamış.",
+                        title="❌ Sistem Yapılandırılmamış"
+                    ),
+                    ephemeral=True
+                )
                 return
             
             # Check if user already has an open ticket
@@ -40,7 +47,10 @@ class TicketView(discord.ui.View):
                 
                 if channel:
                     await interaction.response.send_message(
-                        f"You already have an open ticket: {channel.mention}", 
+                        embed=info_embed(
+                            f"Zaten açık bir ticketınız var: {channel.mention}",
+                            title="ℹ️ Mevcut Ticket"
+                        ),
                         ephemeral=True
                     )
                     return
@@ -51,12 +61,24 @@ class TicketView(discord.ui.View):
             # Get ticket category
             category_id = settings.get("category_id")
             if not category_id:
-                await interaction.response.send_message("Ticket system is not properly configured (no category).", ephemeral=True)
+                await interaction.response.send_message(
+                    embed=error_embed(
+                        "Ticket sistemi düzgün yapılandırılmamış (kategori eksik).",
+                        title="❌ Yapılandırma Hatası"
+                    ),
+                    ephemeral=True
+                )
                 return
             
             category = interaction.guild.get_channel(int(category_id))
             if not category:
-                await interaction.response.send_message("Ticket category was not found.", ephemeral=True)
+                await interaction.response.send_message(
+                    embed=error_embed(
+                        "Ticket kategorisi bulunamadı. Lütfen yöneticiye bildirin.",
+                        title="❌ Kategori Bulunamadı"
+                    ),
+                    ephemeral=True
+                )
                 return
             
             # Create the ticket channel
@@ -91,10 +113,9 @@ class TicketView(discord.ui.View):
             })
             
             # Send initial message in ticket channel
-            embed = discord.Embed(
-                title="Support Ticket",
-                description=f"Thank you for creating a ticket, {interaction.user.mention}.\nSupport staff will be with you shortly.",
-                color=discord.Color.green()
+            embed = success_embed(
+                f"Ticket oluşturduğunuz için teşekkür ederiz, {interaction.user.mention}.\n\nDestek ekibimiz en kısa sürede sizinle ilgilenecektir.\n\n**Lütfen sorununuzu detaylı bir şekilde açıklayın.**",
+                title="🎫 Destek Ticket'ı"
             )
             
             # Add ticket management buttons
@@ -103,13 +124,22 @@ class TicketView(discord.ui.View):
             
             # Notify user
             await interaction.response.send_message(
-                f"Your ticket has been created: {ticket_channel.mention}", 
+                embed=success_embed(
+                    f"Ticket'ınız başarıyla oluşturuldu: {ticket_channel.mention}\n\nLütfen ticket kanalında sorununuzu detaylı bir şekilde açıklayın.",
+                    title="✅ Ticket Oluşturuldu"
+                ),
                 ephemeral=True
             )
             
         except Exception as e:
             logger.error(f"Error creating ticket: {e}", exc_info=True)
-            await interaction.response.send_message("An error occurred while creating your ticket.", ephemeral=True)
+            await interaction.response.send_message(
+                embed=error_embed(
+                    "Ticket oluşturulurken bir hata oluştu. Lütfen daha sonra tekrar deneyin.",
+                    title="❌ Hata"
+                ),
+                ephemeral=True
+            )
 
 class TicketControlView(discord.ui.View):
     """View for support staff to manage an open ticket"""

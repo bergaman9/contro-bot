@@ -333,106 +333,149 @@ class Utility(commands.Cog):
         embed.set_footer(icon_url=ctx.author.display_avatar, text=f"Requested by {ctx.author}")
         await ctx.send(embed=embed)
 
-    @commands.hybrid_command(name="server", description="Displays detailed server information.")
+    @commands.hybrid_group(name="server", description="Server-related commands")
     async def server(self, ctx):
+        """Server-related commands"""
+        if ctx.invoked_subcommand is None:
+            # Default to server info
+            await self.server_info(ctx)
+
+    @server.command(name="info", description="Displays detailed server information.")
+    async def server_info(self, ctx):
+        """Displays information about the current server including member counts, boost status, and more."""
         guild = ctx.guild
-        embed = discord.Embed(
-            title=f"{guild.name} - Server Information",
-            description=guild.description or "No description available.",
-            color=discord.Color.blue()
-        )
+        embed = discord.Embed(title=f"{guild.name} Server Information", color=discord.Color.blue())
         embed.set_thumbnail(url=guild.icon.url if guild.icon else None)
+        
+        # Basic information
         embed.add_field(name="Server ID", value=guild.id, inline=True)
-        embed.add_field(name="Owner", value=guild.owner.mention if guild.owner else "Unknown", inline=True)
-        embed.add_field(name="Created On", value=guild.created_at.strftime("%d %B %Y, %I:%M %p UTC"), inline=True)
-        embed.add_field(name="Members", value=f"{guild.member_count} members", inline=True)
-        embed.add_field(name="Roles", value=f"{len(guild.roles)} roles", inline=True)
-        embed.add_field(name="Emojis", value=f"{len(guild.emojis)} emojis", inline=True)
-        embed.add_field(name="Text Channels", value=f"{len(guild.text_channels)} channels", inline=True)
-        embed.add_field(name="Voice Channels", value=f"{len(guild.voice_channels)} channels", inline=True)
-        embed.add_field(name="Boost Level", value=f"Level {guild.premium_tier} ({guild.premium_subscription_count} boosts)", inline=True)
-        embed.set_footer(text=f"Requested by {ctx.author.display_name}", icon_url=ctx.author.display_avatar)
+        embed.add_field(name="Owner", value=guild.owner.mention, inline=True)
+        embed.add_field(name="Created", value=discord.utils.format_dt(guild.created_at, style='D'), inline=True)
+        
+        # Member counts
+        total_members = guild.member_count
+        humans = sum(1 for m in guild.members if not m.bot)
+        bots = total_members - humans
+        embed.add_field(name="Members", value=f"Total: {total_members}\nHumans: {humans}\nBots: {bots}", inline=True)
+        
+        # Channels
+        text_channels = len(guild.text_channels)
+        voice_channels = len(guild.voice_channels)
+        categories = len(guild.categories)
+        embed.add_field(name="Channels", value=f"Text: {text_channels}\nVoice: {voice_channels}\nCategories: {categories}", inline=True)
+        
+        # Server boost info
+        boost_level = guild.premium_tier
+        boost_count = guild.premium_subscription_count
+        embed.add_field(name="Boost Status", value=f"Level {boost_level}\n{boost_count} Boosts", inline=True)
+        
+        # Additional info
+        embed.add_field(name="Roles", value=len(guild.roles), inline=True)
+        embed.add_field(name="Emojis", value=len(guild.emojis), inline=True)
+        embed.add_field(name="Verification Level", value=str(guild.verification_level).title(), inline=True)
+        
+        embed.set_footer(text=f"Requested by {ctx.author}", icon_url=ctx.author.display_avatar.url)
         await ctx.send(embed=embed)
 
-    @commands.hybrid_command(name="privacy_policy", description="Displays the privacy policy for the bot.")
-    async def privacy_policy(self, ctx):
-        embed = discord.Embed(
-            title="Privacy Policy for Contro",
-            description="Effective Date: 23.01.2025",
-            color=discord.Color.blue()
-        )
-        
-        embed.add_field(
-            name="1. Introduction",
-            value=(
-                "Welcome to Contro. This Privacy Policy explains how we collect, use, "
-                "and protect your information when you use our Discord bot. By using Contro, "
-                "you agree to the collection and use of information in accordance with this policy."
-            ),
-            inline=False
-        )
-        
-        embed.add_field(
-            name="2. Information We Collect",
-            value=(
-                "- **User Data:** We may collect your Discord user ID, username, and discriminator to provide personalized services and features.\n"
-                "- **Message Content:** We may access the content of messages for command processing and moderation purposes. "
-                "We do not store message content unless explicitly stated.\n"
-                "- **Guild Data:** We collect information about the servers (guilds) where the bot is used, "
-                "including server ID, name, and member count.\n"
-                "- **Activity Data:** We may track user activities, such as game playing status, for features like game statistics and leaderboards."
-            ),
-            inline=False
-        )
-        
-        embed.add_field(
-            name="3. How We Use Your Information",
-            value=(
-                "- **To Provide Services:** We use your information to operate and improve the bot's features and functionality.\n"
-                "- **Moderation and Safety:** We use message content and user data to enforce server rules and ensure a safe environment.\n"
-                "- **Analytics:** We may use aggregated data for analytics to understand usage patterns and improve the bot."
-            ),
-            inline=False
-        )
-        
-        embed.add_field(
-            name="4. Data Storage and Security",
-            value=(
-                "- **Data Storage:** User data is stored securely in our database. "
-                "We take reasonable measures to protect your information from unauthorized access or disclosure.\n"
-                "- **Data Retention:** We retain user data only as long as necessary to provide our services or as required by law."
-            ),
-            inline=False
-        )
-        
-        embed.add_field(
-            name="5. Sharing Your Information",
-            value="We do not share your personal information with third parties, except as required by law or to protect our rights.",
-            inline=False
-        )
-        
-        embed.add_field(
-            name="6. Your Rights",
-            value=(
-                "- **Access and Correction:** You have the right to access and correct your personal information.\n"
-                "- **Data Deletion:** You can request the deletion of your data by contacting us at omerguler53@gmail.com."
-            ),
-            inline=False
-        )
-        
-        embed.add_field(
-            name="7. Changes to This Privacy Policy",
-            value="We may update this Privacy Policy from time to time. We will notify you of any changes by posting the new policy on this page.",
-            inline=False
-        )
-        
-        embed.add_field(
-            name="8. Contact Us",
-            value="If you have any questions or concerns about this Privacy Policy, please contact us at omerguler53@gmail.com.",
-            inline=False
-        )
+    @server.command(name="games", description="Show the most played games in the server")
+    async def server_games(self, ctx):
+        """Display the top played games on the server with statistics."""
+        try:
+            # Get game stats cog
+            game_stats_cog = self.bot.get_cog("GameStats")
+            if not game_stats_cog or not game_stats_cog.mongodb:
+                embed = discord.Embed(
+                    title="❌ Game Statistics Unavailable",
+                    description="The game statistics system is not available.",
+                    color=discord.Color.red()
+                )
+                return await ctx.send(embed=embed)
 
-        await ctx.send(embed=embed)
+            # Get guild stats
+            game_stats = game_stats_cog.mongodb["game_stats"]
+            guild_data = await game_stats.find_one({"guild_id": ctx.guild.id})
+            
+            if not guild_data or not guild_data.get("played_games"):
+                embed = discord.Embed(
+                    title="📊 No Game Statistics",
+                    description="No game statistics available yet. Statistics will appear once members start playing games.",
+                    color=discord.Color.blue()
+                )
+                return await ctx.send(embed=embed)
+
+            # Sort games by total time played
+            played_games = guild_data.get("played_games", [])
+            sorted_games = sorted(played_games, key=lambda x: x.get("total_time_played", 0), reverse=True)
+            
+            # Take top 10 games
+            top_games = sorted_games[:10]
+            
+            embed = discord.Embed(
+                title="🎮 Most Played Games",
+                description=f"Game statistics for {ctx.guild.name}:",
+                color=discord.Color.blue()
+            )
+            
+            if top_games:
+                game_list = []
+                for idx, game in enumerate(top_games, 1):
+                    game_name = game.get("game_name", "Unknown Game")
+                    total_time = game.get("total_time_played", 0)
+                    player_count = len(game.get("players", []))
+                    
+                    # Convert time to hours and minutes
+                    hours = total_time // 60
+                    minutes = total_time % 60
+                    
+                    if hours > 0:
+                        time_str = f"{hours}h {minutes}m" if minutes > 0 else f"{hours}h"
+                    else:
+                        time_str = f"{minutes}m"
+                    
+                    # Add medal emojis for top 3
+                    if idx == 1:
+                        medal = "🥇"
+                    elif idx == 2:
+                        medal = "🥈"
+                    elif idx == 3:
+                        medal = "🥉"
+                    else:
+                        medal = f"{idx}."
+                    
+                    game_list.append(f"{medal} **{game_name}**\n└ ⏱️ {time_str} • 👥 {player_count} players")
+                
+                # Split into chunks if too long
+                game_text = "\n\n".join(game_list)
+                if len(game_text) <= 1024:
+                    embed.add_field(
+                        name="📈 Statistics",
+                        value=game_text,
+                        inline=False
+                    )
+                else:
+                    # Split into multiple fields
+                    for i in range(0, len(game_list), 5):
+                        chunk = game_list[i:i+5]
+                        embed.add_field(
+                            name="📈 Statistics" if i == 0 else "\u200b",
+                            value="\n\n".join(chunk),
+                            inline=False
+                        )
+            
+            # Add footer with additional info
+            total_games_tracked = len(played_games)
+            embed.set_footer(text=f"Tracking {total_games_tracked} different games • Requested by {ctx.author}")
+            
+            await ctx.send(embed=embed)
+            
+        except Exception as e:
+            logger.error(f"Error in server games command: {e}")
+            embed = discord.Embed(
+                title="❌ Error",
+                description="An error occurred while fetching game statistics.",
+                color=discord.Color.red()
+            )
+            await ctx.send(embed=embed)
 
     @commands.hybrid_command(name="members_of_role", description="Lists members with a specific role.")
     @app_commands.describe(role="The role to list members from.")
@@ -737,22 +780,23 @@ class Utility(commands.Cog):
             ), ephemeral=True)
 
     # Role management commands
-    @commands.hybrid_command(name="set_status_role",
-                             description="Sets the custom status and role for the status_role command.")
-    @commands.has_permissions(manage_guild=True)
-    @app_commands.describe(
-        custom_status="The custom status text to trigger role assignment (comma-separated for multiple statuses)",
-        role="The role to assign when a member has the specified custom status"
-    )
-    async def set_status_role(self, ctx, custom_status: str, role: discord.Role):
-        # Get the status_roles collection from the database
-        cleaned_custom_status = custom_status.strip().lower()
-        collection = self.mongo_db["status_roles"]
-        
-        # Update the status_role mapping
-        collection.update_one({"guild_id": ctx.guild.id},
-                              {"$set": {"custom_status": cleaned_custom_status, "role_id": role.id}}, upsert=True)
-        await ctx.send(f"Status role set to {role.mention} for custom status '{custom_status}'.")
+    # REMOVED: This command is now integrated into the unified /settings panel (Status Roles section)
+    # @commands.hybrid_command(name="set_status_role",
+    #                          description="Sets the custom status and role for the status_role command.")
+    # @commands.has_permissions(manage_guild=True)
+    # @app_commands.describe(
+    #     custom_status="The custom status text to trigger role assignment (comma-separated for multiple statuses)",
+    #     role="The role to assign when a member has the specified custom status"
+    # )
+    # async def set_status_role(self, ctx, custom_status: str, role: discord.Role):
+    #     # Get the status_roles collection from the database
+    #     cleaned_custom_status = custom_status.strip().lower()
+    #     collection = self.mongo_db["status_roles"]
+    #     
+    #     # Update the status_role mapping
+    #     collection.update_one({"guild_id": ctx.guild.id},
+    #                           {"$set": {"custom_status": cleaned_custom_status, "role_id": role.id}}, upsert=True)
+    #     await ctx.send(f"Status role set to {role.mention} for custom status '{custom_status}'.")
 
     @app_commands.command(name="mass_unban", description="Mass unban people banned from the server.")
     @commands.has_permissions(manage_guild=True)
@@ -1123,49 +1167,72 @@ class Config(commands.Cog):
         except Exception as e:
             print(f"Error syncing command tree: {e}")
 
-    @commands.hybrid_command(name="contro_guilds", description="Shows a list of all servers the bot is in.")
-    @commands.is_owner()
-    async def contro_guilds(self, ctx):
-        """Shows a list of all servers the bot is in with detailed information."""
-        try:
-            await ctx.defer()
-            guilds_sorted = sorted(self.bot.guilds, key=lambda g: g.created_at,
-                                   reverse=True)  # Sunucuları tarihe göre sırala
+    # REMOVED: These commands are now integrated into the unified /settings panel
+    # contro_guilds is now in Developer section (owner-only)
+    # support is replaced by button in settings or website
+    # @commands.hybrid_command(name="contro_guilds", description="Shows a list of all servers the bot is in.")
+    # @commands.is_owner()
+    # async def contro_guilds(self, ctx):
+    #     try:
+    #         # Create an embed with guild list
+    #         guilds = sorted(self.bot.guilds, key=lambda g: g.member_count, reverse=True)
+    #         
+    #         # Paginate if there are many guilds
+    #         embeds = []
+    #         for i in range(0, len(guilds), 10):
+    #             embed = discord.Embed(
+    #                 title=f"📊 Bot Servers ({len(guilds)} total)",
+    #                 color=discord.Color.blue()
+    #             )
+    #             
+    #             guild_slice = guilds[i:i+10]
+    #             for guild in guild_slice:
+    #                 embed.add_field(
+    #                     name=guild.name,
+    #                     value=f"Members: {guild.member_count}\nID: {guild.id}",
+    #                     inline=True
+    #                 )
+    #             
+    #             embed.set_footer(text=f"Page {i//10 + 1}/{(len(guilds)-1)//10 + 1}")
+    #             embeds.append(embed)
+    #         
+    #         # Send with pagination if multiple pages
+    #         if len(embeds) > 1:
+    #             view = PaginationView(embeds)
+    #             await ctx.send(embed=embeds[0], view=view)
+    #         else:
+    #             await ctx.send(embed=embeds[0])
+    #             
+    #     except Exception as e:
+    #         await ctx.send(f"Error: {str(e)}")
 
-            each_page = 7
-            pages = math.ceil(len(guilds_sorted) / each_page)
-            embeds = []
-
-            for page in range(pages):
-                embed = discord.Embed(title=f"Server List ({len(guilds_sorted)})", color=discord.Color.pink())
-                start_idx = page * each_page
-                end_idx = start_idx + each_page
-
-                for guild in guilds_sorted[start_idx:end_idx]:
-                    try:
-                        invites = await guild.invites()
-                        first_invite = invites[0].url if invites else 'No invite link'
-                    except Exception:  # Tüm exceptionları yakalamak için genel bir Exception kullanın
-                        first_invite = 'No invite link'
-                    member = await guild.fetch_member(783064615012663326)
-                    embed.add_field(
-                        name=f"{guild.name} ({guild.member_count})",
-                        value=f"*Owner:* <@{guild.owner_id}> \n*Join Date:* {member.joined_at.strftime('%m/%d/%Y, %H:%M:%S')} \n*Invite:* {first_invite}",
-                        inline=False
-                    )
-                embed.set_footer(text=f"Page: {page + 1}/{pages}")
-                embeds.append(embed)
-
-            view = Paginator(embeds)
-            await view.send_initial_message(ctx)
-        except Exception as e:
-            print(e)
-
-    @commands.hybrid_command(name="support", description="Shows information about the bot's support server.")
-    async def support(self, ctx):
-        """Provides links to the bot's support server, invite link, and other helpful resources."""
-        embed = discord.Embed(title=f"Do you need help {ctx.author.name}?", description="You can join bot's support server: \nhttps://discord.gg/ynGqvsYxah", color=discord.Color.pink())
-        await ctx.send(embed=embed, view=SupportView(self.bot))
+    # @commands.hybrid_command(name="support", description="Shows information about the bot's support server.")
+    # async def support(self, ctx):
+    #     embed = discord.Embed(
+    #         title="🛡️ Support Server",
+    #         description="Need help? Join our support server!",
+    #         color=discord.Color.blue()
+    #     )
+    #     
+    #     embed.add_field(
+    #         name="Support Server",
+    #         value="[Click here to join](https://discord.gg/YOUR_INVITE_LINK)",
+    #         inline=False
+    #     )
+    #     
+    #     embed.add_field(
+    #         name="Website",
+    #         value="[Visit our website](https://your-website.com)",
+    #         inline=True
+    #     )
+    #     
+    #     embed.add_field(
+    #         name="Documentation",
+    #         value="[Read the docs](https://docs.your-website.com)",
+    #         inline=True
+    #     )
+    #     
+    #     await ctx.send(embed=embed)
 
     @commands.Cog.listener()
     async def on_interaction(self, interaction: discord.Interaction):

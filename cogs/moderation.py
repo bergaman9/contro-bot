@@ -400,42 +400,6 @@ class Moderation(commands.Cog):
         # This would be replaced with actual implementation
         await ctx.send(embed=embed, ephemeral=True)
 
-    @commands.hybrid_command(name="edit_nicknames", description="Edit nicknames in bulk")
-    @commands.has_permissions(manage_nicknames=True)
-    async def edit_nicknames(self, ctx, role: discord.Role = None):
-        """Edit nicknames in bulk for members with a specific role"""
-        if role:
-            members = [member for member in ctx.guild.members if role in member.roles]
-        else:
-            members = ctx.guild.members
-            
-        embed = discord.Embed(
-            title="✏️ Bulk Nickname Editor",
-            description=f"This will allow you to edit nicknames for {len(members)} members.",
-            color=discord.Color.blue()
-        )
-        
-        # This would be replaced with actual implementation
-        await ctx.send(embed=embed, ephemeral=True)
-
-    @commands.hybrid_command(name="reset_nicknames", description="Reset nicknames in bulk")
-    @commands.has_permissions(manage_nicknames=True)
-    async def reset_nicknames(self, ctx, role: discord.Role = None):
-        """Reset nicknames in bulk for members with a specific role"""
-        if role:
-            members = [member for member in ctx.guild.members if role in member.roles]
-        else:
-            members = ctx.guild.members
-            
-        embed = discord.Embed(
-            title="🔄 Bulk Nickname Reset",
-            description=f"This will reset nicknames for {len(members)} members.",
-            color=discord.Color.blue()
-        )
-        
-        # This would be replaced with actual implementation
-        await ctx.send(embed=embed, ephemeral=True)
-
     @commands.hybrid_command(name="give_everyone", description="Give everyone a specific role")
     @commands.has_permissions(administrator=True)
     async def give_everyone(self, ctx, role: discord.Role):

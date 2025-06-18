@@ -453,244 +453,246 @@ class Register(commands.Cog):
             
         return role
     
-    @commands.hybrid_command(name="kayıt", description="Registers a user with the given name and age.")
-    @app_commands.describe(
-        member="The member to register",
-        name="The name of the member",
-        age="The age of the member"
-    )
-    @commands.has_permissions(manage_roles=True)
-    async def kayıt(self, ctx, member: discord.Member, name: str, age: int):
-        """
-        Registers a member with the specified name and age, assigning them the configured registration role.
-        """
-        try:
-            # Get the registration role
-            role = await self._get_register_role(ctx.guild)
-            
-            # Update member's nickname and roles
-            await member.edit(nick=f"{name} | {age}")
-            await member.add_roles(role)
-            
-            # Record the registration in the database
-            self.mongo_db["register_log"].update_one(
-                {"guild_id": ctx.guild.id, "user_id": member.id},
-                {"$set": {
-                    "name": name,
-                    "age": age,
-                    "registered_by": ctx.author.id,
-                    "registered_at": discord.utils.utcnow().timestamp()
-                }},
-                upsert=True
-            )
-            
-            await ctx.send(embed=create_embed(
-                f"{member.mention} başarıyla {role.mention} rolü ile kayıt edildi.", 
-                discord.Color.green()
-            ))
-            
-        except RegisterError as e:
-            await ctx.send(embed=create_embed(str(e), discord.Color.red()))
-        except discord.Forbidden:
-            await ctx.send(embed=create_embed(
-                "Bot gerekli izinlere sahip değil. Rol yönetimi ve kullanıcı düzenleme izinleri gereklidir.",
-                discord.Color.red()
-            ))
-        except Exception as e:
-            await ctx.send(embed=create_embed(
-                f"Kayıt işlemi sırasında bir hata oluştu: {str(e)}",
-                discord.Color.red()
-            ))
-    
-    @commands.hybrid_command(name="kayıt_setup", description="Sets up the registration system.")
-    @app_commands.describe(
-        role="The role to give to registered members"
-    )
-    @commands.has_permissions(administrator=True)
-    async def kayıt_setup(self, ctx, role: discord.Role):
-        """
-        Sets up the registration system by configuring the role to be assigned to registered members.
-        """
-        try:
-            # Store the registration role in the database
-            self.mongo_db["register"].update_one(
-                {"guild_id": ctx.guild.id},
-                {"$set": {"role_id": str(role.id)}},
-                upsert=True
-            )
-            
-            await ctx.send(embed=create_embed(
-                f"Kayıt sistemi başarıyla ayarlandı. Kayıt olan üyelere {role.mention} rolü verilecek.\n\nDaha detaylı ayarlar için ayarlar modülündeki `/register_settings` komutunu kullanabilirsiniz.",
-                discord.Color.green()
-            ))
-            
-        except Exception as e:
-            await ctx.send(embed=create_embed(
-                f"Kayıt sistemi ayarlanırken bir hata oluştu: {str(e)}",
-                discord.Color.red()
-            ))
-    
+    # REMOVED: These commands are now integrated into the unified /settings panel (Registration section)
+    # @commands.hybrid_command(name="kayıt", description="Registers a user with the given name and age.")
+    # @app_commands.describe(
+    #     user="The user to register",
+    #     name="The user's real name",
+    #     age="The user's age"
+    # )
+    # @commands.has_any_role("Registration Officer", "Admin", "Moderator")
+    # async def kayit(self, ctx, user: discord.Member, name: str, age: int):
+    #     """Register a user with the given name and age"""
+    #     try:
+    #         # Get guild settings
+    #         guild_settings = await self.db.register_settings.find_one({"guild_id": str(ctx.guild.id)}) or {}
+    #         
+    #         # Get configured roles
+    #         main_role_id = guild_settings.get("main_role_id")
+    #         age_plus_role_id = guild_settings.get("age_plus_role_id")
+    #         age_minus_role_id = guild_settings.get("age_minus_role_id")
+    #         bronze_role_id = guild_settings.get("bronze_role_id")
+    #         
+    #         # Validate that required roles are configured
+    #         if not main_role_id:
+    #             return await ctx.send(embed=self._error_embed("❌ Ana kayıt rolü ayarlanmamış! Lütfen önce `/kayıt_setup` kullanın."))
+    #         
+    #         # Get roles
+    #         roles_to_add = []
+    #         main_role = ctx.guild.get_role(int(main_role_id))
+    #         if main_role:
+    #             roles_to_add.append(main_role)
+    #         
+    #         # Add age-based role
+    #         if age >= 18 and age_plus_role_id:
+    #             age_role = ctx.guild.get_role(int(age_plus_role_id))
+    #             if age_role:
+    #                 roles_to_add.append(age_role)
+    #         elif age < 18 and age_minus_role_id:
+    #             age_role = ctx.guild.get_role(int(age_minus_role_id))
+    #             if age_role:
+    #                 roles_to_add.append(age_role)
+    #         
+    #         # Add bronze role if configured
+    #         if bronze_role_id:
+    #             bronze_role = ctx.guild.get_role(int(bronze_role_id))
+    #             if bronze_role:
+    #                 roles_to_add.append(bronze_role)
+    #         
+    #         # Set nickname
+    #         nickname = f"{name} | {age}"
+    #         await user.edit(nick=nickname, roles=user.roles + roles_to_add)
+    #         
+    #         # Send success message
+    #         await ctx.send(embed=self._success_embed(f"✅ {user.mention} başarıyla kayıt edildi!\n**İsim:** {name}\n**Yaş:** {age}"))
+    #         
+    #         # Log to registration channel if configured
+    #         log_channel_id = guild_settings.get("log_channel_id")
+    #         if log_channel_id:
+    #             log_channel = ctx.guild.get_channel(int(log_channel_id))
+    #             if log_channel:
+    #                 log_embed = discord.Embed(
+    #                     title="📝 Yeni Kayıt",
+    #                     color=discord.Color.green(),
+    #                     timestamp=datetime.utcnow()
+    #                 )
+    #                 log_embed.add_field(name="Kayıt Edilen", value=user.mention, inline=True)
+    #                 log_embed.add_field(name="İsim", value=name, inline=True)
+    #                 log_embed.add_field(name="Yaş", value=age, inline=True)
+    #                 log_embed.add_field(name="Kayıt Eden", value=ctx.author.mention, inline=True)
+    #                 log_embed.set_footer(text=f"ID: {user.id}")
+    #                 await log_channel.send(embed=log_embed)
+    #                 
+    #     except discord.Forbidden:
+    #         await ctx.send(embed=self._error_embed("❌ Bu kullanıcıyı kayıt etmek için yeterli yetkim yok!"))
+    #     except Exception as e:
+    #         logger.error(f"Registration error: {e}")
+    #         await ctx.send(embed=self._error_embed(f"❌ Kayıt sırasında bir hata oluştu: {str(e)}"))
 
-    
-    @commands.hybrid_command(name="kayıt_settings_show", description="Shows the current registration system settings.")
-    @commands.has_permissions(manage_roles=True)
-    async def kayıt_settings_show(self, ctx):
-        """
-        Displays the current registration system settings including the configured role.
-        """
-        try:
-            # Get settings from database
-            settings = self.mongo_db["register"].find_one({"guild_id": ctx.guild.id})
-            if not settings:
-                return await ctx.send(embed=create_embed(
-                    "❌ Kayıt sistemi henüz ayarlanmamış.",
-                    discord.Color.red()
-                ))
-            
-            embed = discord.Embed(
-                title="📋 Kayıt Sistemi Ayarları", 
-                color=discord.Color.blue()
-            )
-            
-            # Main role
-            role_id = settings.get("role_id")
-            if role_id:
-                role = ctx.guild.get_role(int(role_id))
-                role_value = f"{role.mention} ({role.id})" if role else f"Rol bulunamadı (ID: {role_id})"
-                embed.add_field(name="Ana Kayıt Rolü", value=role_value, inline=True)
-            else:
-                embed.add_field(name="Ana Kayıt Rolü", value="❌ Ayarlanmamış", inline=True)
-            
-            # Adult role
-            adult_role_id = settings.get("adult_role_id")
-            if adult_role_id:
-                adult_role = ctx.guild.get_role(int(adult_role_id))
-                role_value = f"{adult_role.mention} ({adult_role.id})" if adult_role else f"Rol bulunamadı (ID: {adult_role_id})"
-                embed.add_field(name="18+ Yaş Rolü", value=role_value, inline=True)
-            else:
-                embed.add_field(name="18+ Yaş Rolü", value="❌ Ayarlanmamış", inline=True)
-            
-            # Minor role
-            minor_role_id = settings.get("minor_role_id")
-            if minor_role_id:
-                minor_role = ctx.guild.get_role(int(minor_role_id))
-                role_value = f"{minor_role.mention} ({minor_role.id})" if minor_role else f"Rol bulunamadı (ID: {minor_role_id})"
-                embed.add_field(name="18- Yaş Rolü", value=role_value, inline=True)
-            else:
-                embed.add_field(name="18- Yaş Rolü", value="❌ Ayarlanmamış", inline=True)
-            
-            # Bronze role
-            bronze_role_id = settings.get("bronze_role_id")
-            if bronze_role_id:
-                bronze_role = ctx.guild.get_role(int(bronze_role_id))
-                role_value = f"{bronze_role.mention} ({bronze_role.id})" if bronze_role else f"Rol bulunamadı (ID: {bronze_role_id})"
-                embed.add_field(name="Bronz Rol", value=role_value, inline=True)
-            else:
-                embed.add_field(name="Bronz Rol", value="❌ Ayarlanmamış", inline=True)
-            
-            # Log channel
-            log_channel_id = settings.get("log_channel_id")
-            if log_channel_id:
-                log_channel = ctx.guild.get_channel(int(log_channel_id))
-                channel_value = f"{log_channel.mention} ({log_channel.id})" if log_channel else f"Kanal bulunamadı (ID: {log_channel_id})"
-                embed.add_field(name="Log Kanalı", value=channel_value, inline=True)
-            else:
-                embed.add_field(name="Log Kanalı", value="❌ Ayarlanmamış", inline=True)
-            
-            embed.set_footer(text="Daha detaylı ayarlar için ayarlar modülündeki /register_settings komutunu kullanabilirsiniz.")
-            await ctx.send(embed=embed)
-            
-        except Exception as e:
-            logger.error(f"Error showing register settings: {e}")
-            await ctx.send(embed=create_embed(
-                f"Ayarlar gösterilirken bir hata oluştu: {str(e)}",
-                discord.Color.red()
-            ))
-    
-    @commands.command(name="debug_register", help="Check registration system status and troubleshoot issues")
-    @commands.has_permissions(administrator=True)
-    async def debug_register(self, ctx):
-        """Command to debug registration system issues"""
-        try:
-            # Check MongoDB connection
-            db_status = "✅ Connected" if self.mongo_db else "❌ Not connected"
-            
-            # Check if register button is in persistent views
-            register_view_count = sum(1 for v in self.bot.persistent_views if isinstance(v, RegisterButton))
-            
-            # Build debug info embed
-            embed = discord.Embed(
-                title="Registration System Debug",
-                description="Diagnostic information for the registration system",
-                color=discord.Color.blue()
-            )
-            
-            embed.add_field(name="Database Status", value=db_status, inline=False)
-            embed.add_field(name="Register Button Views", value=str(register_view_count), inline=False)
-            
-            # Add guild settings info
-            try:
-                guild_settings = self.mongo_db["register"].find_one({"guild_id": str(ctx.guild.id)})
-                if guild_settings:
-                    settings_info = "✅ Found"
-                    
-                    # Check for required fields
-                    for field in ["roles", "log_channel", "welcome_message"]:
-                        if field in guild_settings:
-                            embed.add_field(
-                                name=f"{field.replace('_', ' ').title()}", 
-                                value=f"✅ Configured", 
-                                inline=True
-                            )
-                        else:
-                            embed.add_field(
-                                name=f"{field.replace('_', ' ').title()}", 
-                                value=f"❌ Not configured", 
-                                inline=True
-                            )
-                else:
-                    settings_info = "❌ Not found - Run configuration commands first"
-                
-                embed.add_field(name="Guild Settings", value=settings_info, inline=False)
-            except Exception as e:
-                embed.add_field(name="Guild Settings", value=f"❌ Error: {str(e)}", inline=False)
-            
-            await ctx.send(embed=embed)
-            
-            # Create a fresh register button for testing
-            await ctx.send(
-                "New registration button for testing (temporary):", 
-                view=RegisterButton()
-            )
-            
-        except Exception as e:
-            logger.error(f"Error in debug_register: {e}\n{traceback.format_exc()}")
-            await ctx.send(f"Error during registration debug: {str(e)}")
+    # @commands.hybrid_command(name="kayıt_setup", description="Sets up the registration system.")
+    # @commands.has_permissions(administrator=True)
+    # async def kayit_setup(self, ctx):
+    #     """Set up the registration system"""
+    #     embed = discord.Embed(
+    #         title="📝 Kayıt Sistemi Kurulumu",
+    #         description="Kayıt sistemini yapılandırmak için aşağıdaki butonu kullanın:",
+    #         color=discord.Color.blue()
+    #     )
+    #     embed.add_field(
+    #         name="ℹ️ Bilgi",
+    #         value="Bu panel üzerinden kayıt rollerini ve kanallarını ayarlayabilirsiniz.",
+    #         inline=False
+    #     )
+    #     
+    #     view = RegisterSetupView(self.bot, ctx.guild.id)
+    #     await ctx.send(embed=embed, view=view)
 
-    @commands.command(name="reset_register_views", help="Clear and reload registration buttons")
-    @commands.has_permissions(administrator=True)
-    async def reset_register_views(self, ctx):
-        """Reset all registration button views"""
-        try:
-            # Create a new register button
-            new_button = RegisterButton()
-            
-            # Add it to the bot
-            self.bot.add_view(new_button)
-            
-            await ctx.send(
-                embed=create_embed(
-                    description="✅ Registration button views have been reset. New buttons should now work.",
-                    color=discord.Color.green()
-                )
-            )
-            
-            # Send a test button
-            await ctx.send("Test button:", view=new_button)
-            
-        except Exception as e:
-            logger.error(f"Error in reset_register_views: {e}\n{traceback.format_exc()}")
-            await ctx.send(f"Error resetting views: {str(e)}")
+    # @commands.hybrid_command(name="kayıt_settings_show", description="Shows the current registration system settings.")
+    # @commands.has_permissions(manage_guild=True)
+    # async def kayit_settings_show(self, ctx):
+    #     """Show current registration system settings"""
+    #     try:
+    #         # Get guild settings
+    #         guild_settings = await self.db.register_settings.find_one({"guild_id": str(ctx.guild.id)}) or {}
+    #         
+    #         embed = discord.Embed(
+    #             title="📝 Kayıt Sistemi Ayarları",
+    #             color=discord.Color.blue()
+    #         )
+    #         
+    #         # Main role
+    #         main_role_id = guild_settings.get("main_role_id")
+    #         if main_role_id:
+    #             role = ctx.guild.get_role(int(main_role_id))
+    #             embed.add_field(name="Ana Kayıt Rolü", value=role.mention if role else "❌ Rol bulunamadı", inline=True)
+    #         else:
+    #             embed.add_field(name="Ana Kayıt Rolü", value="❌ Ayarlanmamış", inline=True)
+    #         
+    #         # Age roles
+    #         age_plus_role_id = guild_settings.get("age_plus_role_id")
+    #         if age_plus_role_id:
+    #             role = ctx.guild.get_role(int(age_plus_role_id))
+    #             embed.add_field(name="18+ Rolü", value=role.mention if role else "❌ Rol bulunamadı", inline=True)
+    #         else:
+    #             embed.add_field(name="18+ Rolü", value="❌ Ayarlanmamış", inline=True)
+    #         
+    #         age_minus_role_id = guild_settings.get("age_minus_role_id")
+    #         if age_minus_role_id:
+    #             role = ctx.guild.get_role(int(age_minus_role_id))
+    #             embed.add_field(name="18- Rolü", value=role.mention if role else "❌ Rol bulunamadı", inline=True)
+    #         else:
+    #             embed.add_field(name="18- Rolü", value="❌ Ayarlanmamış", inline=True)
+    #         
+    #         # Bronze role
+    #         bronze_role_id = guild_settings.get("bronze_role_id")
+    #         if bronze_role_id:
+    #             role = ctx.guild.get_role(int(bronze_role_id))
+    #             embed.add_field(name="Bronz Rolü", value=role.mention if role else "❌ Rol bulunamadı", inline=True)
+    #         else:
+    #             embed.add_field(name="Bronz Rolü", value="❌ Ayarlanmamış", inline=True)
+    #         
+    #         # Log channel
+    #         log_channel_id = guild_settings.get("log_channel_id")
+    #         if log_channel_id:
+    #             channel = ctx.guild.get_channel(int(log_channel_id))
+    #             embed.add_field(name="Log Kanalı", value=channel.mention if channel else "❌ Kanal bulunamadı", inline=True)
+    #         else:
+    #             embed.add_field(name="Log Kanalı", value="❌ Ayarlanmamış", inline=True)
+    #         
+    #         # Register channel
+    #         register_channel_id = guild_settings.get("register_channel_id")
+    #         if register_channel_id:
+    #             channel = ctx.guild.get_channel(int(register_channel_id))
+    #             embed.add_field(name="Kayıt Kanalı", value=channel.mention if channel else "❌ Kanal bulunamadı", inline=True)
+    #         else:
+    #             embed.add_field(name="Kayıt Kanalı", value="❌ Ayarlanmamış", inline=True)
+    #         
+    #         await ctx.send(embed=embed)
+    #         
+    #     except Exception as e:
+    #         logger.error(f"Error showing registration settings: {e}")
+    #         await ctx.send(embed=self._error_embed(f"❌ Ayarlar gösterilirken hata oluştu: {str(e)}"))
+
+    # @commands.command(name="debug_register", help="Check registration system status and troubleshoot issues")
+    # @commands.has_permissions(administrator=True)
+    # async def debug_register(self, ctx):
+    #     """Debug command to check registration system status"""
+    #     try:
+    #         embed = discord.Embed(
+    #             title="🔧 Registration System Debug",
+    #             color=discord.Color.blue()
+    #         )
+    #         
+    #         # Check guild settings
+    #         guild_settings = await self.db.register_settings.find_one({"guild_id": str(ctx.guild.id)}) or {}
+    #         
+    #         if guild_settings:
+    #             embed.add_field(name="✅ Guild Settings", value="Found in database", inline=False)
+    #             
+    #             # Check each configured ID
+    #             for setting_name, setting_value in guild_settings.items():
+    #                 if setting_name == "_id" or setting_name == "guild_id":
+    #                     continue
+    #                     
+    #                 if "role" in setting_name and setting_value:
+    #                     role = ctx.guild.get_role(int(setting_value))
+    #                     status = "✅ Found" if role else "❌ Not found"
+    #                     embed.add_field(
+    #                         name=setting_name,
+    #                         value=f"{setting_value} - {status}",
+    #                         inline=True
+    #                     )
+    #                 elif "channel" in setting_name and setting_value:
+    #                     channel = ctx.guild.get_channel(int(setting_value))
+    #                     status = "✅ Found" if channel else "❌ Not found"
+    #                     embed.add_field(
+    #                         name=setting_name,
+    #                         value=f"{setting_value} - {status}",
+    #                         inline=True
+    #                     )
+    #         else:
+    #             embed.add_field(name="❌ Guild Settings", value="Not found in database", inline=False)
+    #         
+    #         # Check for registration message
+    #         if guild_settings.get("register_channel_id"):
+    #             channel = ctx.guild.get_channel(int(guild_settings["register_channel_id"]))
+    #             if channel:
+    #                 # Try to find registration message
+    #                 async for message in channel.history(limit=50):
+    #                     if message.author == self.bot.user and message.embeds:
+    #                         for embed_msg in message.embeds:
+    #                             if "Kayıt Ol" in embed_msg.title or "Register" in embed_msg.title:
+    #                                 embed.add_field(
+    #                                     name="✅ Registration Message",
+    #                                     value=f"Found in {channel.mention}",
+    #                                     inline=False
+    #                                 )
+    #                                 break
+    #         
+    #         await ctx.send(embed=embed)
+    #         
+    #     except Exception as e:
+    #         logger.error(f"Debug register error: {e}")
+    #         await ctx.send(f"❌ Debug error: {str(e)}")
+
+    # @commands.command(name="reset_register_views", help="Clear and reload registration buttons")
+    # @commands.has_permissions(administrator=True)
+    # async def reset_register_views(self, ctx):
+    #     """Reset registration views"""
+    #     try:
+    #         # Clear existing views
+    #         for view in self.bot.persistent_views:
+    #             if isinstance(view, RegisterButton):
+    #                 self.bot.remove_view(view)
+    #         
+    #         # Re-add the view
+    #         self.bot.add_view(RegisterButton())
+    #         
+    #         await ctx.send("✅ Registration views have been reset!")
+    #         
+    #     except Exception as e:
+    #         logger.error(f"Error resetting register views: {e}")
+    #         await ctx.send(f"❌ Error: {str(e)}")
 
 async def setup(bot):
     # Import the error_handler at setup time

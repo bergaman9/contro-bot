@@ -1,16 +1,19 @@
         <:dot:1048034906057474098>Sunucudaki bazı kanalların görevleri aşağıda açıklanmıştır. Bazı kanalların görevlerini üyelerin görmesi açısından açıklamalarına yazdım.
 
-        **Yazı Kanalları**
-        {rules}: Sunucu kurallarının yazılı olduğu kanal.
+        **Metin Kanalları**
+        {rules}: Sunucu kurallarının bulunduğu kanal.
         {roles}: Üyelerin rollerini alıp bırakabileceği kanal.
         {support}: Üyelerin ticket oluşturabileceği kanal.
-        {general}: Üyelerin sohbet edebileceği kanal.
-        {giveaways}: Çekilişlerin yapıldığı kanal.
-        {games}: Oyunlarla ilgili konuşulan kanal. Bedava oyun duyuruları ve oyun güncellemeleri burada yayınlanır.
-        {commands}: Üyelerin komutları kullanabileceği kanal.
+        {general}: Genel sohbet kanalı.
+        {giveaways}: Çekilişlerin düzenlendiği kanal.
+        {commands}: Bot komutlarının kullanıldığı kanal.
+        {announcements}: Önemli duyuruların yapıldığı kanal.
 
         **Ses Kanalları**
-        {temporary}: Geçici ses kanallarının oluşturulduğu kanal oluşturucu kanal.
+        {temporary}: Geçici kanal oluşturma hub'ı.
+        {activity}: Etkinlikler için ses kanalı.
+        🎵 Müzik: Müzik dinleme kanalları.
+        🎮 Oyun: Oyun oynama ses kanalları.
 
         **Duyuru Kanalları**
         {streams}: Twitch yayınlarının duyurulduğu kanal.
@@ -20,4 +23,4 @@
         {activity}: Etkinliklerin yapıldığı kanal.
 
         **Forum Kanalları**
-        {forum}: Üyelerin tartışma başlatabileceği kanal.
+        {forum}: Tartışma ve konu başlıkları için forum kanalı.

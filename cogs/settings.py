@@ -18,10 +18,16 @@ from utils.settings.views import (
     RoleManagementView,
     StarboardView,
     FeatureManagementView,
-    LevellingSettingsView
+    LevellingSettingsView,
+    PrefixSettingsView,
+    StatusRoleSettingsView,
+    BirthdaySettingsView,
+    AISettingsView,
+    LegalInfoView,
+    ChannelSelectView,
+    AdvancedSettingsView
 )
 from utils.settings.logging_views import LoggingSettingsView
-from utils.setup.views import LanguageSelectView
 from utils.settings.register_views import RegisterSettingsView
 from utils.database.connection import get_async_db, initialize_mongodb
 from utils.database.db_manager import db_manager
@@ -38,7 +44,12 @@ class Settings(commands.Cog):
     async def initialize_db(self):
         """Initialize the database connection"""
         try:
-            self.db = await db_manager.get_database()
+            # Get the database from db_manager
+            if db_manager and hasattr(db_manager, 'get_database'):
+                self.db = db_manager.get_database()
+            else:
+                # Fallback to bot's async_db if available
+                self.db = getattr(self.bot, 'async_db', None)
             logger.info("Database connection initialized for Settings cog")
         except Exception as e:
             logger.error(f"Error initializing database connection: {e}")
@@ -77,7 +88,7 @@ class Settings(commands.Cog):
     async def get_settings_summary(self, guild_id):
         """Get a summary of current server settings"""
         if self.db is None:
-            self.db = await db_manager.get_database()
+            self.db = db_manager.get_database()
             
         summary_parts = []
         
@@ -106,6 +117,18 @@ class Settings(commands.Cog):
             summary_parts.append("🎫 Tickets: Enabled")
         else:
             summary_parts.append("🎫 Tickets: Disabled")
+        
+        # Check bot prefix
+        bot_settings = await self.db.settings.find_one({"guild_id": guild_id}) or {}
+        prefix = bot_settings.get("prefix", ">")
+        summary_parts.append(f"🤖 Prefix: `{prefix}`")
+        
+        # Check birthday system
+        birthday_settings = await self.db.birthday.find_one({"guild_id": guild_id})
+        if birthday_settings and birthday_settings.get("channel_id"):
+            summary_parts.append("🎂 Birthday: Enabled")
+        else:
+            summary_parts.append("🎂 Birthday: Disabled")
             
         return "\n".join(summary_parts)
 

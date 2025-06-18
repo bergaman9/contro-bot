@@ -7,6 +7,8 @@ import asyncio
 import motor.motor_asyncio
 import pymongo
 import time
+from ..core.logger import logger
+import certifi
 
 # Motor kütüphanesi, MongoDB için asenkron işlemler sağlar
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -351,8 +353,19 @@ class DummyAsyncDatabase:
     
     def __init__(self):
         logger.warning("Using DummyAsyncDatabase - MongoDB connection failed")
+        # Add commonly accessed collections as properties
+        self.levelling_settings = DummyAsyncCollection("levelling_settings")
+        self.feature_toggles = DummyAsyncCollection("feature_toggles")
+        self.server_settings = DummyAsyncCollection("server_settings")
+        self.welcomer = DummyAsyncCollection("welcomer")
+        self.ticket_settings = DummyAsyncCollection("ticket_settings")
+        self.turkoyto_users = DummyAsyncCollection("turkoyto_users")
+        self.users = DummyAsyncCollection("users")
     
     def __getitem__(self, collection_name: str):
+        # Return existing collection if it's one of the predefined ones
+        if hasattr(self, collection_name):
+            return getattr(self, collection_name)
         return DummyAsyncCollection(collection_name)
     
     async def list_collection_names(self) -> List[str]:

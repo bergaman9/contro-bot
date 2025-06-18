@@ -4,26 +4,25 @@ from discord import app_commands
 import asyncio
 import datetime
 import json
-import aiohttp
 import os
-import dotenv
-from typing import Optional, Dict, Any
 import logging
-import pathlib
+from typing import Optional, Dict, Any, List
 
 from utils.core.formatting import create_embed
+from utils.database.db_manager import db_manager
+from utils.setup.views import MainSetupView, BusinessCommandsView
+from utils.setup.templates import get_builtin_template, get_emojis, get_headers
 from utils.content_loader import load_content
-from utils.setup import LanguageSelectView
-from utils.database.connection import initialize_mongodb
-
-dotenv.load_dotenv()
+from utils.setup.views import AnalyticsView, TemplateManagementView
+from utils.database.content_manager import content_manager
+from utils.core.content_loader import async_load_content, async_set_content
 
 class ServerSetup(commands.Cog):
+    """Sunucu kurulum ve yönetim araçları - Owner only"""
+    
     def __init__(self, bot):
         self.bot = bot
-        self.mongo_db = initialize_mongodb()
-        self.perplexity_api_key = os.getenv("PERPLEXITY_API_KEY")
-        self.perplexity_api_url = "https://api.perplexity.ai/chat/completions"
+        self.db = None
         
         # JSON dosya yolları
         self.templates_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'templates')
@@ -36,29 +35,42 @@ class ServerSetup(commands.Cog):
         # Format değişkenlerini yükle
         self.format_variables = self.load_format_variables()
         
-        # Varsayılan kanal açıklamaları
-        self.default_channel_descriptions = {
-            "🎉・çekilişler": "Çekilişlerin düzenlendiği kanal.",
-            "🎫・destek": "Üyelerin ticket açarak destek alabildiği kanal.",
-            "🎮・oyunlar": "Oyunlar gerçek hayatı taklit eden harika teknoloji ürünleridir.",
-            "📺・yayınlar": "Twitch yayınlarının duyurulduğu kanal.",
-            "📢・duyurular": "Sunucu hakkında yapılan duyuruları buradan takip edebilirsiniz.",
-            "🧠・tartışmalar": "Çeşitli konularda tartışmak için konular açabilirsiniz.",
-            "🤖・komutlar": "Komutları kullanabileceğiniz kanal.",
-            "📜・kurallar": "Sunucu kurallarını buradan okuyabilirsiniz.",
-            "💬・sohbet": "Kurallar çerçevesinde her konudan konuşabilirsiniz.",
-            "🎭・roller": "Reaksiyon rollerinizi alabileceğiniz kanal.",
-            "👋・hoş-geldin": "Sunucuya yeni katılan üyeleri karşıladığımız kanal.",
-            "📷・görseller": "Görsel paylaşabilirsiniz.",
-            "🎥・videolar": "Video paylaşabilirsiniz.",
-            "🍿・dizi-film": "Dizi ve filmler üzerine konuşabilirsiniz.",
-            "🎵・müzik": "Müzik çalmak için komutları kullanabilirsiniz."
-        }
-
     async def cog_check(self, ctx):
         """Sadece bot sahibi bu komutları kullanabilir"""
         return await self.bot.is_owner(ctx.author)
-
+    
+    async def cog_load(self):
+        """Cog yüklendiğinde database bağlantısını kur"""
+        self.db = db_manager.get_database()
+    
+    @app_commands.command(name="setup", description="Comprehensive server setup and management panel")
+    async def setup_panel(self, interaction: discord.Interaction):
+        """Opens the main setup panel - uses views from utils/setup"""
+        embed = discord.Embed(
+            title="🛠️ Comprehensive Server Setup Panel",
+            description="Access all server management tools from one place:",
+            color=discord.Color.blue()
+        )
+        embed.add_field(
+            name="🎯 Main Features",
+            value=(
+                "🏗️ **Server Structure** - Automatic setup with templates\n"
+                "📝 **Content Management** - Rules, announcements, embeds\n"
+                "🤖 **Bot Integration** - Mass bot addition\n"
+                "🎨 **Customization** - Roles, permissions, emoji styles\n"
+                "📊 **Analytics & Maintenance** - Statistics, description updates\n"
+                "💾 **Template Management** - Save, load, share\n"
+                "🏢 **Business Commands** - Bionluk integration\n"
+                "📥 **Discord Template Import** - Import ready templates"
+            ),
+            inline=False
+        )
+        embed.set_footer(text="Select an option to continue")
+        
+        # Create MainSetupView with English language
+        view = MainSetupView(self.bot, language="en")
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+    
     # region Format Variables System
     def load_format_variables(self):
         """Format değişkenlerini JSON dosyasından yükler"""
@@ -309,34 +321,6 @@ class ServerSetup(commands.Cog):
             return False
     # endregion
 
-    # region Main Setup Command
-    @app_commands.command(name="setup", description="Kapsamlı sunucu kurulum ve yönetim paneli")
-    async def setup_panel(self, interaction: discord.Interaction):
-        """Ana kurulum panelini açar"""
-        embed = discord.Embed(
-            title="🛠️ Kapsamlı Sunucu Kurulum Paneli",
-            description="Tüm sunucu yönetim araçlarına tek noktadan erişin:",
-            color=discord.Color.blue()
-        )
-        embed.add_field(
-            name="🎯 Ana Özellikler",
-            value=(
-                "🏗️ **Sunucu Yapısı** - Template'lerle otomatik kurulum\n"
-                "📝 **İçerik Yönetimi** - Kurallar, duyurular, embed'ler\n"
-                "🤖 **Bot Entegrasyonu** - Toplu bot ekleme\n"
-                "🎨 **Özelleştirme** - Roller, izinler, emoji stili\n"
-                "📊 **Analiz & Bakım** - İstatistikler, açıklama güncelleme\n"
-                "💾 **Template Yönetimi** - Kaydet, yükle, paylaş\n"
-                "🏢 **İş Komutları** - Bionluk entegrasyonu\n"
-                "📥 **Discord Template Import** - Hazır template'leri içe aktar"
-            ),
-            inline=False
-        )
-        embed.set_footer(text="Önce dil seçimi yapın")
-        
-        await interaction.response.send_message(embed=embed, view=LanguageSelectView(self.bot), ephemeral=True)
-    # endregion
-
     # region Utility Functions
     async def create_invite(self, guild):
         """Sunucu için davet linki oluşturur"""
@@ -362,15 +346,26 @@ class ServerSetup(commands.Cog):
                 if progress_message:
                     await progress_message.edit(content=f"İşleniyor: {channel.name} ({i + 1}/{len(text_channels)})")
                 
-                # Önce varsayılan açıklamalara bak
-                description = self.default_channel_descriptions.get(channel.name)
+                # Varsayılan açıklamalar
+                default_descriptions = {
+                    "🎉・çekilişler": "Çekilişlerin düzenlendiği kanal.",
+                    "🎫・destek": "Üyelerin ticket açarak destek alabildiği kanal.",
+                    "🎮・oyunlar": "Oyunlar hakkında sohbet kanalı.",
+                    "📺・yayınlar": "Twitch yayınlarının duyurulduğu kanal.",
+                    "📢・duyurular": "Sunucu hakkında yapılan duyuruları buradan takip edebilirsiniz.",
+                    "🧠・tartışmalar": "Çeşitli konularda tartışmak için konular açabilirsiniz.",
+                    "🤖・komutlar": "Komutları kullanabileceğiniz kanal.",
+                    "📜・kurallar": "Sunucu kurallarını buradan okuyabilirsiniz.",
+                    "💬・sohbet": "Kurallar çerçevesinde her konudan konuşabilirsiniz.",
+                    "🎭・roller": "Reaksiyon rollerinizi alabileceğiniz kanal.",
+                    "👋・hoş-geldin": "Sunucuya yeni katılan üyeleri karşıladığımız kanal.",
+                    "📷・görseller": "Görsel paylaşabilirsiniz.",
+                    "🎥・videolar": "Video paylaşabilirsiniz.",
+                    "🍿・dizi-film": "Dizi ve filmler üzerine konuşabilirsiniz.",
+                    "🎵・müzik": "Müzik çalmak için komutları kullanabilirsiniz."
+                }
                 
-                # Yoksa AI ile üret
-                if not description and self.perplexity_api_key:
-                    description = await self.generate_channel_description(channel.name)
-                
-                if not description:
-                    description = f"Kanal: {channel.name}"
+                description = default_descriptions.get(channel.name, f"Kanal: {channel.name}")
                 
                 # Kanal açıklamasını güncelle
                 await channel.edit(topic=description)
@@ -381,250 +376,186 @@ class ServerSetup(commands.Cog):
                 continue
         
         return updated_count
-
-    async def generate_channel_description(self, channel_name: str, language: str = "tr"):
-        """AI kullanarak kanal açıklaması üretir"""
-        if not self.perplexity_api_key:
-            return f"Kanal: {channel_name}"
-        
-        try:
-            system_prompt = (
-                "Sen bir Discord sunucusu için kanal açıklamaları yazan samimi bir asistansın. "
-                "Kısa, net ve maksimum 100 karakter uzunluğunda açıklama yaz."
-            ) if language == "tr" else (
-                "You are a friendly assistant who writes channel descriptions for Discord servers. "
-                "Write short, clear descriptions with a maximum of 100 characters."
-            )
-            
-            user_prompt = (
-                f"Discord sunucusundaki '{channel_name}' adlı kanal için kısa bir açıklama yaz. "
-                f"Bu açıklama kullanıcıya kanalın amacını açıklamalı."
-            ) if language == "tr" else (
-                f"Write a short description for the '{channel_name}' channel in a Discord server. "
-                f"This description should explain the purpose of the channel to users."
-            )
-            
-            headers = {
-                "Authorization": f"Bearer {self.perplexity_api_key}",
-                "Content-Type": "application/json"
-            }
-            
-            payload = {
-                "model": "sonar",
-                "messages": [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}
-                ]
-            }
-            
-            async with aiohttp.ClientSession() as session:
-                async with session.post(self.perplexity_api_url, headers=headers, json=payload) as response:
-                    if response.status == 200:
-                        result = await response.json()
-                        choices = result.get("choices", [])
-                        if choices:
-                            description = choices[0].get("message", {}).get("content", "")
-                            return description if description else f"Kanal: {channel_name}"
-                    return f"Kanal: {channel_name}"
-        except Exception as e:
-            logging.error(f"AI açıklama üretme hatası: {e}")
-            return f"Kanal: {channel_name}"
     # endregion
 
-    @app_commands.command(name="load_cogs", description="Tüm cogları yükleyerek dev bot sorununu çözer")
-    async def load_all_cogs(self, interaction: discord.Interaction):
-        """Tüm cogları yükler ve dev bot sorununu çözer"""
-        await interaction.response.defer(thinking=True)
+    # region Content Management Commands
+    @commands.group(name="content", description="Manage server content")
+    @commands.has_permissions(manage_guild=True)
+    async def content_group(self, ctx):
+        """Content management command group"""
+        if ctx.invoked_subcommand is None:
+            await ctx.send_help(ctx.command)
+    
+    @content_group.command(name="view", description="View current content")
+    async def content_view(self, ctx, content_key: str):
+        """View current content for a specific key"""
+        guild_id = str(ctx.guild.id)
         
-        try:
-            results = await self.fix_dev_bot()
-            
-            loaded_cogs = "\n".join(results["loaded"])
-            failed_cogs = "\n".join([f"{cog}" for cog in results["failed"]])
-            
+        # Initialize content manager if needed
+        if not content_manager._initialized:
+            await content_manager.initialize()
+        
+        content = await async_load_content(guild_id, content_key)
+        
+        # Check if content is too long for Discord
+        if len(content) > 1900:
+            # Split into multiple messages
+            chunks = [content[i:i+1900] for i in range(0, len(content), 1900)]
+            for i, chunk in enumerate(chunks):
+                embed = discord.Embed(
+                    title=f"📄 Content: {content_key} (Part {i+1}/{len(chunks)})",
+                    description=f"```md\n{chunk}\n```",
+                    color=discord.Color.blue()
+                )
+                await ctx.send(embed=embed)
+        else:
             embed = discord.Embed(
-                title="🔧 Cog Yükleme Sonuçları",
-                color=discord.Color.green()
-            )
-            
-            if loaded_cogs:
-                embed.add_field(name="✅ Yüklenen Coglar", value=f"```\n{loaded_cogs}\n```", inline=False)
-            else:
-                embed.add_field(name="❌ Yüklenen Cog Yok", value="Hiçbir cog yüklenemedi.", inline=False)
-                
-            if failed_cogs:
-                embed.add_field(name="❌ Yüklenemeyen Coglar", value=f"```\n{failed_cogs}\n```", inline=False)
-            
-            embed.set_footer(text=f"Toplam: {len(results['loaded'])} başarılı, {len(results['failed'])} başarısız")
-            
-            await interaction.followup.send(embed=embed)
-        except Exception as e:
-            await interaction.followup.send(f"❌ Hata: {str(e)}")
-
-    @staticmethod
-    async def fix_dev_bot():
-        """A utility method to fix development bot cog loading issues"""
-        import discord
-        from discord.ext import commands
-        import os
-        import pathlib
-        import asyncio
-        
-        bot = commands.Bot(command_prefix=">>", intents=discord.Intents.all())
-        
-        # Count available cogs
-        cogs_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "cogs")
-        cog_files = [f.stem for f in pathlib.Path(cogs_dir).glob("*.py") if f.stem != "__init__"]
-        
-        print(f"Found {len(cog_files)} cogs to load")
-        
-        # Load all cogs
-        loaded = []
-        failed = []
-        
-        for cog in cog_files:
-            try:
-                await bot.load_extension(f"cogs.{cog}")
-                loaded.append(cog)
-                print(f"Loaded: {cog}")
-            except Exception as e:
-                failed.append(f"{cog}: {e}")
-                print(f"Failed to load {cog}: {e}")
-        
-        print(f"\nResults: Loaded {len(loaded)} cogs, {len(failed)} failed")
-        if failed:
-            print("\nFailed cogs:")
-            for fail in failed:
-                print(f"- {fail}")
-                
-        # Sync commands
-        try:
-            await bot.tree.sync()
-            print("Commands synced successfully")
-        except Exception as e:
-            print(f"Error syncing commands: {e}")
-        
-        return {"loaded": loaded, "failed": failed}
-
-    # New method to handle settings
-    @app_commands.command(name="server_settings", description="Sunucu ayarlarını yönetmenizi sağlar")
-    async def server_settings(self, interaction: discord.Interaction):
-        """Sunucu ayarları menüsünü gösterir"""
-        try:
-            # Create embed for settings
-            embed = discord.Embed(
-                title="⚙️ Sunucu Ayarları",
-                description="Aşağıdaki butonları kullanarak sunucu ayarlarını yapılandırabilirsiniz.",
+                title=f"📄 Content: {content_key}",
+                description=f"```md\n{content}\n```",
                 color=discord.Color.blue()
             )
-            
+            embed.set_footer(text="Use /content edit to modify this content")
+            await ctx.send(embed=embed)
+    
+    @content_group.command(name="edit", description="Edit server content")
+    async def content_edit(self, ctx, content_key: str, *, new_content: str):
+        """Edit content for a specific key"""
+        guild_id = str(ctx.guild.id)
+        
+        # Initialize content manager if needed
+        if not content_manager._initialized:
+            await content_manager.initialize()
+        
+        success = await async_set_content(guild_id, content_key, new_content)
+        
+        if success:
+            embed = discord.Embed(
+                title="✅ Content Updated",
+                description=f"Successfully updated content for `{content_key}`",
+                color=discord.Color.green()
+            )
+            await ctx.send(embed=embed)
+        else:
+            embed = discord.Embed(
+                title="❌ Update Failed",
+                description=f"Failed to update content for `{content_key}`",
+                color=discord.Color.red()
+            )
+            await ctx.send(embed=embed)
+    
+    @content_group.command(name="list", description="List all available content keys")
+    async def content_list(self, ctx):
+        """List all available content keys"""
+        guild_id = str(ctx.guild.id)
+        
+        # Initialize content manager if needed
+        if not content_manager._initialized:
+            await content_manager.initialize()
+        
+        all_contents = await content_manager.get_all_contents(guild_id)
+        
+        embed = discord.Embed(
+            title="📚 Available Content Keys",
+            description="Use `/content view <key>` to view content\nUse `/content edit <key> <content>` to edit",
+            color=discord.Color.blue()
+        )
+        
+        content_list = []
+        for key in sorted(all_contents.keys()):
+            content_preview = all_contents[key][:50] + "..." if len(all_contents[key]) > 50 else all_contents[key]
+            content_list.append(f"• **{key}**: {content_preview}")
+        
+        embed.add_field(
+            name="Content Keys",
+            value="\n".join(content_list) if content_list else "No content available",
+            inline=False
+        )
+        
+        await ctx.send(embed=embed)
+    
+    @content_group.command(name="import", description="Import default content")
+    @commands.is_owner()
+    async def content_import(self, ctx):
+        """Import all default content for this server"""
+        guild_id = str(ctx.guild.id)
+        
+        # Initialize content manager if needed
+        if not content_manager._initialized:
+            await content_manager.initialize()
+        
+        embed = discord.Embed(
+            title="📥 Importing Default Content",
+            description="Importing all default content files...",
+            color=discord.Color.blue()
+        )
+        msg = await ctx.send(embed=embed)
+        
+        success = await content_manager.import_default_for_guild(guild_id)
+        
+        if success:
+            embed = discord.Embed(
+                title="✅ Import Complete",
+                description="Successfully imported all default content!",
+                color=discord.Color.green()
+            )
             embed.add_field(
-                name="📋 Mevcut Kategoriler",
-                value=(
-                    "🔧 **Feature Management** - Özellikleri aç/kapat\n"
-                    "🏠 **Server Settings** - Temel sunucu ayarları\n"
-                    "👋 **Welcome/Goodbye** - Karşılama ve vedalaşma sistemi\n"
-                    "🛡️ **Moderation** - Moderasyon araçları ve otomatik roller\n"
-                    "📊 **Logging** - Sunucu eventi logları\n"
-                    "🎫 **Ticket System** - Destek ticket sistemi\n"
-                    "👑 **Role Management** - Rol yönetimi ve reaksiyon rolleri\n"
-                    "⭐ **Starboard** - Yıldız panosu sistemi\n"
-                    "🎮 **Temp Channels** - Geçici sesli kanal sistemi"
-                ),
+                name="Next Steps",
+                value="• Use `/content list` to see all content\n"
+                      "• Use `/content view <key>` to view specific content\n"
+                      "• Use `/content edit <key>` to customize content",
                 inline=False
             )
-            
-            # Create view with buttons
-            view = discord.ui.View(timeout=180)
-            
-            # Feature management button
-            feature_button = discord.ui.Button(
-                style=discord.ButtonStyle.secondary,
-                label="🔧 Özellik Yönetimi", 
-                custom_id="features_button"
+        else:
+            embed = discord.Embed(
+                title="❌ Import Failed",
+                description="Failed to import default content. Check logs for details.",
+                color=discord.Color.red()
             )
-            
-            # Server settings button
-            server_button = discord.ui.Button(
-                style=discord.ButtonStyle.secondary,
-                label="🏠 Sunucu Ayarları", 
-                custom_id="server_button"
-            )
-            
-            # Welcome/goodbye button
-            welcome_button = discord.ui.Button(
-                style=discord.ButtonStyle.secondary,
-                label="👋 Hoş Geldin/Güle Güle", 
-                custom_id="welcome_button"
-            )
-            
-            # Moderation button
-            moderation_button = discord.ui.Button(
-                style=discord.ButtonStyle.secondary,
-                label="🛡️ Moderasyon", 
-                custom_id="moderation_button"
-            )
-            
-            # Logging button
-            logging_button = discord.ui.Button(
-                style=discord.ButtonStyle.secondary,
-                label="📊 Logging", 
-                custom_id="logging_button"
-            )
-            
-            # Add button callbacks
-            async def feature_callback(interaction: discord.Interaction):
-                await interaction.response.send_message(
-                    "Özellik yönetimi menüsü açılıyor...", 
-                    ephemeral=True
+        
+        await msg.edit(embed=embed)
+    
+    @content_group.command(name="reset", description="Reset content to default")
+    async def content_reset(self, ctx, content_key: Optional[str] = None):
+        """Reset content to default values"""
+        guild_id = str(ctx.guild.id)
+        
+        # Initialize content manager if needed
+        if not content_manager._initialized:
+            await content_manager.initialize()
+        
+        if content_key:
+            # Reset specific content
+            success = await content_manager.reset_content(guild_id, content_key)
+            if success:
+                embed = discord.Embed(
+                    title="✅ Content Reset",
+                    description=f"Successfully reset `{content_key}` to default",
+                    color=discord.Color.green()
                 )
-            
-            async def server_callback(interaction: discord.Interaction):
-                await interaction.response.send_message(
-                    "Sunucu ayarları menüsü açılıyor...", 
-                    ephemeral=True
+            else:
+                embed = discord.Embed(
+                    title="❌ Reset Failed",
+                    description=f"Failed to reset `{content_key}`",
+                    color=discord.Color.red()
                 )
-                
-            async def welcome_callback(interaction: discord.Interaction):
-                await interaction.response.send_message(
-                    "Hoş geldin/güle güle ayarları menüsü açılıyor...", 
-                    ephemeral=True
+        else:
+            # Reset all content
+            success = await content_manager.reset_all_contents(guild_id)
+            if success:
+                embed = discord.Embed(
+                    title="✅ All Content Reset",
+                    description="Successfully reset all content to defaults",
+                    color=discord.Color.green()
                 )
-                
-            async def moderation_callback(interaction: discord.Interaction):
-                await interaction.response.send_message(
-                    "Moderasyon ayarları menüsü açılıyor...", 
-                    ephemeral=True
+            else:
+                embed = discord.Embed(
+                    title="❌ Reset Failed",
+                    description="Failed to reset content",
+                    color=discord.Color.red()
                 )
-                
-            async def logging_callback(interaction: discord.Interaction):
-                await interaction.response.send_message(
-                    "Logging ayarları menüsü açılıyor...", 
-                    ephemeral=True
-                )
-            
-            # Assign callbacks to buttons
-            feature_button.callback = feature_callback
-            server_button.callback = server_callback
-            welcome_button.callback = welcome_callback
-            moderation_button.callback = moderation_callback
-            logging_button.callback = logging_callback
-            
-            # Add buttons to view
-            view.add_item(feature_button)
-            view.add_item(server_button)
-            view.add_item(welcome_button)
-            view.add_item(moderation_button)
-            view.add_item(logging_button)
-            
-            # Send response
-            await interaction.response.send_message(embed=embed, view=view)
-        except Exception as e:
-            logging.error(f"Settings command error: {e}")
-            await interaction.response.send_message(
-                f"⚠️ Ayarlar menüsünü açarken bir hata oluştu: {str(e)}",
-                ephemeral=True
-            )
+        
+        await ctx.send(embed=embed)
+    # endregion
 
 async def setup(bot):
     await bot.add_cog(ServerSetup(bot))

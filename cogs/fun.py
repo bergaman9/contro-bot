@@ -103,54 +103,56 @@ class Fun(commands.Cog):
             await ctx.send(
                 embed=create_embed(f"{member.mention}, {removed_roles_string} burç rolün kaldırıldı.", 0xff0076))
 
-    @commands.hybrid_command(name="birthday", description="Doğum günü belirterek burcunuzu alın.")
-    @app_commands.describe(day="Doğum gününüzün günü.", month="Doğum gününüzün ayı.", year="Doğum gününüzün yılı.")
-    async def birthday(self, ctx, day: int, month: int, year: int = None):
-        # Kullanıcıya göre burç belirleme
-        zodiac_sign = self.get_zodiac_sign(day, month)
+    # Comment out - moved to unified settings
+    # @commands.hybrid_command(name="birthday", description="Doğum günü belirterek burcunuzu alın.")
+    # @app_commands.describe(day="Doğum gününüzün günü.", month="Doğum gününüzün ayı.", year="Doğum gününüzün yılı.")
+    # async def birthday(self, ctx, day: int, month: int, year: int = None):
+    #     # Kullanıcıya göre burç belirleme
+    #     zodiac_sign = self.get_zodiac_sign(day, month)
+    #
+    #     if zodiac_sign:
+    #         role = discord.utils.get(ctx.guild.roles, name=zodiac_sign)
+    #         if role:
+    #             member = ctx.author
+    #
+    #             await self.remove_zodiac_role(ctx, member)
+    #
+    #             await member.add_roles(role)
+    #
+    #             # Kullanıcının doğum gününü veritabanına kaydedin
+    #             self.mongo_db['birthday'].update_one({"guild_id": ctx.guild.id}, {
+    #                 "$push": {"members": {"day": day, "month": month, "year": year, "member_id": member.id}}},
+    #                                                      upsert=True)
+    #
+    #             await ctx.send(embed=create_embed(f"{member.mention}, burcun {role.mention} olarak belirlendi.",
+    #                                               discord.Colour.green()))
+    #         else:
+    #             await ctx.send(embed=create_embed(
+    #                 f"{zodiac_sign} adında bir rol bulunamadı. Lütfen sunucu yöneticisine bu rolü oluşturmasını söyleyin.",
+    #                 discord.Colour.red()))
+    #     else:
+    #         await ctx.send(embed=create_embed("Geçersiz doğum günü veya ay.", discord.Colour.red()))
 
-        if zodiac_sign:
-            role = discord.utils.get(ctx.guild.roles, name=zodiac_sign)
-            if role:
-                member = ctx.author
-
-                await self.remove_zodiac_role(ctx, member)
-
-                await member.add_roles(role)
-
-                # Kullanıcının doğum gününü veritabanına kaydedin
-                self.mongo_db['birthday'].update_one({"guild_id": ctx.guild.id}, {
-                    "$push": {"members": {"day": day, "month": month, "year": year, "member_id": member.id}}},
-                                                     upsert=True)
-
-                await ctx.send(embed=create_embed(f"{member.mention}, burcun {role.mention} olarak belirlendi.",
-                                                  discord.Colour.green()))
-            else:
-                await ctx.send(embed=create_embed(
-                    f"{zodiac_sign} adında bir rol bulunamadı. Lütfen sunucu yöneticisine bu rolü oluşturmasını söyleyin.",
-                    discord.Colour.red()))
-        else:
-            await ctx.send(embed=create_embed("Geçersiz doğum günü veya ay.", discord.Colour.red()))
-
-    @commands.hybrid_command(name="birthday_setup", description="Burç rollerini ve doğum günü kanalını ayarlayın.")
-    @app_commands.describe(channel="Doğum günü mesajlarının paylaşılacağı kanal.")
-    @commands.has_permissions(manage_roles=True)
-    async def birthday_setup(self, ctx, channel: discord.TextChannel = None):
-        # Burç rollerini ayarlayın
-        await ctx.defer()
-        zodiac_roles = ["Akrep", "Yay", "Oğlak", "Kova", "Balık", "Koç", "Boğa", "İkizler", "Yengeç", "Aslan", "Başak",
-                        "Terazi"]
-        for role in zodiac_roles:
-            if not discord.utils.get(ctx.guild.roles, name=role):
-                await ctx.guild.create_role(name=role)
-
-        await ctx.send(embed=create_embed("Burç rolleri oluşturuldu.", discord.Colour.green()))
-
-        if channel:
-            self.mongo_db['birthday'].update_one({"guild_id": ctx.guild.id}, {"$set": {"channel_id": channel.id}},
-                                                 upsert=True)
-            await ctx.send(embed=create_embed(f"{channel.mention} kanalında doğum günü mesajları paylaşılacak.",
-                                              discord.Colour.green()))
+    # Comment out - moved to unified settings  
+    # @commands.hybrid_command(name="birthday_setup", description="Burç rollerini ve doğum günü kanalını ayarlayın.")
+    # @app_commands.describe(channel="Doğum günü mesajlarının paylaşılacağı kanal.")
+    # @commands.has_permissions(manage_roles=True)
+    # async def birthday_setup(self, ctx, channel: discord.TextChannel = None):
+    #     # Burç rollerini ayarlayın
+    #     await ctx.defer()
+    #     zodiac_roles = ["Akrep", "Yay", "Oğlak", "Kova", "Balık", "Koç", "Boğa", "İkizler", "Yengeç", "Aslan", "Başak",
+    #                     "Terazi"]
+    #     for role in zodiac_roles:
+    #         if not discord.utils.get(ctx.guild.roles, name=role):
+    #             await ctx.guild.create_role(name=role)
+    #
+    #     await ctx.send(embed=create_embed("Burç rolleri oluşturuldu.", discord.Colour.green()))
+    #
+    #     if channel:
+    #         self.mongo_db['birthday'].update_one({"guild_id": ctx.guild.id}, {"$set": {"channel_id": channel.id}},
+    #                                              upsert=True)
+    #         await ctx.send(embed=create_embed(f"{channel.mention} kanalında doğum günü mesajları paylaşılacak.",
+    #                                           discord.Colour.green()))
 
     @app_commands.command(name="ask", description="Get an answer to a question.")
     @app_commands.describe(question="Write your question.")
@@ -548,12 +550,6 @@ class Fun(commands.Cog):
         embed.add_field(name="Genres", value=(", ").join(str(e) for e in genre_names), inline=True)
         embed.set_image(url=f"https://image.tmdb.org/t/p/original/{content['backdrop_path']}")
 
-        await ctx.send(embed=embed)
-
-    @commands.hybrid_command(name="love", description="Sends a channel message that you love mentioned member.")
-    @app_commands.describe(member="The member to love.")
-    async def love(self, ctx, member: discord.Member):
-        embed = discord.Embed(description=f"{ctx.author.mention}, {member.mention} seni çok seviyor! ❤", color=0xffcbdb)
         await ctx.send(embed=embed)
 
     @commands.hybrid_command(name="love_calculator", description="Calculate love percentage between two members.")

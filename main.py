@@ -119,6 +119,8 @@ def parse_arguments():
                         help="Enable debug mode with additional logging")
     parser.add_argument("--skip-token-verification", action="store_true",
                         help="Skip Discord API token verification (use for debugging)")
+    parser.add_argument("--resync", action="store_true",
+                        help="Sync slash commands with Discord on startup")
     
     return parser.parse_args()
 
@@ -413,7 +415,7 @@ async def main():
     # Store configuration manager and client ID on bot
     bot.config_manager = config_manager
     bot.client_id = client_id
-    bot.startTime = time.time()  # Set bot start time for uptime calculations
+    bot.start_time = datetime.utcnow()  # Set bot start time for uptime calculations
     
     # Load bot version from version_config.json
     try:
@@ -437,7 +439,8 @@ async def main():
     # Initialize MongoDB connection with better error handling using centralized manager
     try:
         # Add timeout to database initialization
-        db = await asyncio.wait_for(db_manager.initialize(), timeout=60.0)
+        mongodb_uri = os.getenv("MONGO_DB") or os.getenv("MONGODB_URI", "mongodb://localhost:27017/")
+        db = await asyncio.wait_for(db_manager.initialize(mongodb_uri), timeout=60.0)
         logger.info("MongoDB connected successfully")
         print_colored("✅ MongoDB connected successfully", "green")
         
@@ -763,36 +766,6 @@ async def main():
             logger.error(f"Error syncing commands: {e}")
             await ctx.send(f"❌ Failed to sync commands: {e}")
 
-    # Add command to clear and reload persistent views
-    @bot.command(name="reload_views", help="Clear and reload all persistent views")
-    @commands.is_owner()
-    async def reload_views(ctx):
-        try:
-            # Clear existing view tracking
-            PERSISTENT_VIEWS.clear()
-            PERSISTENT_VIEW_IDS.clear()
-            
-            # Note: We can't remove views from the bot directly,
-            # but we can reload them which will supersede the old ones
-            
-            # Reload all views
-            await setup_persistent_views()
-            
-            await ctx.send(
-                embed=create_embed(
-                    description=f"✅ Successfully reloaded {len(PERSISTENT_VIEWS)} persistent views.",
-                    color=discord.Color.green()
-                )
-            )
-        except Exception as e:
-            logger.error(f"Error reloading views: {e}")
-            await ctx.send(
-                embed=create_embed(
-                    description=f"❌ Failed to reload views: {str(e)}",
-                    color=discord.Color.red()
-                )
-            )
-
     # --- COG MANAGEMENT COMMANDS ---
 
     @bot.command(name="load", help="Load a cog by name")
@@ -886,102 +859,6 @@ async def main():
             except Exception as e:
                 await ctx.send(f"❌ Failed to reload cog `{cog}`: {e}")
 
-    @bot.command(name="restart", help="Reload all cogs and core/admin modules without shutting down the bot")
-    @commands.is_owner()
-    async def restart(ctx):
-        import importlib
-        import sys
-        import pathlib
-        import time
-        
-        start_time = time.time()
-        status_msg = await ctx.send("⏳ Restarting bot services... Please wait.")
-
-        # Reload utils modules first
-        utils_dir = os.path.join(os.path.dirname(__file__), "utils")
-        utils_modules = []
-        for pyfile in pathlib.Path(utils_dir).rglob("*.py"):
-            if "__pycache__" in str(pyfile):
-                continue
-            rel_path = pyfile.relative_to(os.path.dirname(__file__)).as_posix().replace("/", ".")[:-3]
-            try:
-                mod = importlib.import_module(rel_path)
-                importlib.reload(mod)
-                utils_modules.append(rel_path)
-            except Exception as e:
-                logger.error(f"Failed to reload util module {rel_path}: {e}")
-        
-        # Unload all cogs first
-        cogs_dir = os.path.join(os.path.dirname(__file__), "cogs")
-        cog_files = [f.stem for f in pathlib.Path(cogs_dir).glob("*.py") if f.stem != "__init__"]
-        reloaded = []
-        failed = []
-        
-        # First unload all cogs
-        for cog in cog_files:
-            try:
-                if f"cogs.{cog}" in bot.extensions:
-                    await bot.unload_extension(f"cogs.{cog}")
-            except Exception as e:
-                logger.error(f"Error unloading {cog}: {e}")
-
-        # Then reload all cogs
-        for cog in cog_files:
-            try:
-                await bot.load_extension(f"cogs.{cog}")
-                reloaded.append(cog)
-            except Exception as e:
-                failed.append(f"{cog}: {e}")
-                logger.error(f"Failed to reload cog {cog}: {e}")
-        
-        # Sync application commands
-        try:
-            await bot.tree.sync()
-            logger.info("Command tree successfully synced")
-        except Exception as e:
-            logger.error(f"Error syncing command tree: {e}")
-            failed.append(f"command_sync: {e}")
-
-        # Reload admin.py
-        try:
-            import importlib.util
-            spec = importlib.util.find_spec("admin")
-            if spec is None:
-                raise ImportError("admin.py not found")
-            admin = importlib.import_module("admin")
-            importlib.reload(admin)
-            reloaded.append("admin.py")
-        except Exception as e:
-            failed.append(f"admin.py: {e}")
-
-        # Reload admin_views
-        try:
-            import importlib.util
-            spec = importlib.util.find_spec("admin_views")
-            if spec is None:
-                raise ImportError("admin_views.py not found")
-            admin_views = importlib.import_module("admin_views")
-            importlib.reload(admin_views)
-            reloaded.append("admin_views")
-        except Exception as e:
-            failed.append(f"admin_views: {e}")
-
-        # Reload core directory
-        core_dir = os.path.join(os.path.dirname(__file__), "core")
-        for pyfile in pathlib.Path(core_dir).rglob("*.py"):
-            rel_path = pyfile.relative_to(os.path.dirname(__file__)).as_posix().replace("/", ".")[:-3]
-            try:
-                mod = importlib.import_module(rel_path)
-                importlib.reload(mod)
-                reloaded.append(rel_path)
-            except Exception as e:
-                failed.append(f"{rel_path}: {e}")
-
-        msg = f"♻️ Restarted (reloaded): {', '.join(reloaded)}"
-        if failed:
-            msg += f"\n❌ Failed: {', '.join(failed)}"
-        await ctx.send(msg)
-
     # Helper function to load cogs with improved parallel loading
     async def load_cogs():
         # Get enabled cogs for this client
@@ -1020,27 +897,24 @@ async def main():
         
         logger.info(f"Cog loading complete: {success_count} loaded, {failed_count} failed")
         
-        # Sync commands after cogs are loaded
-        try:
-            logger.info("Syncing application commands...")
-            await bot.tree.sync()
-            logger.info("Application commands synced successfully")
-        except Exception as e:
-            logger.error(f"Error syncing commands: {e}")
+        # Sync commands only if --resync flag is provided
+        if args.resync:
+            try:
+                logger.info("Syncing application commands (--resync flag provided)...")
+                await bot.tree.sync()
+                logger.info("Application commands synced successfully")
+                print_colored("✅ Commands synced successfully", "green")
+            except Exception as e:
+                logger.error(f"Error syncing commands: {e}")
+                print_colored(f"❌ Failed to sync commands: {e}", "red")
+        else:
+            logger.info("Skipping command sync (use --resync flag to sync commands)")
     
     # Start the bot with the client-specific token
     try:
         print_colored(f"\nStarting {client_id.upper()} bot using {token_source}...", "cyan", "bold")
         logger.info(f"Starting {client_id} client with token from {token_source}...")
-        # Start API server in background before connecting to Discord
-        if not args.no_api and client_id == "main":
-            try:
-                logger.info("Starting API server immediately (main client only)")
-                print_colored("Starting API server...", "cyan")
-                api_thread = start_api_server()
-            except Exception as e:
-                logger.error(f"Exception when starting API server: {e}")
-                print_colored(f"⚠️ API server startup error: {e}", "red")
+        # API server already started above, no need to start again
                 
         # Connect to Discord
         await bot.start(token)

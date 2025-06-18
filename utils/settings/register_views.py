@@ -6,7 +6,8 @@ import datetime
 from pathlib import Path
 import os
 
-from utils.database.db_manager import get_collection
+from utils.database.connection import get_collection
+from utils.database.db_manager import db_manager
 from utils.core.formatting import create_embed, hex_to_int
 
 # Set up logging
@@ -26,16 +27,25 @@ class RegisterSettingsView(discord.ui.View):
         self.bot = bot
         self.guild_id = guild_id
         
-        # Load settings and update button styles
-        self.update_button_styles()
+        # Initialize button styles will be done after initialization
+        self.bot.loop.create_task(self.initialize_view())
+    
+    async def initialize_view(self):
+        """Initialize the view with database data"""
+        await self.update_button_styles()
         
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         """Ensure only admins can use these buttons"""
         return interaction.user.guild_permissions.administrator
     
-    def update_button_styles(self):
+    async def update_button_styles(self):
         """Update button styles based on configuration status"""
-        settings = get_collection("register").find_one({"guild_id": self.guild_id}) or {}
+        # Get database from db_manager
+        db = db_manager.get_database()
+        if db is None:
+            return
+            
+        settings = await db.register.find_one({"guild_id": self.guild_id}) or {}
         
         # Update each button's style based on whether it's configured
         for item in self.children:
@@ -68,7 +78,8 @@ class RegisterSettingsView(discord.ui.View):
     @discord.ui.button(label="Entry Roles", emoji="🎭", style=discord.ButtonStyle.primary, row=0, custom_id="register_entry_roles")
     async def entry_roles_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Configure roles to give after registration"""
-        settings = get_collection("register").find_one({"guild_id": self.guild_id}) or {}
+        db = db_manager.get_database()
+        settings = await db.register.find_one({"guild_id": self.guild_id}) or {}
         roles_to_add = settings.get("roles_to_add", [])
         
         # Check if configured
@@ -87,7 +98,8 @@ class RegisterSettingsView(discord.ui.View):
     @discord.ui.button(label="Roles to Remove", emoji="🚫", style=discord.ButtonStyle.primary, row=0, custom_id="register_remove_roles")
     async def remove_roles_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Configure roles to remove after registration"""
-        settings = get_collection("register").find_one({"guild_id": self.guild_id}) or {}
+        db = db_manager.get_database()
+        settings = await db.register.find_one({"guild_id": self.guild_id}) or {}
         roles_to_remove = settings.get("roles_to_remove", [])
         
         # Check if configured
@@ -106,7 +118,8 @@ class RegisterSettingsView(discord.ui.View):
     @discord.ui.button(label="Age Roles", emoji="🎂", style=discord.ButtonStyle.secondary, row=0, custom_id="register_age_roles")
     async def age_roles_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Configure age-based roles"""
-        settings = get_collection("register").find_one({"guild_id": self.guild_id}) or {}
+        db = db_manager.get_database()
+        settings = await db.register.find_one({"guild_id": self.guild_id}) or {}
         age_roles_enabled = settings.get("age_roles_enabled", False)
         
         # Button color based on status
@@ -127,7 +140,8 @@ class RegisterSettingsView(discord.ui.View):
     @discord.ui.button(label="Log Channel", emoji="📊", style=discord.ButtonStyle.secondary, row=1, custom_id="register_log_channel")
     async def log_channel_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Configure the log channel"""
-        settings = get_collection("register").find_one({"guild_id": self.guild_id}) or {}
+        db = db_manager.get_database()
+        settings = await db.register.find_one({"guild_id": self.guild_id}) or {}
         log_channel_id = settings.get("log_channel_id")
         
         button_style = discord.ButtonStyle.success if log_channel_id else discord.ButtonStyle.danger
@@ -141,7 +155,8 @@ class RegisterSettingsView(discord.ui.View):
     @discord.ui.button(label="Nickname Update", emoji="✏️", style=discord.ButtonStyle.secondary, row=1, custom_id="register_nickname_update")
     async def nickname_update_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Configure nickname update after registration"""
-        settings = get_collection("register").find_one({"guild_id": self.guild_id}) or {}
+        db = db_manager.get_database()
+        settings = await db.register.find_one({"guild_id": self.guild_id}) or {}
         nickname_enabled = settings.get("nickname_update_enabled", False)
         
         button_style = discord.ButtonStyle.success if nickname_enabled else discord.ButtonStyle.danger
@@ -634,7 +649,7 @@ class RegisterMessageSendView(discord.ui.View):
         super().__init__(timeout=timeout)
         self.bot = bot
         self.guild_id = guild_id
-                self.language = "en"
+        self.language = "en"
         
     @discord.ui.button(label="🇬🇧 English", style=discord.ButtonStyle.primary, row=0)
     async def english_button(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -939,7 +954,7 @@ class RoleSelectionView(discord.ui.View):
         self.guild_id = guild_id
         self.setting_key = setting_key
         self.title = title
-                self.current_page = 0
+        self.current_page = 0
         self.roles_per_page = 20
         
         # Get all roles except @everyone

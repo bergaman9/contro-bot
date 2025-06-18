@@ -4,6 +4,7 @@ import logging
 import asyncio
 from discord import ui
 from utils.database.connection import get_async_db
+from utils.common import error_embed, success_embed, info_embed, warning_embed
 
 # Configure logger
 logger = logging.getLogger('temp_channels_settings')
@@ -253,7 +254,10 @@ class TempChannelsAdvancedView(discord.ui.View):
     async def toggle_game_emojis(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Toggle game emojis on/off"""
         if not self.parent_view.config:
-            return await interaction.response.send_message("❌ Ayarlar yüklenemedi.", ephemeral=True)
+            return await interaction.response.send_message(
+                embed=error_embed("Ayarlar yüklenemedi. Lütfen daha sonra tekrar deneyin."),
+                ephemeral=True
+            )
             
         # Toggle the game emojis
         self.parent_view.config["game_emojis_enabled"] = not self.parent_view.config.get("game_emojis_enabled", True)
@@ -314,7 +318,10 @@ class SetUserLimitModal(discord.ui.Modal, title="Kullanıcı Limiti Ayarla"):
             # Convert to int and validate
             limit = int(self.user_limit.value)
             if limit < 0:
-                return await interaction.response.send_message("❌ Limit 0 veya daha büyük olmalıdır.", ephemeral=True)
+                return await interaction.response.send_message(
+                    embed=error_embed("Limit 0 veya daha büyük olmalıdır."),
+                    ephemeral=True
+                )
                 
             # Update the config
             self.parent_view.config["user_limit"] = limit
@@ -334,7 +341,10 @@ class SetUserLimitModal(discord.ui.Modal, title="Kullanıcı Limiti Ayarla"):
             
             await interaction.response.edit_message(embed=embed, view=self.advanced_view)
         except ValueError:
-            await interaction.response.send_message("❌ Geçerli bir sayı girin.", ephemeral=True)
+            await interaction.response.send_message(
+                embed=error_embed("Geçerli bir sayı girin."),
+                ephemeral=True
+            )
         except Exception as e:
             logger.error(f"Error setting user limit: {e}")
             await interaction.response.send_message(f"❌ Bir hata oluştu: {str(e)}", ephemeral=True)
@@ -364,7 +374,10 @@ class SetTimeoutModal(discord.ui.Modal, title="Zaman Aşımı Ayarla"):
             # Convert to int and validate
             timeout = int(self.timeout.value)
             if timeout < 0:
-                return await interaction.response.send_message("❌ Zaman aşımı 0 veya daha büyük olmalıdır.", ephemeral=True)
+                return await interaction.response.send_message(
+                    embed=error_embed("Zaman aşımı 0 veya daha büyük olmalıdır."),
+                    ephemeral=True
+                )
                 
             # Update the config
             self.parent_view.config["inactive_timeout"] = timeout
@@ -384,7 +397,13 @@ class SetTimeoutModal(discord.ui.Modal, title="Zaman Aşımı Ayarla"):
             
             await interaction.response.edit_message(embed=embed, view=self.advanced_view)
         except ValueError:
-            await interaction.response.send_message("❌ Geçerli bir sayı girin.", ephemeral=True)
+            await interaction.response.send_message(
+                embed=error_embed("Geçerli bir sayı girin."),
+                ephemeral=True
+            )
         except Exception as e:
             logger.error(f"Error setting timeout: {e}")
-            await interaction.response.send_message(f"❌ Bir hata oluştu: {str(e)}", ephemeral=True)
+            await interaction.response.send_message(
+                embed=error_embed(f"Bir hata oluştu: {str(e)}"),
+                ephemeral=True
+            )

@@ -70,7 +70,7 @@ class Levelling(commands.Cog):
                 # Try to initialize directly
                 try:
                     from utils.database.db_manager import db_manager
-                    self.mongo_db = await db_manager.get_database()
+                    self.mongo_db = db_manager.get_database()
                     if self.mongo_db is not None:
                         logger.info("Initialized MongoDB connection directly")
                     else:
@@ -97,7 +97,7 @@ class Levelling(commands.Cog):
                 # Try to initialize
                 try:
                     from utils.database.db_manager import db_manager
-                    self.mongo_db = await db_manager.get_database()
+                    self.mongo_db = db_manager.get_database()
                     if self.mongo_db is not None:
                         logger.info("Database connection established for Levelling")
                     else:
@@ -452,173 +452,145 @@ class Levelling(commands.Cog):
             logger.error(f"Error in level command for user {member.id if member else 'None'}: {e}", exc_info=True)
             await ctx.send("An error occurred while showing the level card.", ephemeral=True)
 
-    @commands.hybrid_command(name="levelinfo", aliases=["levelstats"], description="Show detailed level information")
-    async def levelinfo(self, ctx, member: discord.Member = None):
-        """
-        Show detailed level information for a user.
-        
-        Parameters
-        ----------
-        member: discord.Member
-            Optional - User whose information to show. If not specified, shows command user's info.
-        """
+    @commands.hybrid_group(name="leaderboard", aliases=["lb"], description="Show server leaderboards")
+    async def leaderboard(self, ctx):
+        """Show server leaderboards"""
+        if ctx.invoked_subcommand is None:
+            # Default to level leaderboard
+            await self.level_leaderboard(ctx)
+
+    @leaderboard.command(name="level", aliases=["xp"], description="Show XP leaderboard")
+    async def level_leaderboard(self, ctx):
+        """Show the XP/level leaderboard"""
         try:
-            # Check if levelling is enabled
+            # Check if leveling is enabled
             settings = await self.get_guild_settings(ctx.guild.id)
-            if not settings.get("enabled", True):
-                await ctx.send("Levelling system is disabled in this server.", ephemeral=True)
-                return
-            
-            # If no member is provided, use the command invoker
-            if member is None:
-                member = ctx.author
+            if not settings.get('enabled', True):
+                embed = discord.Embed(
+                    title="❌ Leveling Disabled",
+                    description="The leveling system is disabled in this server.",
+                    color=discord.Color.red()
+                )
+                return await ctx.send(embed=embed)
 
-            # Let the user know we're processing their request
-            if hasattr(ctx, 'interaction') and ctx.interaction is not None:
-                await ctx.defer()
-            
-            # Get user data for embedding
-            user_data = await self.xp_manager.prepare_level_card_data(member, ctx.guild)
-            
-            # Get accent color for embed
-            scheme = get_level_scheme(user_data.get('level', 0))
-            embed_color = scheme_to_discord_color(scheme)
-            
-            # Create embed with user stats
-            embed = discord.Embed(
-                title=f"{member.display_name}'s Level Stats",
-                color=embed_color
-            )
-            
-            # Add user stats fields
-            embed.add_field(
-                name="Level", 
-                value=f"**{user_data.get('level', 0)}**", 
-                inline=True
-            )
-            
-            embed.add_field(
-                name="Rank", 
-                value=f"**#{user_data.get('rank', 'N/A') if user_data.get('rank', 0) > 0 else 'N/A'}**", 
-                inline=True
-            )
-            
-            # XP progress
-            current_xp = user_data.get('xp', 0)
-            next_level_xp = user_data.get('next_level_xp', 1000)
-            total_xp = user_data.get('total_xp', current_xp)
-            
-            embed.add_field(
-                name="XP Progress", 
-                value=f"**{current_xp:,}** / **{next_level_xp:,}**", 
-                inline=True
-            )
-            
-            embed.add_field(
-                name="Total XP", 
-                value=f"**{total_xp:,}**", 
-                inline=True
-            )
-            
-            embed.add_field(
-                name="Messages", 
-                value=f"**{user_data.get('messages', 0):,}**", 
-                inline=True
-            )
-            
-            embed.add_field(
-                name="Voice Time", 
-                value=f"**{user_data.get('total_voice_time', 0):.1f}** minutes", 
-                inline=True
-            )
-            
-            # Set thumbnail to member's avatar
-            if member.avatar:
-                embed.set_thumbnail(url=member.avatar.url)
-            
-            # Set footer
-            embed.set_footer(text=f"Levelling System", icon_url=self.bot.user.avatar.url if self.bot.user.avatar else None)
-            
-            # Send the embed
-            await ctx.send(embed=embed)
+            # Get top users by XP
+            guild_id = str(ctx.guild.id)
+            top_users = list(self.levels_collection.find(
+                {"guild_id": guild_id}
+            ).sort("xp", -1).limit(10))
 
-        except Exception as e:
-            logger.error(f"Error in levelinfo command for user {member.id if member else 'None'}: {e}", exc_info=True)
-            await ctx.send("An error occurred while displaying user information.", ephemeral=True)
-
-    @commands.hybrid_command(name="leaderboard", aliases=["lb", "top"], description="Show the server leaderboard")
-    async def leaderboard(self, ctx, limit: int = 10):
-        """
-        Show the server leaderboard.
-        
-        Parameters
-        ----------
-        limit: int
-            Number of users to show (max 25)
-        """
-        try:
-            # Check if levelling is enabled
-            settings = await self.get_guild_settings(ctx.guild.id)
-            if not settings.get("enabled", True):
-                await ctx.send("Levelling system is disabled in this server.", ephemeral=True)
-                return
-            
-            # Limit the results
-            limit = min(max(limit, 1), 25)
-            
-            if hasattr(ctx, 'interaction') and ctx.interaction is not None:
-                await ctx.defer()
-            
-            # Get top users
-            top_users = await self.xp_manager.get_top_users(ctx.guild.id, limit)
-            
             if not top_users:
-                await ctx.send("No users found in the leaderboard.", ephemeral=True)
-                return
-            
+                embed = discord.Embed(
+                    title="📊 Level Leaderboard",
+                    description="No users have earned XP yet!",
+                    color=discord.Color.blue()
+                )
+                return await ctx.send(embed=embed)
+
             embed = discord.Embed(
-                title=f"🏆 {ctx.guild.name} Leaderboard",
-                description=f"Top {len(top_users)} users by XP",
+                title=f"📊 {ctx.guild.name} - Level Leaderboard",
+                description="Top 10 users by XP",
                 color=discord.Color.gold()
             )
-            
+
             leaderboard_text = ""
             for i, user_data in enumerate(top_users, 1):
-                user_id = user_data.get("user_id")
-                try:
-                    user = ctx.guild.get_member(int(user_id))
-                    if user:
-                        name = user.display_name
-                    else:
-                        name = f"User {user_id}"
-                except:
-                    name = f"User {user_id}"
-                
-                level = user_data.get("level", 0)
-                xp = user_data.get("xp", 0)
-                
-                # Add medal emojis for top 3
-                if i == 1:
-                    emoji = "🥇"
-                elif i == 2:
-                    emoji = "🥈"
-                elif i == 3:
-                    emoji = "🥉"
-                else:
-                    emoji = f"{i}."
-                
-                leaderboard_text += f"{emoji} **{name}** - Level {level} ({xp:,} XP)\n"
-            
+                user = ctx.guild.get_member(int(user_data['user_id']))
+                if user:
+                    level = user_data.get('level', 1)
+                    xp = user_data.get('xp', 0)
+                    
+                    # Medal emojis for top 3
+                    medal = ""
+                    if i == 1:
+                        medal = "🥇"
+                    elif i == 2:
+                        medal = "🥈"
+                    elif i == 3:
+                        medal = "🥉"
+                    
+                    leaderboard_text += f"{medal} **{i}.** {user.mention} - Level {level} ({xp:,} XP)\n"
+
             embed.description = leaderboard_text
-            
-            if ctx.guild.icon:
-                embed.set_thumbnail(url=ctx.guild.icon.url)
-            
+            embed.set_footer(text=f"Requested by {ctx.author}", icon_url=ctx.author.display_avatar.url)
+            embed.timestamp = discord.utils.utcnow()
+
             await ctx.send(embed=embed)
-            
+
         except Exception as e:
-            logger.error(f"Error in leaderboard command: {e}", exc_info=True)
-            await ctx.send("An error occurred while showing the leaderboard.", ephemeral=True)
+            logger.error(f"Error in level leaderboard: {e}")
+            await ctx.send("An error occurred while fetching the leaderboard.")
+
+    @leaderboard.command(name="invites", description="Show invites leaderboard")
+    async def invites_leaderboard(self, ctx):
+        """Show the invites leaderboard"""
+        try:
+            # Get invite stats from MongoDB
+            mongo_db = self.bot.get_cog("InviteTracker").mongo_db if self.bot.get_cog("InviteTracker") else None
+            
+            if not mongo_db:
+                embed = discord.Embed(
+                    title="❌ Invite Tracking Unavailable",
+                    description="The invite tracking system is not available.",
+                    color=discord.Color.red()
+                )
+                return await ctx.send(embed=embed)
+
+            # Get top inviters from invite_stats collection
+            guild_id = ctx.guild.id
+            cursor = mongo_db.invite_stats.find({"guild_id": guild_id}).sort("total_invites", -1).limit(10)
+            
+            top_inviters = []
+            async for invite_data in cursor:
+                top_inviters.append(invite_data)
+
+            if not top_inviters:
+                embed = discord.Embed(
+                    title="🎯 Invites Leaderboard",
+                    description="No invite data available yet!",
+                    color=discord.Color.blue()
+                )
+                return await ctx.send(embed=embed)
+
+            embed = discord.Embed(
+                title=f"🎯 {ctx.guild.name} - Invites Leaderboard",
+                description="Top 10 inviters",
+                color=discord.Color.green()
+            )
+
+            leaderboard_text = ""
+            for i, invite_data in enumerate(top_inviters, 1):
+                user_id = invite_data.get('user_id')
+                user = ctx.guild.get_member(user_id)
+                if user:
+                    # Calculate total invites
+                    regular = invite_data.get('regular_invites', 0)
+                    bonus = invite_data.get('bonus_invites', 0)
+                    left = invite_data.get('left_invites', 0)
+                    fake = invite_data.get('fake_invites', 0)
+                    total = regular + bonus - left - fake
+                    
+                    # Medal emojis for top 3
+                    medal = ""
+                    if i == 1:
+                        medal = "🥇"
+                    elif i == 2:
+                        medal = "🥈"
+                    elif i == 3:
+                        medal = "🥉"
+                    
+                    leaderboard_text += f"{medal} **{i}.** {user.mention} - {total} invites "
+                    leaderboard_text += f"({regular} regular, {bonus} bonus, {left} left)\n"
+
+            embed.description = leaderboard_text
+            embed.set_footer(text=f"Requested by {ctx.author}", icon_url=ctx.author.display_avatar.url)
+            embed.timestamp = discord.utils.utcnow()
+
+            await ctx.send(embed=embed)
+
+        except Exception as e:
+            logger.error(f"Error in invites leaderboard: {e}")
+            await ctx.send("An error occurred while fetching the leaderboard.")
 
 async def setup(bot):
     await bot.add_cog(Levelling(bot))

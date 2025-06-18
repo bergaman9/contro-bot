@@ -157,25 +157,21 @@ class Ticket(commands.Cog):
         self.bot = bot
         self.mongodb = initialize_mongodb()
         
-    @commands.hybrid_command(
-        name="send_ticket_message",
-        description="Sends a message with a button for users to create support tickets"
-    )
-    @app_commands.describe(
-        title="The title for the ticket message",
-        description="The description text for the ticket message"
-    )
-    @commands.has_permissions(manage_channels=True)
-    async def send_ticket_message(self, ctx, title: str = "Support Tickets", *, description: str = "Click the button below to create a support ticket"):
-        """
-        Sends a message with a button that users can click to create support tickets.
-        
-        You can customize the title and description of the message to fit your server's needs.
-        Users clicking the button will create private support ticket channels.
-        """
-        embed = discord.Embed(title=title, description=description, color=discord.Color.blue())
-        await ctx.send(embed=embed, view=TicketButton())
-        await ctx.send(embed=create_embed("Ticket message sent successfully!", discord.Color.green()), ephemeral=True)
+    # REMOVED: This command is now integrated into the unified /settings panel (Ticket System section)
+    # @commands.hybrid_command(
+    #     name="send_ticket_message",
+    #     description="Send the ticket creation button",
+    #     help="Sends a message with a button that allows users to create support tickets."
+    # )
+    # @commands.has_permissions(administrator=True)
+    # @app_commands.describe(
+    #     title="The title of the ticket embed",
+    #     description="The description of the ticket embed"
+    # )
+    # async def send_ticket_message(self, ctx, title: str = "Support Tickets", *, description: str = "Click the button below to create a support ticket"):
+    #     """Send the ticket creation button"""
+    #     # Command implementation would be here
+    #     pass
     
     @commands.Cog.listener()
     async def on_interaction(self, interaction: discord.Interaction):

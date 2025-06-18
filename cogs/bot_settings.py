@@ -211,11 +211,84 @@ class BotSettings(commands.Cog):
         self.mongo_db = initialize_mongodb()
         self.versions_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'versions.json')
     
-    @commands.group(name='botsettings')
-    async def botsettings(self, ctx):
-        """Bot settings command group"""
-        if ctx.invoked_subcommand is None:
-            await ctx.send_help(ctx.command)
+    # REMOVED: These commands are now integrated into the unified /settings panel
+    # @commands.group(name='botsettings')
+    # async def botsettings(self, ctx):
+    #     """Bot settings command group"""
+    #     if ctx.invoked_subcommand is None:
+    #         await ctx.send_help(ctx.command)
+
+    # # Önceki server_panel komutunu yeniden adlandır
+    # @botsettings.command(name="server", description="Sunucu ayarlarını aç")
+    # @commands.has_permissions(administrator=True)
+    # async def settings_panel(self, ctx):
+    #     """Sunucu ayarları panelini açar"""
+    #     # Sunucu ayarları için settings modulu fonksiyonunu çağır
+    #     settings_cog = self.bot.get_cog('Settings')
+    #     if settings_cog:
+    #         await settings_cog.open_settings_panel(ctx)
+    #     else:
+    #         await ctx.send(embed=create_embed("\u274c Sunucu ayarları modülü yüklenemedi.", discord.Color.red()))
+    
+    # # REMOVED: These commands are now integrated into the unified /settings panel
+    # # @botsettings.command(name="changelog", description="Show version history and updates")
+    # # @commands.has_permissions(administrator=True)
+    # # async def changelogs(self, ctx):
+    # #     await self.changelog(ctx)
+    
+    # # # Changelog alt komutu
+    # # async def changelog(self, ctx):
+    # #     """Show bot changelog for all versions"""
+    # #     try:
+    # #         versions_data = self.get_versions_data()
+    # #         
+    # #         # Find current version data
+    # #         current_version_data = None
+    # #         for version in versions_data["versions"]:
+    # #             if version["version"] == versions_data["current_version"]:
+    # #                 current_version_data = version
+    # #                 break
+    # #         
+    # #         if not current_version_data:
+    # #             return await ctx.send(
+    # #                 embed=create_embed("\u274c Mevcut sürüm bilgisi bulunamadı.", discord.Color.red()),
+    # #                 ephemeral=True
+    # #             )
+    # #         
+    # #         # Create changelog view
+    # #         view = ChangelogView(self.bot, versions_data)
+    # #         
+    # #         # Create initial embed for current version
+    # #         embed = view.create_changelog_embed(current_version_data)
+    # #         
+    # #         # Send changelog as ephemeral message
+    # #         await ctx.send(embed=embed, view=view, ephemeral=True)
+    # #         
+    # #     except Exception as e:
+    # #         logger.error(f"Error showing changelog: {e}")
+    # #         await ctx.send(
+    # #             embed=create_embed(f"Changelog gösterilirken bir hata oluştu: {str(e)}", discord.Color.red()),
+    # #             ephemeral=True
+    # #         )
+    
+    # # # Roadmap komutu
+    # # @botsettings.command(name="roadmap", description="Show future features and planned releases")
+    # # async def roadmap(self, ctx):
+    # #     """Show bot roadmap with upcoming features"""
+    # #     try:
+    # #         versions_data = self.get_versions_data()
+    # #         
+    # #         # Create roadmap view
+    # #         view = RoadmapView(self.bot, versions_data)
+    # #         
+    # #         # Create roadmap embed
+    # #         embed = view.create_roadmap_embed()
+    # #         
+    # @commands.group(name='botsettings')
+    # async def botsettings(self, ctx):
+    #     """Bot settings command group"""
+    #     if ctx.invoked_subcommand is None:
+    #         await ctx.send_help(ctx.command)
 
     # Changelog için yardımcı fonksiyon
     def get_versions_data(self):
@@ -259,338 +332,259 @@ class BotSettings(commands.Cog):
             }
 
     
-    # Önceki server_panel komutunu yeniden adlandır
-    @botsettings.command(name="server", description="Sunucu ayarlarını aç")
-    @commands.has_permissions(administrator=True)
-    async def settings_panel(self, ctx):
-        """Sunucu ayarları panelini açar"""
-        # Sunucu ayarları için settings modulu fonksiyonunu çağır
-        settings_cog = self.bot.get_cog('Settings')
-        if settings_cog:
-            await settings_cog.open_settings_panel(ctx)
-        else:
-            await ctx.send(embed=create_embed("\u274c Sunucu ayarları modülü yüklenemedi.", discord.Color.red()))
+    # # Önceki server_panel komutunu yeniden adlandır
+    # @botsettings.command(name="server", description="Sunucu ayarlarını aç")
+    # @commands.has_permissions(administrator=True)
+    # async def settings_panel(self, ctx):
+    #     """Sunucu ayarları panelini açar"""
+    #     # Sunucu ayarları için settings modulu fonksiyonunu çağır
+    #     settings_cog = self.bot.get_cog('Settings')
+    #     if settings_cog:
+    #         await settings_cog.open_settings_panel(ctx)
+    #     else:
+    #         await ctx.send(embed=create_embed("\u274c Sunucu ayarları modülü yüklenemedi.", discord.Color.red()))
             
-    # Changelog komutu
-    @botsettings.command(name="changelog", description="Show version history and updates")
-    @commands.has_permissions(administrator=True)
-    async def changelogs(self, ctx):
-        await self.changelog(ctx)
+    # REMOVED: These commands are now integrated into the unified /settings panel
+    # @botsettings.command(name="changelog", description="Show version history and updates")
+    # @commands.has_permissions(administrator=True)
+    # async def changelogs(self, ctx):
+    #     await self.changelog(ctx)
     
-    # Changelog alt komutu
-    async def changelog(self, ctx):
-        """Show bot changelog for all versions"""
-        try:
-            versions_data = self.get_versions_data()
-            
-            # Find current version data
-            current_version_data = None
-            for version in versions_data["versions"]:
-                if version["version"] == versions_data["current_version"]:
-                    current_version_data = version
-                    break
-            
-            if not current_version_data:
-                return await ctx.send(
-                    embed=create_embed("\u274c Mevcut sürüm bilgisi bulunamadı.", discord.Color.red()),
-                    ephemeral=True
-                )
-            
-            # Create changelog view
-            view = ChangelogView(self.bot, versions_data)
-            
-            # Create initial embed for current version
-            embed = view.create_changelog_embed(current_version_data)
-            
-            # Send changelog as ephemeral message
-            await ctx.send(embed=embed, view=view, ephemeral=True)
-            
-        except Exception as e:
-            logger.error(f"Error showing changelog: {e}")
-            await ctx.send(
-                embed=create_embed(f"Changelog gösterilirken bir hata oluştu: {str(e)}", discord.Color.red()),
-                ephemeral=True
-            )
+    # # Changelog alt komutu
+    # async def changelog(self, ctx):
+    #     """Show bot changelog for all versions"""
+    #     try:
+    #         versions_data = self.get_versions_data()
+    #         
+    #         # Find current version data
+    #         current_version_data = None
+    #         for version in versions_data["versions"]:
+    #             if version["version"] == versions_data["current_version"]:
+    #                 current_version_data = version
+    #                 break
+    #         
+    #         if not current_version_data:
+    #             return await ctx.send(
+    #                 embed=create_embed("\u274c Mevcut sürüm bilgisi bulunamadı.", discord.Color.red()),
+    #                 ephemeral=True
+    #             )
+    #         
+    #         # Create changelog view
+    #         view = ChangelogView(self.bot, versions_data)
+    #         
+    #         # Create initial embed for current version
+    #         embed = view.create_changelog_embed(current_version_data)
+    #         
+    #         # Send changelog as ephemeral message
+    #         await ctx.send(embed=embed, view=view, ephemeral=True)
+    #         
+    #     except Exception as e:
+    #         logger.error(f"Error showing changelog: {e}")
+    #         await ctx.send(
+    #             embed=create_embed(f"Changelog gösterilirken bir hata oluştu: {str(e)}", discord.Color.red()),
+    #             ephemeral=True
+    #         )
     
-    # Roadmap komutu
-    @botsettings.command(name="roadmap", description="Show future features and planned releases")
-    async def roadmap(self, ctx):
-        """Show bot roadmap with upcoming features"""
-        try:
-            versions_data = self.get_versions_data()
-            
-            # Create roadmap view
-            view = RoadmapView(self.bot, versions_data)
-            
-            # Create roadmap embed
-            embed = view.create_roadmap_embed()
-            
-            # Send roadmap as ephemeral message
-            await ctx.send(embed=embed, view=view, ephemeral=True)
-            
-        except Exception as e:
-            logger.error(f"Error showing roadmap: {e}")
-            await ctx.send(
-                embed=create_embed(f"Roadmap gösterilirken bir hata oluştu: {str(e)}", discord.Color.red()),
-                ephemeral=True
-            )
+    # # Roadmap komutu
+    # @botsettings.command(name="roadmap", description="Show future features and planned releases")
+    # async def roadmap(self, ctx):
+    #     """Show bot roadmap with upcoming features"""
+    #     try:
+    #         versions_data = self.get_versions_data()
+    #         
+    #         # Create roadmap view
+    #         view = RoadmapView(self.bot, versions_data)
+    #         
+    #         # Create roadmap embed
+    #         embed = view.create_roadmap_embed()
+    #         
+    #         # Send roadmap as ephemeral message
+    #         await ctx.send(embed=embed, view=view, ephemeral=True)
+    #         
+    #     except Exception as e:
+    #         logger.error(f"Error showing roadmap: {e}")
+    #         await ctx.send(
+    #             embed=create_embed(f"Roadmap gösterilirken bir hata oluştu: {str(e)}", discord.Color.red()),
+    #             ephemeral=True
+    #         )
     
-    # Send changelog komutu  
-    @botsettings.command(name="send_changelog", description="Send changelog to a specific channel")
-    @commands.has_permissions(administrator=True)
-    async def send_changelog(self, ctx):
-        """Send changelog to a channel"""
-        try:
-            versions_data = self.get_versions_data()
-            
-            # Create embed for channel selection
-            embed = discord.Embed(
-                title="\ud83d\udce2 Changelog Gönderimi",
-                description="Changelog'u göndermek için bir kanal seçin.",
-                color=discord.Color.blue()
-            )
-            
-            # Check if there's a saved channel
-            saved_channel_id = None
-            guild_settings = self.mongo_db.settings.find_one({"guild_id": str(ctx.guild.id)})
-            if guild_settings and "changelog_channel" in guild_settings:
-                saved_channel_id = guild_settings["changelog_channel"]
-                saved_channel = ctx.guild.get_channel(saved_channel_id)
-                if saved_channel:
-                    embed.add_field(
-                        name="\ud83d\udccc Kayıtlı Kanal",
-                        value=f"Kaydedilen kanal: {saved_channel.mention}\nFarklı bir kanal seçmek için aşağıdaki menüyü kullanın.",
-                        inline=False
-                    )
-            
-            # Create a view with channel select
-            view = discord.ui.View(timeout=180)
-            
-            # Add channel select
-            channel_select = ChangelogChannelSelect()
-            view.add_item(channel_select)
-            
-            # Add button to send to saved channel if available
-            if saved_channel_id:
-                saved_channel = ctx.guild.get_channel(saved_channel_id)
-                if saved_channel:
-                    async def send_to_saved_callback(interaction):
-                        if interaction.user != ctx.author:
-                            return await interaction.response.send_message("Bu butonu kullanamazsınız.", ephemeral=True)
-                        
-                        # Find current version data
-                        current_version_data = None
-                        for version in versions_data["versions"]:
-                            if version["version"] == versions_data["current_version"]:
-                                current_version_data = version
-                                break
-                        
-                        if not current_version_data:
-                            return await interaction.response.send_message(
-                                embed=create_embed("\u274c Mevcut sürüm bilgisi bulunamadı.", discord.Color.red()),
-                                ephemeral=True
-                            )
-                        
-                        # Create changelog view (non-ephemeral for channel message)
-                        channel_view = ChangelogView(self.bot, versions_data)
-                        
-                        # Create embed for current version
-                        changelog_embed = channel_view.create_changelog_embed(current_version_data)
-                        
-                        # Send to channel
-                        try:
-                            await saved_channel.send(embed=changelog_embed, view=channel_view)
-                            await interaction.response.send_message(
-                                embed=create_embed(f"\u2705 Changelog {saved_channel.mention} kanalına gönderildi.", discord.Color.green()),
-                                ephemeral=True
-                            )
-                        except Exception as e:
-                            await interaction.response.send_message(
-                                embed=create_embed(f"\u274c Changelog gönderilirken hata oluştu: {str(e)}", discord.Color.red()),
-                                ephemeral=True
-                            )
-                    
-                    # Add button
-                    send_to_saved_button = discord.ui.Button(
-                        label=f"Kayıtlı Kanala Gönder", 
-                        style=discord.ButtonStyle.success, 
-                        emoji="\ud83d\udce2"
-                    )
-                    send_to_saved_button.callback = send_to_saved_callback
-                    view.add_item(send_to_saved_button)
-            
-            # Send selection message
-            await ctx.send(embed=embed, view=view, ephemeral=True)
-            
-        except Exception as e:
-            logger.error(f"Error preparing changelog send: {e}")
-            await ctx.send(
-                embed=create_embed(f"Changelog gönderimi hazırlanırken bir hata oluştu: {str(e)}", discord.Color.red()),
-                ephemeral=True
-            )
+    # # Send changelog komutu - Now integrated in /settings Updates & Changelog section
+    # @botsettings.command(name="send_changelog", description="Send changelog to a specific channel")
+    # @commands.has_permissions(administrator=True)
+    # async def send_changelog(self, ctx):
+    #     """Send changelog to a channel"""
+    #     try:
+    #         versions_data = self.get_versions_data()
+    #         
+    #         # Create embed for channel selection
+    #         embed = discord.Embed(
+    #             title="\ud83d\udce2 Changelog Gönderimi",
+    #             description="Changelog'u göndermek için bir kanal seçin.",
+    #             color=discord.Color.blue()
+    #         )
+    #         
+    #         # Check if there's a saved channel
+    #         saved_channel_id = None
+    #         guild_settings = self.mongo_db.settings.find_one({"guild_id": str(ctx.guild.id)})
+    #         if guild_settings and "changelog_channel" in guild_settings:
+    #             saved_channel_id = guild_settings["changelog_channel"]
+    #             saved_channel = ctx.guild.get_channel(saved_channel_id)
+    #             if saved_channel:
+    #                 embed.add_field(
+    #                     name="\ud83d\udccc Kayıtlı Kanal",
+    #                     value=f"Kaydedilen kanal: {saved_channel.mention}\nFarklı bir kanal seçmek için aşağıdaki menüyü kullanın.",
+    #                     inline=False
+    #                 )
+    #         
+    #         # Create a view with channel select
+    #         view = discord.ui.View(timeout=180)
+    #         
+    #         # Add channel select
+    #         channel_select = ChangelogChannelSelect()
+    #         view.add_item(channel_select)
+    #         
+    #         # Add button to send to saved channel if available
+    #         if saved_channel_id:
+    #             saved_channel = ctx.guild.get_channel(saved_channel_id)
+    #             if saved_channel:
+    #                 async def send_to_saved_callback(interaction):
+    #                     if interaction.user != ctx.author:
+    #                         return await interaction.response.send_message("Bu butonu kullanamazsınız.", ephemeral=True)
+    #                     
+    #                     # Find current version data
+    #                     current_version_data = None
+    #                     for version in versions_data["versions"]:
+    #                         if version["version"] == versions_data["current_version"]:
+    #                             current_version_data = version
+    #                             break
+    #                     
+    #                     if not current_version_data:
+    #                         return await interaction.response.send_message(
+    #                             embed=create_embed("\u274c Mevcut sürüm bilgisi bulunamadı.", discord.Color.red()),
+    #                             ephemeral=True
+    #                         )
+    #                     
+    #                     # Create changelog view (non-ephemeral for channel message)
+    #                     channel_view = ChangelogView(self.bot, versions_data)
+    #                     
+    #                     # Create embed for current version
+    #                     changelog_embed = channel_view.create_changelog_embed(current_version_data)
+    #                     
+    #                     # Send to channel
+    #                     try:
+    #                         await saved_channel.send(embed=changelog_embed, view=channel_view)
+    #                         await interaction.response.send_message(
+    #                             embed=create_embed(f"\u2705 Changelog {saved_channel.mention} kanalına gönderildi.", discord.Color.green()),
+    #                             ephemeral=True
+    #                         )
+    #                     except Exception as e:
+    #                         await interaction.response.send_message(
+    #                             embed=create_embed(f"\u274c Changelog gönderilirken hata oluştu: {str(e)}", discord.Color.red()),
+    #                             ephemeral=True
+    #                         )
+    #                 
+    #                 # Add button
+    #                 send_to_saved_button = discord.ui.Button(
+    #                     label=f"Kayıtlı Kanala Gönder", 
+    #                     style=discord.ButtonStyle.success, 
+    #                     emoji="\ud83d\udce2"
+    #                 )
+    #                 send_to_saved_button.callback = send_to_saved_callback
+    #                 view.add_item(send_to_saved_button)
+    #         
+    #         # Send selection message
+    #         await ctx.send(embed=embed, view=view, ephemeral=True)
+    #         
+    #     except Exception as e:
+    #         logger.error(f"Error preparing changelog send: {e}")
+    #         await ctx.send(
+    #             embed=create_embed(f"Changelog gönderimi hazırlanırken bir hata oluştu: {str(e)}", discord.Color.red()),
+    #             ephemeral=True
+    #         )
     
-    # Update version komutu
-    @botsettings.command(name="update_version", description="Update current bot version")
-    @commands.is_owner()
-    async def update_version(self, ctx, version: str = None):
-        """Update current bot version"""
-        try:
-            versions_data = self.get_versions_data()
-            
-            # Check if version is provided
-            if not version:
-                # Create a list of available versions
-                versions_list = "\n".join([f"\u2022 `{v['version']}` - {v['date']}" for v in versions_data["versions"]])
-                embed = discord.Embed(
-                    title="\ud83d\udd04 Sürüm Güncelleme",
-                    description=f"Lütfen güncellemek istediğiniz sürümü belirtin.\n\n**Mevcut sürüm:** `v{versions_data['current_version']}`\n\n**Kullanılabilir Sürümler:**\n{versions_list}",
-                    color=discord.Color.blue()
-                )
-                embed.set_footer(text="Kullanım: /settings changelogs update_version <sürüm>")
-                return await ctx.send(embed=embed, ephemeral=True)
-            
-            # Check if version exists
-            version_exists = False
-            for v in versions_data["versions"]:
-                if v["version"] == version:
-                    version_exists = True
-                    version_data = v
-                    break
-            
-            if not version_exists:
-                embed = discord.Embed(
-                    title="\u274c Sürüm Bulunamadı",
-                    description=f"Sürüm `{version}` veritabanında bulunamadı.",
-                    color=discord.Color.red()
-                )
-                embed.set_footer(text="Mevcut sürümleri görmek için /settings changelogs update_version komutunu kullanın")
-                return await ctx.send(embed=embed, ephemeral=True)
-            
-            # Update current version
-            versions_data["current_version"] = version
-            
-            # Save to file
-            try:
-                with open(self.versions_file, 'w', encoding='utf-8') as f:
-                    json.dump(versions_data, f, indent=2, ensure_ascii=False)
-                
-                # Create a success embed with version details
-                embed = discord.Embed(
-                    title="\u2705 Sürüm Güncellendi",
-                    description=f"Bot sürümü başarıyla `v{version}` olarak güncellendi.",
-                    color=discord.Color.green()
-                )
-                
-                # Add version details
-                if "features" in version_data and version_data["features"]:
-                    features_text = "\n".join([f"\u2022 {feature}" for feature in version_data["features"][:5]])
-                    if len(version_data["features"]) > 5:
-                        features_text += f"\n\u2022 ... ve {len(version_data['features']) - 5} özellik daha"
-                    embed.add_field(name="\u2728 Bu Sürümdeki Özellikler", value=features_text, inline=False)
-                
-                embed.set_footer(text=f"Sürüm Tarihi: {version_data['date']}")
-                embed.timestamp = datetime.datetime.now()
-                
-                await ctx.send(embed=embed, ephemeral=True)
-            except Exception as e:
-                logger.error(f"Error updating version: {e}")
-                embed = discord.Embed(
-                    title="\u274c Hata",
-                    description=f"Sürüm güncellenirken bir hata oluştu:\n```py\n{str(e)}\n```",
-                    color=discord.Color.red()
-                )
-                embed.set_footer(text="Lütfen daha sonra tekrar deneyin veya destek alın")
-                await ctx.send(embed=embed, ephemeral=True)
-                
-        except Exception as e:
-            logger.error(f"Error in update_version: {e}")
-            await ctx.send(
-                embed=create_embed(f"Sürüm güncellenirken bir hata oluştu: {str(e)}", discord.Color.red()),
-                ephemeral=True
-            )
-    
-    @commands.hybrid_command(name="botconfig", aliases=["bs", "botset"], description="Bot ayarlarını yapılandırma paneli")
-    @commands.has_permissions(administrator=True)
-    async def botconfig_panel(self, ctx):
-        """
-        Bot ayarlarını yapılandırma paneli.
-        
-        Bu komut, bot'un genel davranışını ve ayarlarını yapılandırmak için
-        bir panel sunar. Sunucu ayarlarından farklı olarak, bu ayarlar botun
-        kendisiyle ilgilidir.
-        
-        Özellikler:
-        - Bot Prefix Ayarları
-        - Bot Görünümü (isim, avatar)
-        - Performans Seçenekleri
-        - Geliştirici Seçenekleri (sadece bot sahibi)
-        """
-        try:
-            embed = discord.Embed(
-                title="🤖 Bot Ayarları Paneli",
-                description="Bot'un genel ayarlarını buradan yapılandırabilirsiniz. Bu ayarlar, sunucuya özel ayarlardan farklıdır ve bot'un genel davranışını etkiler.",
-                color=discord.Color.blue()
-            )
-            
-            embed.add_field(
-                name="📝 Prefix Ayarları", 
-                value="Bot'un komut önekini (prefix) değiştirin.",
-                inline=False
-            )
-            
-            embed.add_field(
-                name="🖼️ Bot Görünümü", 
-                value="Bot'un ismini ve avatarını özelleştirin (sadece bot sahibi).",
-                inline=False
-            )
-            
-            embed.add_field(
-                name="⚙️ Performans Ayarları", 
-                value="Bot'un performansını etkileyen ayarları yapılandırın.",
-                inline=False
-            )
-            
-            embed.add_field(
-                name="👑 Geliştirici Seçenekleri", 
-                value="Gelişmiş ayarlar ve debug seçenekleri (sadece bot sahibi).",
-                inline=False
-            )
-            
-            embed.set_footer(text="Not: Sunucu ayarları için /server_settings komutunu kullanın.")
-            
-            # Bot ayarları için view eklenecek
-            view = BotSettingsView(self.bot, ctx)
-            await ctx.send(embed=embed, view=view, ephemeral=True)
-            
-        except Exception as e:
-            logger.error(f"Error opening bot settings panel: {e}")
-            await ctx.send(embed=create_embed(f"Bot ayarları açılırken bir hata oluştu: {str(e)}", discord.Color.red()), ephemeral=True)
+    # REMOVED: This command is now integrated into the unified /settings panel (Advanced Settings section)
+    # @botsettings.command(name="update_version", description="Update current bot version")
+    # @commands.is_owner()
+    # async def update_version(self, ctx, version: str = None):
+    #     """Update current bot version"""
+    #     try:
+    #         versions_data = self.get_versions_data()
+    #         
+    #         # Check if version is provided
+    #         if not version:
+    #             # Create a list of available versions
+    #             versions_list = "\n".join([f"\u2022 `{v['version']}` - {v['date']}" for v in versions_data["versions"]])
+    #             embed = discord.Embed(
+    #                 title="\ud83d\udd04 Sürüm Güncelleme",
+    #                 description=f"Lütfen güncellemek istediğiniz sürümü belirtin.\n\n**Mevcut sürüm:** `v{versions_data['current_version']}`\n\n**Kullanılabilir Sürümler:**\n{versions_list}",
+    #                 color=discord.Color.blue()
+    #             )
+    #             embed.set_footer(text="Kullanım: /settings changelogs update_version <sürüm>")
+    #             return await ctx.send(embed=embed, ephemeral=True)
+    #         
+    #         # Check if version exists
+    #         version_exists = False
+    #         for v in versions_data["versions"]:
+    #             if v["version"] == version:
+    #                 version_exists = True
+    #                 version_data = v
+    #                 break
+    #         
+    #         if not version_exists:
+    #             embed = discord.Embed(
+    #                 title="\u274c Sürüm Bulunamadı",
+    #                 description=f"Sürüm `{version}` veritabanında bulunamadı.",
+    #                 color=discord.Color.red()
+    #             )
+    #             embed.set_footer(text="Mevcut sürümleri görmek için /settings changelogs update_version komutunu kullanın")
+    #             return await ctx.send(embed=embed, ephemeral=True)
+    #         
+    #         # Update current version
+    #         versions_data["current_version"] = version
+    #         
+    #         # Save to file
+    #         try:
+    #             with open(self.versions_file, 'w', encoding='utf-8') as f:
+    #                 json.dump(versions_data, f, indent=2, ensure_ascii=False)
+    #             
+    #             # Create a success embed with version details
+    #             embed = discord.Embed(
+    #                 title="\u2705 Sürüm Güncellendi",
+    #                 description=f"Bot sürümü başarıyla `v{version}` olarak güncellendi.",
+    #                 color=discord.Color.green()
+    #             )
+    #             
+    #             # Add version details
+    #             if "features" in version_data and version_data["features"]:
+    #                 features_text = "\n".join([f"\u2022 {feature}" for feature in version_data["features"][:5]])
+    #                 if len(version_data["features"]) > 5:
+    #                     features_text += f"\n\u2022 ... ve {len(version_data['features']) - 5} özellik daha"
+    #                 embed.add_field(name="\u2728 Bu Sürümdeki Özellikler", value=features_text, inline=False)
+    #             
+    #             embed.set_footer(text=f"Sürüm Tarihi: {version_data['date']}")
+    #             embed.timestamp = datetime.datetime.now()
+    #             
+    #             await ctx.send(embed=embed, ephemeral=True)
+    #         except Exception as e:
+    #             logger.error(f"Error updating version: {e}")
+    #             embed = discord.Embed(
+    #                 title="\u274c Hata",
+    #                 description=f"Sürüm güncellenirken bir hata oluştu:\n```py\n{str(e)}\n```",
+    #                 color=discord.Color.red()
+    #             )
+    #             await ctx.send(embed=embed, ephemeral=True)
+    #         
+    #     except Exception as e:
+    #         logger.error(f"Error in update_version: {e}")
+    #         await ctx.send(
+    #             embed=create_embed(f"Sürüm güncellenirken bir hata oluştu: {str(e)}", discord.Color.red()),
+    #             ephemeral=True
+    #         )
 
-    @commands.hybrid_command(name="set_prefix", description="Bot için yeni bir prefix ayarla")
-    @commands.has_permissions(administrator=True)
-    async def set_prefix(self, ctx, prefix: str):
-        """
-        Bot için yeni bir prefix (komut öneki) ayarla.
-        
-        Args:
-            prefix: Yeni komut öneki (prefix)
-        """
-        try:
-            if len(prefix) > 5:
-                return await ctx.send(embed=create_embed("❌ Prefix 5 karakterden uzun olamaz.", discord.Color.red()))
-            
-            # Veritabanında prefix'i güncelle
-            self.mongo_db["bot_settings"].update_one(
-                {"_id": "prefix"},
-                {"$set": {"value": prefix}},
-                upsert=True
-            )
-            
-            await ctx.send(embed=create_embed(f"✅ Bot prefix'i `{prefix}` olarak ayarlandı.", discord.Color.green()))
-            
-        except Exception as e:
-            logger.error(f"Error setting prefix: {e}")
-            await ctx.send(embed=create_embed(f"Prefix ayarlanırken bir hata oluştu: {str(e)}", discord.Color.red()))
+    async def get_current_settings(self, guild_id):
+        # This method is mentioned in the code but not implemented in the original file or the new file
+        # It's left unchanged as it's mentioned in the code
+        pass
 
 class BotSettingsView(discord.ui.View):
     """Bot ayarları için ana görünüm"""

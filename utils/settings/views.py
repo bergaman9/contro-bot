@@ -73,386 +73,369 @@ class LanguageSelectView(discord.ui.View):
         await interaction.response.send_message(embed=embed, view=MainSettingsView(self.bot, language), ephemeral=True)
 
 class MainSettingsView(discord.ui.View):
-    def __init__(self, bot, guild_id):
-        super().__init__(timeout=300)
+    def __init__(self, bot, guild_id, timeout=180):
+        super().__init__(timeout=timeout)
         self.bot = bot
         self.guild_id = guild_id
-
-    @discord.ui.button(label="Feature Management", emoji="🔧", style=discord.ButtonStyle.success, row=0)
-    async def feature_management(self, interaction: discord.Interaction, button: discord.ui.Button):
-        view = FeatureManagementView(self.bot, self.guild_id)
+        self.db = None
         
-        # Get current feature status
-        mongo_db = get_async_db()
-        features = await mongo_db.feature_toggles.find_one({"guild_id": self.guild_id}) or {}
-        
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        """Only allow administrators to use this view"""
+        return interaction.user.guild_permissions.administrator
+    
+    @discord.ui.button(label="Prefix Settings", style=discord.ButtonStyle.primary, emoji="📝", row=0)
+    async def prefix_settings(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Handle prefix settings button"""
+        view = PrefixSettingsView(self.bot, self.guild_id)
         embed = discord.Embed(
-            title="🔧 Feature Management",
-            description="Toggle server features on/off. Disabled features will not function.",
+            title="📝 Prefix Settings",
+            description="Configure the bot's command prefix for this server.",
             color=discord.Color.blue()
         )
         
-        # Show current feature status
-        feature_status = []
-        default_features = {
-            "welcome_system": True,
-            "leveling_system": True,
-            "starboard_system": False,
-            "auto_moderation": True,
-            "logging_system": True,
-            "ticket_system": True,
-            "community_features": True,
-            "temp_channels": True
-        }
-        
-        for feature, default in default_features.items():
-            is_enabled = features.get(feature, default)
-            status = "🟢 Enabled" if is_enabled else "🔴 Disabled"
-            feature_name = feature.replace("_", " ").title()
-            feature_status.append(f"**{feature_name}**: {status}")
+        # Get current prefix
+        if not self.db:
+            self.db = self.bot.async_db
+        settings = await self.db.settings.find_one({"guild_id": str(self.guild_id)}) or {}
+        current_prefix = settings.get("prefix", ">")
         
         embed.add_field(
-            name="Current Status",
-            value="\n".join(feature_status[:4]),
-            inline=True
+            name="Current Prefix",
+            value=f"`{current_prefix}`",
+            inline=False
         )
         embed.add_field(
-            name="\u200b",
-            value="\n".join(feature_status[4:]),
-            inline=True
-        )
-        
-        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
-
-    @discord.ui.button(label="Welcome System", emoji="👋", style=discord.ButtonStyle.primary, row=0)
-    async def welcome_goodbye(self, interaction: discord.Interaction, button: discord.ui.Button):
-        view = WelcomeGoodbyeView(self.bot, self.guild_id)
-        
-        # Get current settings
-        mongo_db = get_async_db()
-        welcome_settings = await mongo_db.welcomer.find_one({"guild_id": self.guild_id}) or {}
-        goodbye_settings = await mongo_db.byebye.find_one({"guild_id": self.guild_id}) or {}
-        
-        embed = discord.Embed(
-            title="👋 Welcome/Goodbye System",
-            description="Configure welcome and goodbye messages for your server.",
-            color=discord.Color.blue()
-        )
-        
-        # Welcome info
-        welcome_channel_id = welcome_settings.get("welcome_channel_id")
-        welcome_channel = f"<#{welcome_channel_id}>" if welcome_channel_id else "Not configured"
-        welcome_enabled = welcome_settings.get("enabled", False)
-        
-        # Goodbye info
-        goodbye_channel_id = goodbye_settings.get("byebye_channel_id")
-        goodbye_channel = f"<#{goodbye_channel_id}>" if goodbye_channel_id else "Not configured"
-        goodbye_enabled = goodbye_settings.get("enabled", False)
-        
-        embed.add_field(
-            name="🎉 Welcome System",
-            value=f"**Status**: {'🟢 Enabled' if welcome_enabled else '🔴 Disabled'}\n**Channel**: {welcome_channel}",
-            inline=True
-        )
-        
-        embed.add_field(
-            name="👋 Goodbye System",
-            value=f"**Status**: {'🟢 Enabled' if goodbye_enabled else '🔴 Disabled'}\n**Channel**: {goodbye_channel}",
-            inline=True
-        )
-        
-        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
-
-    @discord.ui.button(label="Moderation", emoji="🛡️", style=discord.ButtonStyle.primary, row=0)
-    async def moderation(self, interaction: discord.Interaction, button: discord.ui.Button):
-        view = ModerationView(self.bot, self.guild_id)
-        
-        mongo_db = get_async_db()
-        mod_settings = await mongo_db.moderation.find_one({"guild_id": self.guild_id}) or {}
-        
-        embed = discord.Embed(
-            title="🛡️ Moderation Settings",
-            description="Configure auto-moderation and security features.",
-            color=discord.Color.blue()
-        )
-        
-        # Auto roles
-        auto_roles = mod_settings.get("auto_roles", [])
-        auto_roles_text = f"{len(auto_roles)} roles configured" if auto_roles else "Not configured"
-        
-        # Word filter
-        word_filter = mod_settings.get("word_filter", {})
-        filter_enabled = word_filter.get("enabled", False)
-        filtered_words = len(word_filter.get("words", []))
-        
-        embed.add_field(
-            name="🤖 Auto Roles",
-            value=auto_roles_text,
-            inline=True
-        )
-        
-        embed.add_field(
-            name="🔒 Word Filter",
-            value=f"**Status**: {'🟢 Enabled' if filter_enabled else '🔴 Disabled'}\n**Words**: {filtered_words} words",
-            inline=True
-        )
-        
-        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
-
-    @discord.ui.button(label="Leveling System", emoji="💫", style=discord.ButtonStyle.primary, row=0)
-    async def leveling_system(self, interaction: discord.Interaction, button: discord.ui.Button):
-        view = LevellingSettingsView(self.bot, interaction)
-        
-        # Get current settings
-        settings = await view.get_current_settings(self.guild_id)
-        
-        embed = discord.Embed(
-            title="💫 Leveling System",
-            description="Configure XP and leveling features for your server.",
-            color=discord.Color.blue()
-        )
-        
-        # System status
-        system_enabled = settings.get("enabled", True)
-        message_xp = settings.get("message_xp_enabled", True)
-        voice_xp = settings.get("voice_xp_enabled", True)
-        notifications = settings.get("level_up_notifications", True)
-        
-        embed.add_field(
-            name="System Status",
-            value=f"**Enabled**: {'🟢 Yes' if system_enabled else '🔴 No'}\n"
-                  f"**Message XP**: {'🟢 Yes' if message_xp else '🔴 No'}\n"
-                  f"**Voice XP**: {'🟢 Yes' if voice_xp else '🔴 No'}",
-            inline=True
-        )
-        
-        embed.add_field(
-            name="Settings",
-            value=f"**Level Up Notifications**: {'🟢 Yes' if notifications else '🔴 No'}\n"
-                  f"**Message Multiplier**: {settings.get('message_xp_multiplier', 1.0)}x\n"
-                  f"**Voice Multiplier**: {settings.get('voice_xp_multiplier', 1.0)}x",
-            inline=True
-        )
-        
-        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
-
-    @discord.ui.button(label="Logging", emoji="📊", style=discord.ButtonStyle.secondary, row=1)
-    async def logging(self, interaction: discord.Interaction, button: discord.ui.Button):
-        from utils.settings.logging_views import LoggingSettingsView
-        
-        view = LoggingSettingsView(self.bot, interaction.guild_id)
-        await view.initialize()
-        
-        embed = discord.Embed(
-            title="📊 Logging Settings",
-            description="Configure event logging for your server.",
-            color=discord.Color.blue()
-        )
-        
-        channel_text = f"<#{view.log_channel_id}>" if view.log_channel_id else "Not configured"
-        
-        # Count active log types
-        active_logs = sum(1 for setting, enabled in view.settings.items() if enabled)
-        total_logs = len(view.settings)
-        
-        embed.add_field(
-            name="Configuration",
-            value=f"**Log Channel**: {channel_text}\n**Active Logs**: {active_logs}/{total_logs}",
+            name="Usage",
+            value=f"Commands can be used with `{current_prefix}help` or `/help`",
             inline=False
         )
         
-        # Show some active log types
-        active_types = [k.replace("_", " ").title() for k, v in list(view.settings.items())[:5] if v]
-        if active_types:
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+    
+    @discord.ui.button(label="Server Settings", style=discord.ButtonStyle.primary, emoji="⚙️", row=0)
+    async def server_settings(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Handle server settings button"""
+        view = ServerSettingsView(self.bot, self.guild_id)
+        embed = discord.Embed(
+            title="⚙️ Server Settings",
+            description="Configure various server settings and features.",
+            color=discord.Color.blue()
+        )
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+    
+    @discord.ui.button(label="Welcome & Goodbye", style=discord.ButtonStyle.primary, emoji="👋", row=0)
+    async def welcome_goodbye(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Handle welcome/goodbye settings button"""
+        view = WelcomeGoodbyeView(self.bot, self.guild_id)
+        await view.initialize()
+        
+        embed = discord.Embed(
+            title="👋 Welcome & Goodbye Settings",
+            description="Configure welcome and goodbye messages for your server.",
+            color=discord.Color.blue()
+        )
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+    
+    @discord.ui.button(label="Moderation", style=discord.ButtonStyle.primary, emoji="🛡️", row=0)
+    async def moderation(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Handle moderation settings button"""
+        view = ModerationView(self.bot, self.guild_id)
+        embed = discord.Embed(
+            title="🛡️ Moderation Settings",
+            description="Configure moderation features and auto-moderation rules.",
+            color=discord.Color.blue()
+        )
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+    
+    @discord.ui.button(label="Logging", style=discord.ButtonStyle.primary, emoji="📋", row=1)
+    async def logging(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Handle logging settings button"""
+        view = LoggingSettingsView(self.bot, self.guild_id)
+        await view.initialize()
+        
+        embed = discord.Embed(
+            title="📋 Logging Settings",
+            description="Configure logging for various server events.",
+            color=discord.Color.blue()
+        )
+        
+        # Add current logging status
+        if view.logging_enabled and view.log_channel_id:
             embed.add_field(
-                name="Active Log Types",
-                value="• " + "\n• ".join(active_types) + (f"\n• And {active_logs - 5} more..." if active_logs > 5 else ""),
+                name="Status",
+                value=f"✅ Enabled in <#{view.log_channel_id}>",
+                inline=False
+            )
+        else:
+            embed.add_field(
+                name="Status",
+                value="❌ Disabled",
                 inline=False
             )
         
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
-
-    @discord.ui.button(label="Ticket System", emoji="🎫", style=discord.ButtonStyle.secondary, row=1)
+    
+    @discord.ui.button(label="Ticket System", style=discord.ButtonStyle.primary, emoji="🎫", row=1)
     async def ticket_system(self, interaction: discord.Interaction, button: discord.ui.Button):
-        view = TicketSystemView(self.bot, self.guild_id)
+        """Handle ticket system settings button"""
+        from cogs.settings import Settings
+        settings_cog = self.bot.get_cog('Settings')
+        if settings_cog:
+            await settings_cog.handle_ticket_settings(interaction)
+        else:
+            await interaction.response.send_message("Ticket settings module not available.", ephemeral=True)
+    
+    @discord.ui.button(label="Registration", style=discord.ButtonStyle.primary, emoji="📝", row=1)
+    async def registration(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Handle registration settings button"""
+        from cogs.settings import Settings
+        settings_cog = self.bot.get_cog('Settings')
+        if settings_cog:
+            await settings_cog.handle_registration_settings(interaction)
+        else:
+            await interaction.response.send_message("Registration settings module not available.", ephemeral=True)
+    
+    @discord.ui.button(label="Status Roles", style=discord.ButtonStyle.primary, emoji="🎭", row=1)
+    async def status_roles(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Handle status role settings button"""
+        view = StatusRoleSettingsView(self.bot, self.guild_id)
         await view.initialize()
         
         embed = discord.Embed(
-            title="🎫 Ticket System",
-            description="Configure support ticket system for your server.",
+            title="🎭 Status Role Settings",
+            description="Configure automatic role assignment based on custom status.",
             color=discord.Color.blue()
         )
         
-        # Format settings display
-        category = f"<#{view.ticket_category_id}>" if view.ticket_category_id else "Not set"
-        log_channel = f"<#{view.log_channel_id}>" if view.log_channel_id else "Not set"
-        archive_category = f"<#{view.archive_category_id}>" if view.archive_category_id else "Not set"
-        staff_role = f"<@&{view.staff_role_id}>" if view.staff_role_id else "Not set"
-        
-        embed.add_field(
-            name="Current Configuration",
-            value=f"**Ticket Category**: {category}\n"
-                  f"**Log Channel**: {log_channel}\n"
-                  f"**Archive Category**: {archive_category}\n"
-                  f"**Staff Role**: {staff_role}",
-            inline=False
-        )
+        # Show current status roles
+        if view.status_roles:
+            roles_text = []
+            for status_role in view.status_roles[:5]:  # Show first 5
+                guild = self.bot.get_guild(int(self.guild_id))
+                role = guild.get_role(status_role['role_id']) if guild else None
+                role_mention = role.mention if role else f"<@&{status_role['role_id']}>"
+                roles_text.append(f"• **{status_role['custom_status']}** → {role_mention}")
+            
+            if len(view.status_roles) > 5:
+                roles_text.append(f"... and {len(view.status_roles) - 5} more")
+            
+            embed.add_field(
+                name="Current Status Roles",
+                value="\n".join(roles_text),
+                inline=False
+            )
+        else:
+            embed.add_field(
+                name="Current Status Roles",
+                value="No status roles configured.",
+                inline=False
+            )
         
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
-
-    @discord.ui.button(label="Role Management", emoji="👑", style=discord.ButtonStyle.secondary, row=1)
-    async def role_management(self, interaction: discord.Interaction, button: discord.ui.Button):
-        view = RoleManagementView(self.bot, self.guild_id)
-        
-        mongo_db = get_async_db()
-        role_settings = await mongo_db.role_management.find_one({"guild_id": self.guild_id}) or {}
+    
+    @discord.ui.button(label="Birthday System", style=discord.ButtonStyle.secondary, emoji="🎂", row=2)
+    async def birthday_system(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Handle birthday system settings button"""
+        view = BirthdaySettingsView(self.bot, self.guild_id)
+        await view.initialize()
         
         embed = discord.Embed(
-            title="👑 Role Management",
-            description="Configure self-assignable roles and role messages.",
+            title="🎂 Birthday System Settings",
+            description="Configure birthday announcements and roles.",
             color=discord.Color.blue()
         )
         
-        # Self roles
-        self_roles = role_settings.get("self_roles", [])
-        self_roles_text = f"{len(self_roles)} roles available" if self_roles else "Not configured"
+        # Show current birthday settings
+        if view.birthday_channel_id:
+            embed.add_field(
+                name="Birthday Channel",
+                value=f"<#{view.birthday_channel_id}>",
+                inline=True
+            )
+        if view.birthday_role_id:
+            embed.add_field(
+                name="Birthday Role",
+                value=f"<@&{view.birthday_role_id}>",
+                inline=True
+            )
         
-        # Register channel
-        register_channel_id = role_settings.get("register_channel_id")
-        register_channel = f"<#{register_channel_id}>" if register_channel_id else "Not configured"
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+    
+    @discord.ui.button(label="AI Settings", style=discord.ButtonStyle.secondary, emoji="🤖", row=2)
+    async def ai_settings(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Handle AI settings button"""
+        view = AISettingsView(self.bot, self.guild_id)
+        await view.initialize()
+        
+        embed = discord.Embed(
+            title="🤖 AI Settings",
+            description="Configure AI features and Perplexity integration.",
+            color=discord.Color.blue()
+        )
+        
+        # Show AI status
+        if view.perplexity_enabled:
+            embed.add_field(
+                name="Perplexity AI",
+                value="✅ Enabled",
+                inline=True
+            )
+        else:
+            embed.add_field(
+                name="Perplexity AI",
+                value="❌ Disabled",
+                inline=True
+            )
+        
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+    
+    @discord.ui.button(label="Legal & Info", style=discord.ButtonStyle.secondary, emoji="📜", row=2)
+    async def legal_info(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Handle legal and info button"""
+        view = LegalInfoView(self.bot)
+        
+        embed = discord.Embed(
+            title="📜 Legal Information & Bot Info",
+            description="View privacy policy, terms of service, and bot information.",
+            color=discord.Color.blue()
+        )
         
         embed.add_field(
-            name="Configuration",
-            value=f"**Self-Assignable Roles**: {self_roles_text}\n**Register Channel**: {register_channel}",
-            inline=False
+            name="Bot Version",
+            value=f"`{getattr(self.bot, 'version', '1.0.0')}`",
+            inline=True
+        )
+        embed.add_field(
+            name="Support Server",
+            value="[Join Support](https://discord.gg/vXhwuxJk88)",
+            inline=True
         )
         
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
     
-    @discord.ui.button(label="Starboard", emoji="⭐", style=discord.ButtonStyle.secondary, row=1)
-    async def starboard(self, interaction: discord.Interaction, button: discord.ui.Button):
-        view = StarboardView(self.bot, self.guild_id)
+    @discord.ui.button(label="Updates & Changelog", style=discord.ButtonStyle.secondary, emoji="📋", row=2)
+    async def updates_changelog(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Handle updates and changelog button"""
+        # Get BotSettings cog
+        bot_settings_cog = self.bot.get_cog('BotSettings')
+        if bot_settings_cog:
+            versions_data = bot_settings_cog.get_versions_data()
+            
+            # Find current version data
+            current_version_data = None
+            for version in versions_data["versions"]:
+                if version["version"] == versions_data["current_version"]:
+                    current_version_data = version
+                    break
+            
+            if current_version_data:
+                # Import ChangelogView from bot_settings
+                from cogs.bot_settings import ChangelogView
+                view = ChangelogView(self.bot, versions_data)
+                embed = view.create_changelog_embed(current_version_data)
+                
+                # Add send to channel button
+                send_button = discord.ui.Button(
+                    label="Send to Channel",
+                    style=discord.ButtonStyle.success,
+                    emoji="📢"
+                )
+                
+                async def send_changelog_callback(inter: discord.Interaction):
+                    if not inter.user.guild_permissions.administrator:
+                        return await inter.response.send_message("Only administrators can send changelogs.", ephemeral=True)
+                    
+                    # Create channel select view
+                    select_view = ChannelSelectView(
+                        self.bot,
+                        title="Select Channel for Changelog",
+                        callback=lambda channel: self._send_changelog_to_channel(channel, current_version_data, versions_data)
+                    )
+                    
+                    select_embed = discord.Embed(
+                        title="📢 Send Changelog",
+                        description="Select a channel to send the changelog to:",
+                        color=discord.Color.blue()
+                    )
+                    
+                    await inter.response.send_message(embed=select_embed, view=select_view, ephemeral=True)
+                
+                send_button.callback = send_changelog_callback
+                view.add_item(send_button)
+                
+                await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+            else:
+                await interaction.response.send_message("Version information not available.", ephemeral=True)
+        else:
+            await interaction.response.send_message("Updates module not available.", ephemeral=True)
+    
+    async def _send_changelog_to_channel(self, channel, version_data, versions_data):
+        """Helper method to send changelog to a channel"""
+        from cogs.bot_settings import ChangelogView
+        view = ChangelogView(self.bot, versions_data)
+        embed = view.create_changelog_embed(version_data)
         
-        mongo_db = get_async_db()
-        starboard_settings = await mongo_db.starboard.find_one({"guild_id": self.guild_id}) or {}
+        try:
+            await channel.send(embed=embed, view=view)
+            return True
+        except:
+            return False
+    
+    @discord.ui.button(label="Levelling System", style=discord.ButtonStyle.secondary, emoji="📊", row=3)
+    async def levelling_system(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Handle levelling system settings button"""
+        view = LevellingSettingsView(self.bot, self.guild_id)
+        await view.initialize()
         
         embed = discord.Embed(
-            title="⭐ Starboard System",
-            description="Configure starboard settings for highlighting popular messages.",
-            color=discord.Color.gold()
+            title="📊 Levelling System Settings",
+            description="Configure the XP and levelling system for your server.",
+            color=discord.Color.blue()
         )
         
-        # Get current settings
-        starboard_channel_id = starboard_settings.get("starboard_channel")
-        starboard_channel = f"<#{starboard_channel_id}>" if starboard_channel_id else "Not configured"
-        threshold = starboard_settings.get("threshold", 3)
-        enabled = starboard_settings.get("enabled", False)
-        
-        embed.add_field(
-            name="Configuration",
-            value=f"**Status**: {'🟢 Enabled' if enabled else '🔴 Disabled'}\n"
-                  f"**Starboard Channel**: {starboard_channel}\n"
-                  f"**Star Threshold**: {threshold} ⭐",
-            inline=False
-        )
-        
-        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
-
-    @discord.ui.button(label="Temp Channels", emoji="🎮", style=discord.ButtonStyle.secondary, row=2)
-    async def temp_channels(self, interaction: discord.Interaction, button: discord.ui.Button):
-        from utils.settings.temp_channels_view import TempChannelsView
-        
-        view = TempChannelsView(self.bot, self.guild_id)
-        
-        mongo_db = get_async_db()
-        temp_settings = await mongo_db.temp_channels.find_one({"guild_id": self.guild_id}) or {}
-        
-        embed = discord.Embed(
-            title="🎮 Temporary Voice Channels",
-            description="Configure auto-created voice channels for your server members.",
-            color=discord.Color.purple()
-        )
-        
-        # Get current settings
-        hub_channel_id = temp_settings.get("hub_channel_id")
-        hub_channel = f"<#{hub_channel_id}>" if hub_channel_id else "Not configured"
-        category_id = temp_settings.get("category_id")
-        category = f"<#{category_id}>" if category_id else "Auto-create"
-        enabled = bool(hub_channel_id)
-        
-        embed.add_field(
-            name="Configuration",
-            value=f"**Status**: {'🟢 Enabled' if enabled else '🔴 Disabled'}\n"
-                  f"**Hub Channel**: {hub_channel}\n"
-                  f"**Category**: {category}",
-            inline=False
-        )
-        
-        embed.add_field(
-            name="How it works",
-            value="• Users join the hub channel\n"
-                  "• A private channel is created for them\n"
-                  "• Channel is deleted when empty\n"
-                  "• Game emojis and custom formats supported",
-            inline=False
-        )
+        # Show levelling status
+        if view.levelling_enabled:
+            embed.add_field(
+                name="Status",
+                value="✅ Enabled",
+                inline=True
+            )
+            if view.level_up_channel_id:
+                embed.add_field(
+                    name="Level Up Channel",
+                    value=f"<#{view.level_up_channel_id}>",
+                    inline=True
+                )
+        else:
+            embed.add_field(
+                name="Status",
+                value="❌ Disabled",
+                inline=False
+            )
         
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
     
-    @discord.ui.button(label="Server Settings", emoji="🎨", style=discord.ButtonStyle.secondary, row=2)
-    async def server_settings(self, interaction: discord.Interaction, button: discord.ui.Button):
-        view = ServerSettingsView(self.bot, self.guild_id)
+    @discord.ui.button(label="Advanced Settings", style=discord.ButtonStyle.danger, emoji="⚙️", row=3)
+    async def advanced_settings(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Handle advanced settings button"""
+        # Check if user is bot owner
+        if not await self.bot.is_owner(interaction.user):
+            return await interaction.response.send_message(
+                "This section is only available to the bot owner.",
+                ephemeral=True
+            )
         
-        mongo_db = get_async_db()
-        server_settings = await mongo_db.server_settings.find_one({"server_id": self.guild_id}) or {}
-        
-        embed = discord.Embed(
-            title="🎨 Server Settings",
-            description="Configure basic server settings and defaults.",
-            color=discord.Color.blurple()
-        )
-        
-        # Get current settings
-        embed_color = server_settings.get("embed_color", "0x3498db")
-        report_channel_id = server_settings.get("report_channel_id")
-        report_channel = f"<#{report_channel_id}>" if report_channel_id else "Not configured"
-        
-        embed.add_field(
-            name="Current Settings",
-            value=f"**Embed Color**: {embed_color}\n"
-                  f"**Report Channel**: {report_channel}",
-            inline=False
-        )
-        
-        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
-    
-    @discord.ui.button(label="Registration", emoji="📄", style=discord.ButtonStyle.secondary, row=2)
-    async def registration(self, interaction: discord.Interaction, button: discord.ui.Button):
-        from utils.settings.register_views import RegisterSettingsView
-        
-        view = RegisterSettingsView(self.bot, self.guild_id)
-        
-        mongo_db = get_async_db()
-        register_settings = await mongo_db.register_settings.find_one({"guild_id": self.guild_id}) or {}
+        view = AdvancedSettingsView(self.bot, self.guild_id)
         
         embed = discord.Embed(
-            title="📄 Registration System",
-            description="Configure member registration and verification settings.",
-            color=discord.Color.green()
+            title="⚙️ Advanced Settings",
+            description="Advanced configuration options. Use with caution!",
+            color=discord.Color.red()
         )
         
-        # Get current settings
-        register_channel_id = register_settings.get("register_channel_id")
-        register_channel = f"<#{register_channel_id}>" if register_channel_id else "Not configured"
-        register_role_id = register_settings.get("register_role_id")
-        register_role = f"<@&{register_role_id}>" if register_role_id else "Not configured"
-        enabled = register_settings.get("enabled", False)
-        
         embed.add_field(
-            name="Configuration",
-            value=f"**Status**: {'🟢 Enabled' if enabled else '🔴 Disabled'}\n"
-                  f"**Register Channel**: {register_channel}\n"
-                  f"**Registered Role**: {register_role}",
+            name="⚠️ Warning",
+            value="These settings can significantly affect bot behavior. Only modify if you know what you're doing.",
             inline=False
         )
         
@@ -2607,4 +2590,949 @@ class AddTicketQuestionModal(discord.ui.Modal, title="Add Ticket Question"):
                 ),
                 ephemeral=True
             )
+
+# Birthday System View
+class BirthdaySystemView(discord.ui.View):
+    def __init__(self, bot, guild_id):
+        super().__init__(timeout=300)
+        self.bot = bot
+        self.guild_id = guild_id
+        
+    @discord.ui.button(label="📢 Set Birthday Channel", style=discord.ButtonStyle.primary, row=0)
+    async def set_birthday_channel(self, interaction: discord.Interaction, button: discord.ui.Button):
+        modal = SetBirthdayChannelModal(self.bot, self.guild_id)
+        await interaction.response.send_modal(modal)
+    
+    @discord.ui.button(label="🎭 Setup Zodiac Roles", style=discord.ButtonStyle.secondary, row=0)
+    async def setup_zodiac_roles(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.defer(ephemeral=True)
+        
+        # Create zodiac roles
+        zodiac_roles = ["Akrep", "Yay", "Oğlak", "Kova", "Balık", "Koç", "Boğa", "İkizler", "Yengeç", "Aslan", "Başak", "Terazi"]
+        created_roles = []
+        
+        for role_name in zodiac_roles:
+            if not discord.utils.get(interaction.guild.roles, name=role_name):
+                try:
+                    role = await interaction.guild.create_role(name=role_name)
+                    created_roles.append(role.name)
+                except discord.Forbidden:
+                    await interaction.followup.send(
+                        embed=create_embed("❌ I don't have permission to create roles.", discord.Color.red()),
+                        ephemeral=True
+                    )
+                    return
+        
+        if created_roles:
+            await interaction.followup.send(
+                embed=create_embed(f"✅ Created {len(created_roles)} zodiac roles: {', '.join(created_roles)}", discord.Color.green()),
+                ephemeral=True
+            )
+        else:
+            await interaction.followup.send(
+                embed=create_embed("ℹ️ All zodiac roles already exist.", discord.Color.blue()),
+                ephemeral=True
+            )
+    
+    @discord.ui.button(label="📊 View Birthday List", style=discord.ButtonStyle.secondary, row=0)
+    async def view_birthdays(self, interaction: discord.Interaction, button: discord.ui.Button):
+        mongo_db = get_async_db()
+        birthday_data = await mongo_db.birthday.find_one({"guild_id": self.guild_id}) or {}
+        members_data = birthday_data.get("members", [])
+        
+        if not members_data:
+            await interaction.response.send_message(
+                embed=create_embed("ℹ️ No birthdays registered yet.", discord.Color.blue()),
+                ephemeral=True
+            )
+            return
+        
+        # Sort by month and day
+        sorted_members = sorted(members_data, key=lambda x: (x["month"], x["day"]))
+        
+        birthday_list = []
+        for member_info in sorted_members[:20]:  # Show first 20
+            member = interaction.guild.get_member(member_info["member_id"])
+            if member:
+                birthday_list.append(f"• {member.mention}: {member_info['day']}/{member_info['month']}")
+        
+        embed = discord.Embed(
+            title="🎂 Birthday List",
+            description="\n".join(birthday_list) if birthday_list else "No active members with birthdays.",
+            color=discord.Color.gold()
+        )
+        
+        if len(members_data) > 20:
+            embed.set_footer(text=f"Showing 20 of {len(members_data)} birthdays")
+        
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+    
+    @discord.ui.button(label="🗑️ Clear Birthday Data", style=discord.ButtonStyle.danger, row=1)
+    async def clear_birthdays(self, interaction: discord.Interaction, button: discord.ui.Button):
+        view = ConfirmClearBirthdaysView(self.bot, self.guild_id)
+        embed = discord.Embed(
+            title="⚠️ Clear Birthday Data",
+            description="Are you sure you want to clear all birthday data?\n\n"
+                        "This will remove all registered birthdays but keep the zodiac roles.",
+            color=discord.Color.red()
+        )
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+
+# Legal Info View
+class LegalInfoView(discord.ui.View):
+    def __init__(self, bot, timeout=180):
+        super().__init__(timeout=timeout)
+        self.bot = bot
+        
+    @discord.ui.button(label="🔒 Privacy Policy", style=discord.ButtonStyle.primary, row=0)
+    async def privacy_policy(self, interaction: discord.Interaction, button: discord.ui.Button):
+        embed = discord.Embed(
+            title="🔒 Privacy Policy",
+            description="**Data Collection and Usage**\n\n"
+                        "We collect and store the following data:\n"
+                        "• Server IDs and settings\n"
+                        "• User IDs for features like leveling and birthdays\n"
+                        "• Message content for moderation features (if enabled)\n\n"
+                        "**Data Storage**\n"
+                        "• All data is stored securely in MongoDB\n"
+                        "• Data is not shared with third parties\n"
+                        "• Data is only used for bot functionality\n\n"
+                        "**Data Deletion**\n"
+                        "• Server data is deleted when the bot is removed\n"
+                        "• Users can request data deletion via support server\n\n"
+                        "**Contact**\n"
+                        "For privacy concerns, join our support server.",
+            color=discord.Color.blue()
+        )
+        
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+    
+    @discord.ui.button(label="📋 Terms of Usage", style=discord.ButtonStyle.primary, row=0)
+    async def terms_of_usage(self, interaction: discord.Interaction, button: discord.ui.Button):
+        embed = discord.Embed(
+            title="📋 Terms of Usage",
+            description="**Usage Agreement**\n\n"
+                        "By using this bot, you agree to:\n"
+                        "• Not use the bot for illegal activities\n"
+                        "• Not abuse or exploit bot features\n"
+                        "• Follow Discord's Terms of Service\n\n"
+                        "**Bot Features**\n"
+                        "• Features may be added or removed at any time\n"
+                        "• The bot is provided 'as is' without warranty\n"
+                        "• We reserve the right to restrict access\n\n"
+                        "**Liability**\n"
+                        "• We are not responsible for data loss\n"
+                        "• We are not responsible for server issues\n"
+                        "• Use the bot at your own risk\n\n"
+                        "**Support**\n"
+                        "For support, join our Discord server.",
+            color=discord.Color.gold()
+        )
+        
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+    
+    @discord.ui.button(label="🛡️ Data Protection", style=discord.ButtonStyle.secondary, row=0)
+    async def data_protection(self, interaction: discord.Interaction, button: discord.ui.Button):
+        embed = discord.Embed(
+            title="🛡️ Data Protection & GDPR",
+            description="**Your Rights**\n\n"
+                        "Under GDPR, you have the right to:\n"
+                        "• Access your personal data\n"
+                        "• Correct inaccurate data\n"
+                        "• Delete your data\n"
+                        "• Export your data\n\n"
+                        "**Data Security**\n"
+                        "• Encrypted database connections\n"
+                        "• Regular security updates\n"
+                        "• Limited data access\n\n"
+                        "**Data Requests**\n"
+                        "To exercise your rights, contact us via:\n"
+                        "• Support server (preferred)\n"
+                        "• Bot developer DM\n\n"
+                        "Requests are processed within 30 days.",
+            color=discord.Color.green()
+        )
+        
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+    
+    @discord.ui.button(label="📞 Support Server", style=discord.ButtonStyle.secondary, row=1)
+    async def support_server(self, interaction: discord.Interaction, button: discord.ui.Button):
+        # Send a link in response since link buttons need special handling
+        embed = discord.Embed(
+            title="📞 Support Server",
+            description="Click the link below to join our support server:\n[Join Support Server](https://discord.gg/vXhwuxJk88)",
+            color=discord.Color.blue()
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+# Modal classes for the new views
+class SetPrefixModal(discord.ui.Modal, title="Set Bot Prefix"):
+    def __init__(self, bot, guild_id):
+        super().__init__()
+        self.bot = bot
+        self.guild_id = guild_id
+        
+    prefix_input = discord.ui.TextInput(
+        label="New Prefix",
+        placeholder="Enter the new prefix (e.g., !, ?, >)",
+        required=True,
+        max_length=5,
+        min_length=1
+    )
+    
+    async def on_submit(self, interaction: discord.Interaction):
+        new_prefix = self.prefix_input.value
+        
+        mongo_db = get_async_db()
+        await mongo_db.settings.update_one(
+            {"guild_id": self.guild_id},
+            {"$set": {"prefix": new_prefix}},
+            upsert=True
+        )
+        
+        await interaction.response.send_message(
+            embed=create_embed(f"✅ Bot prefix updated to `{new_prefix}`", discord.Color.green()),
+            ephemeral=True
+        )
+
+class SetBirthdayChannelModal(discord.ui.Modal, title="Set Birthday Channel"):
+    def __init__(self, bot, guild_id):
+        super().__init__()
+        self.bot = bot
+        self.guild_id = guild_id
+        
+    channel_id = discord.ui.TextInput(
+        label="Birthday Channel ID",
+        placeholder="Enter the channel ID for birthday announcements",
+        required=True,
+        max_length=20
+    )
+    
+    async def on_submit(self, interaction: discord.Interaction):
+        try:
+            channel_id = int(self.channel_id.value)
+            channel = interaction.guild.get_channel(channel_id)
+            
+            if not channel:
+                await interaction.response.send_message(
+                    embed=create_embed("❌ Channel not found. Please check the ID.", discord.Color.red()),
+                    ephemeral=True
+                )
+                return
+            
+            if not isinstance(channel, discord.TextChannel):
+                await interaction.response.send_message(
+                    embed=create_embed("❌ Please select a text channel.", discord.Color.red()),
+                    ephemeral=True
+                )
+                return
+            
+            mongo_db = get_async_db()
+            await mongo_db.birthday.update_one(
+                {"guild_id": self.guild_id},
+                {"$set": {"channel_id": channel_id}},
+                upsert=True
+            )
+            
+            await interaction.response.send_message(
+                embed=create_embed(f"✅ Birthday channel set to {channel.mention}", discord.Color.green()),
+                ephemeral=True
+            )
+        except ValueError:
+            await interaction.response.send_message(
+                embed=create_embed("❌ Invalid channel ID format.", discord.Color.red()),
+                ephemeral=True
+            )
+
+# Confirmation views
+class ConfirmBotResetView(discord.ui.View):
+    def __init__(self, bot, guild_id):
+        super().__init__(timeout=60)
+        self.bot = bot
+        self.guild_id = guild_id
+        
+    @discord.ui.button(label="✅ Confirm Reset", style=discord.ButtonStyle.danger)
+    async def confirm_reset(self, interaction: discord.Interaction, button: discord.ui.Button):
+        mongo_db = get_async_db()
+        
+        # Reset prefix and language
+        await mongo_db.settings.update_one(
+            {"guild_id": self.guild_id},
+            {"$unset": {"prefix": "", "language": ""}},
+            upsert=True
+        )
+        
+        await interaction.response.send_message(
+            embed=create_embed("✅ Bot configuration reset to defaults.", discord.Color.green()),
+            ephemeral=True
+        )
+        self.stop()
+    
+    @discord.ui.button(label="❌ Cancel", style=discord.ButtonStyle.secondary)
+    async def cancel_reset(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message(
+            embed=create_embed("❌ Reset cancelled.", discord.Color.red()),
+            ephemeral=True
+        )
+        self.stop()
+
+class ConfirmClearBirthdaysView(discord.ui.View):
+    def __init__(self, bot, guild_id):
+        super().__init__(timeout=60)
+        self.bot = bot
+        self.guild_id = guild_id
+        
+    @discord.ui.button(label="✅ Confirm Clear", style=discord.ButtonStyle.danger)
+    async def confirm_clear(self, interaction: discord.Interaction, button: discord.ui.Button):
+        mongo_db = get_async_db()
+        
+        # Clear birthday members data
+        await mongo_db.birthday.update_one(
+            {"guild_id": self.guild_id},
+            {"$set": {"members": []}},
+            upsert=True
+        )
+        
+        await interaction.response.send_message(
+            embed=create_embed("✅ All birthday data has been cleared.", discord.Color.green()),
+            ephemeral=True
+        )
+        self.stop()
+    
+    @discord.ui.button(label="❌ Cancel", style=discord.ButtonStyle.secondary)
+    async def cancel_clear(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message(
+            embed=create_embed("❌ Clear cancelled.", discord.Color.red()),
+            ephemeral=True
+        )
+        self.stop()
+
+class PrefixSettingsView(discord.ui.View):
+    def __init__(self, bot, guild_id, timeout=180):
+        super().__init__(timeout=timeout)
+        self.bot = bot
+        self.guild_id = guild_id
+        self.db = None
+    
+    @discord.ui.button(label="Change Prefix", style=discord.ButtonStyle.primary, emoji="✏️")
+    async def change_prefix(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Open modal to change prefix"""
+        modal = PrefixModal(self.bot, self.guild_id)
+        await interaction.response.send_modal(modal)
+    
+    @discord.ui.button(label="Reset to Default", style=discord.ButtonStyle.secondary, emoji="🔄")
+    async def reset_prefix(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Reset prefix to default"""
+        if not self.db:
+            self.db = self.bot.async_db
+        
+        await self.db.settings.update_one(
+            {"guild_id": str(self.guild_id)},
+            {"$set": {"prefix": ">"}},
+            upsert=True
+        )
+        
+        embed = discord.Embed(
+            title="✅ Prefix Reset",
+            description="Prefix has been reset to the default: `>`",
+            color=discord.Color.green()
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+class PrefixModal(discord.ui.Modal):
+    def __init__(self, bot, guild_id):
+        super().__init__(title="Change Bot Prefix")
+        self.bot = bot
+        self.guild_id = guild_id
+        
+        self.prefix_input = discord.ui.TextInput(
+            label="New Prefix",
+            placeholder="Enter new prefix (e.g., !, ?, $)",
+            default=">",
+            max_length=5,
+            min_length=1,
+            required=True
+        )
+        self.add_item(self.prefix_input)
+    
+    async def on_submit(self, interaction: discord.Interaction):
+        new_prefix = self.prefix_input.value
+        
+        # Update in database
+        db = self.bot.async_db
+        await db.settings.update_one(
+            {"guild_id": str(self.guild_id)},
+            {"$set": {"prefix": new_prefix}},
+            upsert=True
+        )
+        
+        embed = discord.Embed(
+            title="✅ Prefix Updated",
+            description=f"Bot prefix has been changed to: `{new_prefix}`",
+            color=discord.Color.green()
+        )
+        embed.add_field(
+            name="Usage",
+            value=f"You can now use commands with `{new_prefix}help` or `/help`",
+            inline=False
+        )
+        
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+class StatusRoleSettingsView(discord.ui.View):
+    def __init__(self, bot, guild_id, timeout=180):
+        super().__init__(timeout=timeout)
+        self.bot = bot
+        self.guild_id = guild_id
+        self.status_roles = []
+        self.db = None
+    
+    async def initialize(self):
+        """Load current status roles from database"""
+        if not self.db:
+            self.db = self.bot.async_db
+        
+        # Get all status roles for this guild
+        self.status_roles = await self.db.status_roles.find({"guild_id": int(self.guild_id)}).to_list(None)
+    
+    @discord.ui.button(label="Add Status Role", style=discord.ButtonStyle.primary, emoji="➕")
+    async def add_status_role(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Add a new status role"""
+        modal = StatusRoleModal(self.bot, self.guild_id)
+        await interaction.response.send_modal(modal)
+    
+    @discord.ui.button(label="Remove Status Role", style=discord.ButtonStyle.danger, emoji="🗑️")
+    async def remove_status_role(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Remove a status role"""
+        if not self.status_roles:
+            return await interaction.response.send_message("No status roles to remove.", ephemeral=True)
+        
+        # Create select menu for removal
+        view = StatusRoleRemoveView(self.bot, self.guild_id, self.status_roles)
+        embed = discord.Embed(
+            title="🗑️ Remove Status Role",
+            description="Select a status role to remove:",
+            color=discord.Color.red()
+        )
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+
+class StatusRoleModal(discord.ui.Modal):
+    def __init__(self, bot, guild_id):
+        super().__init__(title="Add Status Role")
+        self.bot = bot
+        self.guild_id = guild_id
+        
+        self.status_input = discord.ui.TextInput(
+            label="Custom Status Text",
+            placeholder="Enter the status text to trigger role assignment",
+            max_length=100,
+            required=True
+        )
+        self.add_item(self.status_input)
+        
+        self.role_input = discord.ui.TextInput(
+            label="Role Name or ID",
+            placeholder="Enter the role name or ID to assign",
+            max_length=100,
+            required=True
+        )
+        self.add_item(self.role_input)
+    
+    async def on_submit(self, interaction: discord.Interaction):
+        status_text = self.status_input.value.strip().lower()
+        role_input = self.role_input.value.strip()
+        
+        # Find the role
+        guild = interaction.guild
+        role = None
+        
+        # Try to find by ID first
+        if role_input.isdigit():
+            role = guild.get_role(int(role_input))
+        
+        # Try to find by name
+        if not role:
+            role = discord.utils.get(guild.roles, name=role_input)
+        
+        if not role:
+            return await interaction.response.send_message(
+                f"Could not find role: {role_input}",
+                ephemeral=True
+            )
+        
+        # Save to database
+        db = self.bot.async_db
+        await db.status_roles.update_one(
+            {"guild_id": int(self.guild_id), "custom_status": status_text},
+            {"$set": {"role_id": role.id}},
+            upsert=True
+        )
+        
+        embed = discord.Embed(
+            title="✅ Status Role Added",
+            description=f"Members with status `{status_text}` will receive {role.mention}",
+            color=discord.Color.green()
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+class StatusRoleRemoveView(discord.ui.View):
+    def __init__(self, bot, guild_id, status_roles, timeout=180):
+        super().__init__(timeout=timeout)
+        self.bot = bot
+        self.guild_id = guild_id
+        
+        # Create select options
+        options = []
+        for sr in status_roles[:25]:  # Discord limit
+            guild = bot.get_guild(int(guild_id))
+            role = guild.get_role(sr['role_id']) if guild else None
+            role_name = role.name if role else f"Unknown Role ({sr['role_id']})"
+            
+            options.append(
+                discord.SelectOption(
+                    label=f"{sr['custom_status']} → {role_name}",
+                    value=sr['custom_status'],
+                    description=f"Remove this status role mapping"
+                )
+            )
+        
+        select = discord.ui.Select(
+            placeholder="Select status role to remove",
+            options=options
+        )
+        select.callback = self.remove_callback
+        self.add_item(select)
+    
+    async def remove_callback(self, interaction: discord.Interaction):
+        selected_status = interaction.data['values'][0]
+        
+        # Remove from database
+        db = self.bot.async_db
+        await db.status_roles.delete_one({
+            "guild_id": int(self.guild_id),
+            "custom_status": selected_status
+        })
+        
+        embed = discord.Embed(
+            title="✅ Status Role Removed",
+            description=f"Status role for `{selected_status}` has been removed.",
+            color=discord.Color.green()
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+class BirthdaySettingsView(discord.ui.View):
+    def __init__(self, bot, guild_id, timeout=180):
+        super().__init__(timeout=timeout)
+        self.bot = bot
+        self.guild_id = guild_id
+        self.birthday_channel_id = None
+        self.birthday_role_id = None
+        self.db = None
+    
+    async def initialize(self):
+        """Load current birthday settings"""
+        if not self.db:
+            self.db = self.bot.async_db
+        
+        settings = await self.db.birthday.find_one({"guild_id": str(self.guild_id)}) or {}
+        self.birthday_channel_id = settings.get("channel_id")
+        self.birthday_role_id = settings.get("birthday_role_id")
+    
+    @discord.ui.button(label="Set Birthday Channel", style=discord.ButtonStyle.primary, emoji="📢")
+    async def set_birthday_channel(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Set birthday announcement channel"""
+        view = ChannelSelectView(
+            self.bot,
+            title="Select Birthday Channel",
+            callback=self._set_birthday_channel
+        )
+        
+        embed = discord.Embed(
+            title="📢 Select Birthday Channel",
+            description="Choose a channel for birthday announcements:",
+            color=discord.Color.blue()
+        )
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+    
+    async def _set_birthday_channel(self, channel):
+        """Save birthday channel to database"""
+        await self.db.birthday.update_one(
+            {"guild_id": str(self.guild_id)},
+            {"$set": {"channel_id": channel.id}},
+            upsert=True
+        )
+        self.birthday_channel_id = channel.id
+    
+    @discord.ui.button(label="Set Birthday Role", style=discord.ButtonStyle.primary, emoji="🎂")
+    async def set_birthday_role(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Set birthday role"""
+        modal = BirthdayRoleModal(self.bot, self.guild_id)
+        await interaction.response.send_modal(modal)
+    
+    @discord.ui.button(label="Test Birthday Message", style=discord.ButtonStyle.secondary, emoji="🎉")
+    async def test_birthday(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Send a test birthday message"""
+        if not self.birthday_channel_id:
+            return await interaction.response.send_message(
+                "Please set a birthday channel first.",
+                ephemeral=True
+            )
+        
+        channel = interaction.guild.get_channel(self.birthday_channel_id)
+        if not channel:
+            return await interaction.response.send_message(
+                "Birthday channel not found.",
+                ephemeral=True
+            )
+        
+        # Send test message
+        embed = discord.Embed(
+            title="🎂 Happy Birthday!",
+            description=f"Today is {interaction.user.mention}'s birthday!\n\nWish them a happy birthday! 🎉",
+            color=discord.Color.gold()
+        )
+        embed.set_thumbnail(url=interaction.user.display_avatar.url)
+        
+        await channel.send(embed=embed)
+        await interaction.response.send_message(
+            f"Test birthday message sent to {channel.mention}",
+            ephemeral=True
+        )
+
+class BirthdayRoleModal(discord.ui.Modal):
+    def __init__(self, bot, guild_id):
+        super().__init__(title="Set Birthday Role")
+        self.bot = bot
+        self.guild_id = guild_id
+        
+        self.role_input = discord.ui.TextInput(
+            label="Birthday Role Name",
+            placeholder="Enter role name or leave empty to create new",
+            required=False
+        )
+        self.add_item(self.role_input)
+    
+    async def on_submit(self, interaction: discord.Interaction):
+        role_name = self.role_input.value.strip() or "🎂 Birthday"
+        
+        # Find or create role
+        guild = interaction.guild
+        role = discord.utils.get(guild.roles, name=role_name)
+        
+        if not role:
+            # Create new role
+            role = await guild.create_role(
+                name=role_name,
+                color=discord.Color.gold(),
+                hoist=True
+            )
+        
+        # Save to database
+        db = self.bot.async_db
+        await db.birthday.update_one(
+            {"guild_id": str(self.guild_id)},
+            {"$set": {"birthday_role_id": role.id}},
+            upsert=True
+        )
+        
+        embed = discord.Embed(
+            title="✅ Birthday Role Set",
+            description=f"Birthday role set to {role.mention}",
+            color=discord.Color.green()
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+class AISettingsView(discord.ui.View):
+    def __init__(self, bot, guild_id, timeout=180):
+        super().__init__(timeout=timeout)
+        self.bot = bot
+        self.guild_id = guild_id
+        self.perplexity_enabled = False
+        self.db = None
+    
+    async def initialize(self):
+        """Load current AI settings"""
+        if not self.db:
+            self.db = self.bot.async_db
+        
+        settings = await self.db.settings.find_one({"guild_id": str(self.guild_id)}) or {}
+        self.perplexity_enabled = settings.get("perplexity_enabled", False)
+    
+    @discord.ui.button(label="Toggle Perplexity AI", style=discord.ButtonStyle.primary, emoji="🤖")
+    async def toggle_perplexity(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Toggle Perplexity AI on/off"""
+        self.perplexity_enabled = not self.perplexity_enabled
+        
+        await self.db.settings.update_one(
+            {"guild_id": str(self.guild_id)},
+            {"$set": {"perplexity_enabled": self.perplexity_enabled}},
+            upsert=True
+        )
+        
+        embed = discord.Embed(
+            title=f"{'✅' if self.perplexity_enabled else '❌'} Perplexity AI",
+            description=f"Perplexity AI has been {'enabled' if self.perplexity_enabled else 'disabled'}.",
+            color=discord.Color.green() if self.perplexity_enabled else discord.Color.red()
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+    
+    @discord.ui.button(label="AI Settings Guide", style=discord.ButtonStyle.secondary, emoji="📖")
+    async def ai_guide(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Show AI features guide"""
+        embed = discord.Embed(
+            title="📖 AI Features Guide",
+            description="Learn how to use AI features in your server.",
+            color=discord.Color.blue()
+        )
+        
+        embed.add_field(
+            name="Perplexity AI",
+            value=(
+                "• **Usage**: Mention the bot or use `/ask`\n"
+                "• **Features**: Web search, Q&A, translations\n"
+                "• **Limits**: 100 queries per day per server"
+            ),
+            inline=False
+        )
+        
+        embed.add_field(
+            name="Tips",
+            value=(
+                "• Be specific with your questions\n"
+                "• Use `/ask` for private responses\n"
+                "• AI can search the web for current info"
+            ),
+            inline=False
+        )
+        
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+class LegalInfoView(discord.ui.View):
+    def __init__(self, bot, timeout=180):
+        super().__init__(timeout=timeout)
+        self.bot = bot
+    
+    @discord.ui.button(label="Privacy Policy", style=discord.ButtonStyle.primary, emoji="🔒")
+    async def privacy_policy(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Show privacy policy"""
+        embed = discord.Embed(
+            title="🔒 Privacy Policy",
+            description="Effective Date: January 23, 2025",
+            color=discord.Color.blue()
+        )
+        
+        embed.add_field(
+            name="1. Information We Collect",
+            value=(
+                "• User IDs and usernames for functionality\n"
+                "• Message content for command processing\n"
+                "• Server information for configuration\n"
+                "• No personal data is sold or shared"
+            ),
+            inline=False
+        )
+        
+        embed.add_field(
+            name="2. How We Use Information",
+            value=(
+                "• Provide bot features and services\n"
+                "• Improve bot functionality\n"
+                "• Ensure server safety and moderation\n"
+                "• Generate anonymous statistics"
+            ),
+            inline=False
+        )
+        
+        embed.add_field(
+            name="3. Data Storage",
+            value=(
+                "• Data is stored securely in MongoDB\n"
+                "• Retained only as long as necessary\n"
+                "• You can request data deletion\n"
+                "• Contact: omerguler53@gmail.com"
+            ),
+            inline=False
+        )
+        
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+    
+    @discord.ui.button(label="Terms of Service", style=discord.ButtonStyle.primary, emoji="📜")
+    async def terms_of_service(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Show terms of service"""
+        embed = discord.Embed(
+            title="📜 Terms of Service",
+            description="By using Contro Bot, you agree to these terms.",
+            color=discord.Color.blue()
+        )
+        
+        embed.add_field(
+            name="Usage Rules",
+            value=(
+                "• Don't use the bot for illegal activities\n"
+                "• Don't attempt to exploit or hack the bot\n"
+                "• Follow Discord's Terms of Service\n"
+                "• Respect other users and servers"
+            ),
+            inline=False
+        )
+        
+        embed.add_field(
+            name="Bot Rights",
+            value=(
+                "• We can modify or discontinue features\n"
+                "• We can remove bot access for violations\n"
+                "• We're not liable for data loss\n"
+                "• Updates may change functionality"
+            ),
+            inline=False
+        )
+        
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+    
+    @discord.ui.button(label="Bot Info", style=discord.ButtonStyle.secondary, emoji="ℹ️")
+    async def bot_info(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Show bot information"""
+        embed = discord.Embed(
+            title="ℹ️ Contro Bot Information",
+            description="Advanced Discord bot for server management",
+            color=discord.Color.blue()
+        )
+        
+        embed.add_field(
+            name="Developer",
+            value="Ömer Güler (omerguler53@gmail.com)",
+            inline=True
+        )
+        embed.add_field(
+            name="Version",
+            value=f"`{getattr(self.bot, 'version', '1.0.0')}`",
+            inline=True
+        )
+        embed.add_field(
+            name="Servers",
+            value=f"{len(self.bot.guilds)}",
+            inline=True
+        )
+        embed.add_field(
+            name="Support",
+            value="[Join Server](https://discord.gg/vXhwuxJk88)",
+            inline=True
+        )
+        embed.add_field(
+            name="Website",
+            value="[controbot.com](https://controbot.com)",
+            inline=True
+        )
+        embed.add_field(
+            name="Source",
+            value="[GitHub](https://github.com/bergaman9)",
+            inline=True
+        )
+        
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+class ChannelSelectView(discord.ui.View):
+    def __init__(self, bot, title="Select Channel", callback=None, timeout=180):
+        super().__init__(timeout=timeout)
+        self.bot = bot
+        self.callback = callback
+        self.title = title
+    
+    @discord.ui.select(
+        cls=discord.ui.ChannelSelect,
+        channel_types=[discord.ChannelType.text],
+        placeholder="Select a channel..."
+    )
+    async def channel_select(self, interaction: discord.Interaction, select: discord.ui.ChannelSelect):
+        channel = select.values[0]
+        
+        if self.callback:
+            await self.callback(channel)
+        
+        embed = discord.Embed(
+            title="✅ Channel Selected",
+            description=f"Selected channel: {channel.mention}",
+            color=discord.Color.green()
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+class AdvancedSettingsView(discord.ui.View):
+    def __init__(self, bot, guild_id, timeout=180):
+        super().__init__(timeout=timeout)
+        self.bot = bot
+        self.guild_id = guild_id
+    
+    @discord.ui.button(label="Bot Statistics", style=discord.ButtonStyle.primary, emoji="📊")
+    async def bot_stats(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Show bot statistics"""
+        embed = discord.Embed(
+            title="📊 Bot Statistics",
+            description="Detailed bot performance metrics",
+            color=discord.Color.blue()
+        )
+        
+        # Calculate stats
+        total_users = sum(g.member_count for g in self.bot.guilds)
+        total_channels = sum(len(g.channels) for g in self.bot.guilds)
+        
+        embed.add_field(name="Servers", value=f"{len(self.bot.guilds)}", inline=True)
+        embed.add_field(name="Users", value=f"{total_users:,}", inline=True)
+        embed.add_field(name="Channels", value=f"{total_channels:,}", inline=True)
+        embed.add_field(name="Commands", value=f"{len(self.bot.commands)}", inline=True)
+        embed.add_field(name="Uptime", value=f"<t:{int(self.bot.start_time.timestamp())}:R>", inline=True)
+        embed.add_field(name="Latency", value=f"{round(self.bot.latency * 1000)}ms", inline=True)
+        
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+    
+    @discord.ui.button(label="Reload Views", style=discord.ButtonStyle.secondary, emoji="🔄")
+    async def reload_views(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Reload persistent views"""
+        await interaction.response.defer(ephemeral=True)
+        
+        try:
+            # Clear current views
+            self.bot.persistent_views.clear()
+            
+            # Reload views
+            views_loaded = 0
+            for cog_name, cog in self.bot.cogs.items():
+                if hasattr(cog, 'setup_views'):
+                    await cog.setup_views()
+                    views_loaded += 1
+            
+            embed = discord.Embed(
+                title="✅ Views Reloaded",
+                description=f"Successfully reloaded persistent views from {views_loaded} cogs.",
+                color=discord.Color.green()
+            )
+            await interaction.followup.send(embed=embed, ephemeral=True)
+        except Exception as e:
+            embed = discord.Embed(
+                title="❌ Reload Failed",
+                description=f"Error: {str(e)}",
+                color=discord.Color.red()
+            )
+            await interaction.followup.send(embed=embed, ephemeral=True)
+    
+    @discord.ui.button(label="Debug Mode", style=discord.ButtonStyle.danger, emoji="🐛")
+    async def debug_mode(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Toggle debug mode"""
+        current_debug = getattr(self.bot, 'debug_mode', False)
+        self.bot.debug_mode = not current_debug
+        
+        embed = discord.Embed(
+            title=f"{'🐛 Debug Mode Enabled' if self.bot.debug_mode else '✅ Debug Mode Disabled'}",
+            description=f"Debug mode has been {'enabled' if self.bot.debug_mode else 'disabled'}.",
+            color=discord.Color.orange() if self.bot.debug_mode else discord.Color.green()
+        )
+        
+        if self.bot.debug_mode:
+            embed.add_field(
+                name="⚠️ Warning",
+                value="Debug mode may expose sensitive information in logs.",
+                inline=False
+            )
+        
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
 
