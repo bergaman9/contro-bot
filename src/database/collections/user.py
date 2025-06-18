@@ -1,15 +1,15 @@
-"""User repository for MongoDB database operations."""
+"""User collection for MongoDB database operations."""
 from typing import Optional, List
-from .base import BaseRepository
+from .base import BaseCollection
 from ..models.user import User
 from ..connection import DatabaseConnection
 
 
-class UserRepository(BaseRepository):
-    """Repository for user operations."""
+class UserCollection(BaseCollection):
+    """Collection for user operations."""
     
     def __init__(self, connection: DatabaseConnection):
-        """Initialize user repository."""
+        """Initialize user collection."""
         super().__init__(connection, User, 'users')
     
     async def find_by_user_id(self, user_id: int) -> Optional[User]:

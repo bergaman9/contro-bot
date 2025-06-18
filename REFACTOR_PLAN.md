@@ -1,5 +1,125 @@
 # Contro Bot Refactor Plan
 
+## Overview
+This document outlines the refactoring strategy for the Contro Discord bot to achieve a modular, scalable architecture.
+
+## Progress
+
+### ✅ Phase 1: Core Infrastructure (COMPLETED)
+- [x] Created new directory structure under `src/`
+- [x] Implemented MongoDB database layer
+  - [x] Database connection with MongoDB Atlas
+  - [x] Base collection pattern (renamed from repositories)
+  - [x] Models: Guild, User, Member
+  - [x] Collections with MongoDB queries
+- [x] Created service layer
+  - [x] BaseService with logging
+  - [x] GuildService, UserService, MemberService
+- [x] Enhanced bot client
+  - [x] Service integration
+  - [x] Database-aware features
+- [x] Utility modules
+  - [x] Text, time, and Discord helpers
+- [x] Base cog structure with example
+
+### 🚧 Phase 2: Command Migration (IN PROGRESS)
+Migrate existing commands to the new cog structure:
+
+#### Admin Commands
+- [ ] Bot management (status, restart, etc.)
+- [ ] Server setup commands
+- [ ] Settings management
+
+#### Moderation Commands
+- [ ] User actions (kick, ban, mute, warn)
+- [ ] Message management (purge, etc.)
+- [ ] Logging configuration
+
+#### Community Commands
+- [ ] Registration system
+- [ ] Welcome/goodbye messages
+- [ ] Leveling system
+
+#### Fun Commands
+- [ ] Games and entertainment
+- [ ] Random utilities
+
+#### Utility Commands
+- [ ] Information commands
+- [ ] Help system
+- [ ] Server statistics
+
+### 📋 Phase 3: Feature Enhancement
+- [ ] Implement proper error handling
+- [ ] Add comprehensive logging
+- [ ] Create unit tests
+- [ ] Add integration tests
+
+### 🔧 Phase 4: Advanced Features
+- [ ] Implement caching layer
+- [ ] Add metrics collection
+- [ ] Create admin dashboard API
+- [ ] Implement webhooks
+
+### 📚 Phase 5: Documentation
+- [ ] API documentation
+- [ ] User guide
+- [ ] Developer documentation
+- [ ] Deployment guide
+
+## Current Focus: Phase 2 - Command Migration
+
+### Next Steps for Phase 2:
+
+1. **Utility Commands** (/info subcommands)
+   - `/info user` - User information
+   - `/info server` - Server information  
+   - `/info bot` - Bot information
+   - `/info emoji` - Emoji information
+   - `/info role` - Role information
+
+2. **Moderation Commands**
+   - `/ban` - Ban a user
+   - `/kick` - Kick a user
+   - `/mute` - Mute a user
+   - `/unmute` - Unmute a user
+   - `/warn` - Warn a user
+   - `/warnings` - View warnings
+   - `/purge` - Delete messages
+
+3. **Welcome System**
+   - Welcome message configuration
+   - Goodbye message configuration
+   - Image generation
+   - Channel settings
+
+4. **Leveling System**
+   - XP gain on messages
+   - Level roles
+   - Leaderboard
+   - Rank cards
+
+5. **Registration System**
+   - User registration
+   - Role assignment
+   - Verification
+
+## Architecture Benefits
+
+1. **Separation of Concerns**: Clear boundaries between data, business logic, and presentation
+2. **Testability**: Each component can be tested in isolation
+3. **Scalability**: Easy to add new features without affecting existing code
+4. **Maintainability**: Organized structure makes code easier to understand and modify
+5. **MongoDB Native**: Leverages MongoDB's document-based structure and operators
+
+## Notes
+
+- Using MongoDB collections instead of SQL repositories
+- All database operations are async with Motor
+- Services handle business logic and logging
+- Cogs only handle Discord interaction logic
+- Clear error handling and logging throughout
+
 ## 🎯 Objectives
 
 1. **Modular Architecture**: Separate concerns into clear, maintainable modules

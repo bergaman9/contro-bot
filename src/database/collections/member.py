@@ -1,15 +1,15 @@
-"""Member repository for MongoDB database operations."""
+"""Member collection for MongoDB database operations."""
 from typing import Optional, List, Tuple
-from .base import BaseRepository
+from .base import BaseCollection
 from ..models.member import Member
 from ..connection import DatabaseConnection
 
 
-class MemberRepository(BaseRepository):
-    """Repository for member operations."""
+class MemberCollection(BaseCollection):
+    """Collection for member operations."""
     
     def __init__(self, connection: DatabaseConnection):
-        """Initialize member repository."""
+        """Initialize member collection."""
         super().__init__(connection, Member, 'members')
     
     async def find_by_ids(self, guild_id: int, user_id: int) -> Optional[Member]:

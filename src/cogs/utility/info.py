@@ -1293,5 +1293,6 @@ class Config(commands.Cog):
 
 
 async def setup(bot):
-    await bot.add_cog(Utility(bot))
-    await bot.add_cog(Config(bot))
+    """Load the cog."""
+    bot.add_cog(Utility(bot))
+    bot.add_cog(Config(bot))

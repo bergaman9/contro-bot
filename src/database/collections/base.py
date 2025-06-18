@@ -1,4 +1,4 @@
-"""Base repository for MongoDB database operations."""
+"""Base collection for MongoDB database operations."""
 from typing import Optional, List, Dict, Any, Type, TypeVar
 from ..models.base import BaseModel
 from ..connection import DatabaseConnection
@@ -10,11 +10,11 @@ T = TypeVar('T', bound=BaseModel)
 logger = logging.getLogger(__name__)
 
 
-class BaseRepository:
-    """Base repository class for MongoDB operations."""
+class BaseCollection:
+    """Base collection class for MongoDB operations."""
     
     def __init__(self, connection: DatabaseConnection, model_class: Type[T], collection_name: str):
-        """Initialize repository.
+        """Initialize collection.
         
         Args:
             connection: Database connection

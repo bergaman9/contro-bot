@@ -1,15 +1,15 @@
-"""Guild repository for MongoDB database operations."""
+"""Guild collection for MongoDB database operations."""
 from typing import Optional, List, Any
-from .base import BaseRepository
+from .base import BaseCollection
 from ..models.guild import Guild
 from ..connection import DatabaseConnection
 
 
-class GuildRepository(BaseRepository):
-    """Repository for guild operations."""
+class GuildCollection(BaseCollection):
+    """Collection for guild operations."""
     
     def __init__(self, connection: DatabaseConnection):
-        """Initialize guild repository."""
+        """Initialize guild collection."""
         super().__init__(connection, Guild, 'guilds')
     
     async def find_by_guild_id(self, guild_id: int) -> Optional[Guild]:

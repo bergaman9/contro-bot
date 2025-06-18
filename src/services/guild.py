@@ -1,7 +1,7 @@
 """Guild service for business logic."""
 from typing import Optional, List, Dict, Any
 from .base import BaseService
-from ..database.repositories import GuildRepository
+from ..database.collections import GuildCollection
 from ..database.models import Guild
 import discord
 
@@ -12,12 +12,12 @@ class GuildService(BaseService):
     def __init__(self, db):
         """Initialize guild service."""
         super().__init__(db)
-        self.guild_repo = GuildRepository(db)
+        self.guild_collection = GuildCollection(db)
     
     async def get_guild(self, guild_id: int) -> Optional[Guild]:
         """Get guild by ID."""
         try:
-            return await self.guild_repo.find_by_guild_id(guild_id)
+            return await self.guild_collection.find_by_guild_id(guild_id)
         except Exception as e:
             self.log_error(f"Error getting guild {guild_id}", exc_info=e)
             return None
@@ -25,7 +25,7 @@ class GuildService(BaseService):
     async def ensure_guild_exists(self, discord_guild: discord.Guild) -> Guild:
         """Ensure guild exists in database."""
         try:
-            return await self.guild_repo.get_or_create(
+            return await self.guild_collection.get_or_create(
                 guild_id=discord_guild.id,
                 name=discord_guild.name
             )
@@ -36,7 +36,7 @@ class GuildService(BaseService):
     async def update_guild_info(self, discord_guild: discord.Guild) -> bool:
         """Update guild information from Discord."""
         try:
-            return await self.guild_repo.update_one(
+            return await self.guild_collection.update_one(
                 filter={'guild_id': discord_guild.id},
                 update={'$set': {
                     'name': discord_guild.name,
@@ -60,7 +60,7 @@ class GuildService(BaseService):
             if len(prefix) > 5:
                 raise ValueError("Prefix too long (max 5 characters)")
             
-            success = await self.guild_repo.update_prefix(guild_id, prefix)
+            success = await self.guild_collection.update_prefix(guild_id, prefix)
             if success:
                 self.log_info(f"Updated prefix for guild {guild_id} to '{prefix}'")
             return success
@@ -79,7 +79,7 @@ class GuildService(BaseService):
             if language not in ['en', 'tr']:  # Add more languages as needed
                 raise ValueError(f"Unsupported language: {language}")
             
-            return await self.guild_repo.update_language(guild_id, language)
+            return await self.guild_collection.update_language(guild_id, language)
         except Exception as e:
             self.log_error(f"Error setting language for guild {guild_id}", exc_info=e)
             return False
@@ -92,7 +92,7 @@ class GuildService(BaseService):
     async def set_setting(self, guild_id: int, key: str, value: Any) -> bool:
         """Set a guild setting."""
         try:
-            return await self.guild_repo.update_setting(guild_id, key, value)
+            return await self.guild_collection.update_setting(guild_id, key, value)
         except Exception as e:
             self.log_error(f"Error setting {key} for guild {guild_id}", exc_info=e)
             return False
@@ -105,7 +105,7 @@ class GuildService(BaseService):
     async def add_feature(self, guild_id: int, feature: str) -> bool:
         """Add a feature to guild."""
         try:
-            return await self.guild_repo.add_feature(guild_id, feature)
+            return await self.guild_collection.add_feature(guild_id, feature)
         except Exception as e:
             self.log_error(f"Error adding feature {feature} to guild {guild_id}", exc_info=e)
             return False
@@ -113,7 +113,7 @@ class GuildService(BaseService):
     async def remove_feature(self, guild_id: int, feature: str) -> bool:
         """Remove a feature from guild."""
         try:
-            return await self.guild_repo.remove_feature(guild_id, feature)
+            return await self.guild_collection.remove_feature(guild_id, feature)
         except Exception as e:
             self.log_error(f"Error removing feature {feature} from guild {guild_id}", exc_info=e)
             return False
@@ -121,7 +121,7 @@ class GuildService(BaseService):
     async def get_active_guilds(self, days: int = 30) -> List[Guild]:
         """Get recently active guilds."""
         try:
-            return await self.guild_repo.get_active_guilds(days)
+            return await self.guild_collection.get_active_guilds(days)
         except Exception as e:
             self.log_error("Error getting active guilds", exc_info=e)
             return []
@@ -129,7 +129,7 @@ class GuildService(BaseService):
     async def get_stats(self) -> Dict[str, int]:
         """Get guild statistics."""
         try:
-            total = await self.guild_repo.count()
+            total = await self.guild_collection.count()
             active = len(await self.get_active_guilds(7))
             
             return {
