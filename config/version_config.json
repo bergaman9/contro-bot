@@ -1,0 +1,18 @@
+{
+  "auto_increment": true,
+  "version_format": "semantic",
+  "track_git_commits": true,
+  "auto_changelog": true,
+  "notification_webhook": null,
+  "backup_versions": true,
+  "features_tracking": {
+    "registration_system": true,
+    "level_system": true,
+    "ticket_system": true,
+    "welcome_system": true,
+    "moderation_system": true,
+    "giveaway_system": true,
+    "game_stats": true,
+    "fun_commands": true
+  }
+}

@@ -12,7 +12,7 @@ class ConfigManager:
     and controlled loading of cogs based on client permissions.
     """
     
-    def __init__(self, config_path: str = "config/config.json"):
+    def __init__(self, config_path: str = "src/config/config.json"):
         """
         Initialize the configuration manager.
         

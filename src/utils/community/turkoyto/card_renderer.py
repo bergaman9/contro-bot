@@ -14,7 +14,62 @@ import discord
 logger = logging.getLogger('turkoyto.card_renderer')
 
 # Constants
-FONT_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), 'data', 'fonts', 'GothamNarrow-Bold.otf')
+# FONT_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), 'resources', 'fonts', 'GothamNarrow-Bold.otf')
+
+def get_font_path():
+    """Get font path with Unicode support and fallback options"""
+    font_paths = [
+        # Try relative paths from different possible locations
+        os.path.join('resources', 'fonts', 'GothamNarrow-Bold.otf'),
+        os.path.join('..', 'resources', 'fonts', 'GothamNarrow-Bold.otf'),
+        os.path.join('..', '..', 'resources', 'fonts', 'GothamNarrow-Bold.otf'),
+        os.path.join('..', '..', '..', 'resources', 'fonts', 'GothamNarrow-Bold.otf'),
+        
+        # Try absolute path construction with proper encoding
+        os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), 'resources', 'fonts', 'GothamNarrow-Bold.otf'),
+        
+        # Try alternative font names
+        os.path.join('resources', 'fonts', 'Gotham-Black.otf'),
+        
+        # System fonts as fallback
+        'C:/Windows/Fonts/arial.ttf',
+        'C:/Windows/Fonts/Arial.ttf',
+        'C:/Windows/Fonts/calibri.ttf',
+        'C:/Windows/Fonts/Calibri.ttf',
+        '/System/Library/Fonts/Arial.ttf',  # macOS
+        '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf',  # Linux
+    ]
+    
+    for path in font_paths:
+        try:
+            # Use os.path.abspath to handle Unicode properly
+            full_path = os.path.abspath(path)
+            if os.path.exists(full_path):
+                logger.info(f"Font found at: {full_path}")
+                return full_path
+        except Exception as e:
+            logger.debug(f"Error checking font path {path}: {e}")
+            continue
+    
+    logger.warning("No custom fonts found, will use default font")
+    return None
+
+# Global font path
+FONT_PATH = get_font_path()
+
+def load_font_safe(size):
+    """Load font safely with fallback to default"""
+    try:
+        if FONT_PATH and os.path.exists(FONT_PATH):
+            return ImageFont.truetype(FONT_PATH, size)
+    except Exception as e:
+        logger.warning(f"Error loading font at size {size}: {e}")
+    
+    try:
+        return ImageFont.load_default()
+    except Exception:
+        # Very last resort - create a minimal font
+        return ImageFont.load_default()
 
 # Helper functions
 async def get_user_avatar(bot, member):
@@ -447,13 +502,13 @@ async def create_level_card(bot, member, userdata, guild=None, mongo_db=None, ou
 
         draw = ImageDraw.Draw(background_image)
 
-        # Load fonts
+        # Load fonts safely
         try:
-            font_big = ImageFont.truetype(FONT_PATH, 44)
-            font_med = ImageFont.truetype(FONT_PATH, 30)
-            font_small = ImageFont.truetype(FONT_PATH, 20)
-            font_level = ImageFont.truetype(FONT_PATH, 32)
-            font_rank_label = ImageFont.truetype(FONT_PATH, 18)
+            font_big = load_font_safe(44)
+            font_med = load_font_safe(30)
+            font_small = load_font_safe(20)
+            font_level = load_font_safe(32)
+            font_rank_label = load_font_safe(18)
         except Exception as font_error:
             logger.warning(f"Error loading fonts: {font_error}. Using default font.")
             font_big = font_med = font_small = font_level = font_rank_label = ImageFont.load_default()
@@ -538,7 +593,7 @@ async def create_level_card(bot, member, userdata, guild=None, mongo_db=None, ou
             if len(rank_text) > 3:
                 rank_num_font_size = max(30 - ((len(rank_text) - 3) * 2), 18)
             
-            font_rank_num = ImageFont.truetype(FONT_PATH, rank_num_font_size)
+            font_rank_num = load_font_safe(rank_num_font_size)
             
             rank_number_bbox = font_rank_num.getbbox(rank_text)
             rank_number_width = rank_number_bbox[2] - rank_number_bbox[0]
@@ -809,18 +864,6 @@ async def create_level_card(bot, member, userdata, guild=None, mongo_db=None, ou
     except Exception as e:
         logger.error(f"Error creating level card for {member.id}: {e}", exc_info=True)
         return None
-
-def get_font_path():
-    font_paths = [
-        os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'data', 'fonts', 'GothamNarrow-Bold.otf'),
-        'fonts/GothamNarrow-Bold.otf',
-        'C:/Windows/Fonts/Arial.ttf',
-        'C:/Windows/Fonts/Segoe UI Bold.ttf'
-    ]
-    for path in font_paths:
-        if os.path.exists(path):
-            return path
-    return None
 
 def get_ticket_level_colors():
     """Kart renderer ile aynı 20 seviye rengini döndürür (Discord renk objesi olarak)."""
@@ -1168,11 +1211,11 @@ async def create_register_card(bot, guild, mongo_db=None):
 
         # --- Load Fonts ---
         try:
-            title_font = ImageFont.truetype(FONT_PATH, 36)
-            count_font = ImageFont.truetype(FONT_PATH, 72)
-            label_font = ImageFont.truetype(FONT_PATH, 24)
-            small_font = ImageFont.truetype(FONT_PATH, 18)
-            trend_font = ImageFont.truetype(FONT_PATH, 28)
+            title_font = load_font_safe(36)
+            count_font = load_font_safe(72)
+            label_font = load_font_safe(24)
+            small_font = load_font_safe(18)
+            trend_font = load_font_safe(28)
         except Exception as e:
             logger.warning(f"Error loading fonts: {e}. Using default font.")
             title_font = count_font = label_font = small_font = trend_font = ImageFont.load_default()

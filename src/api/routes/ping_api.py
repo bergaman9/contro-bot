@@ -1,12 +1,10 @@
-from flask import Flask, jsonify
+from flask import Blueprint, jsonify
 import psutil
 import time
 import logging
 from datetime import timedelta
-from .commands_api import commands_api, initialize_commands_api, cleanup_rate_limits
 
-app = Flask(__name__)
-app.register_blueprint(commands_api)
+ping_api = Blueprint('ping_api', __name__)
 
 # Global variable to hold the bot instance
 bot_instance = None
@@ -16,27 +14,14 @@ start_time = None
 # Setup logging
 logger = logging.getLogger('ping_api')
 
-def initialize_api(bot):
+def initialize_ping_api(bot):
     global bot_instance, start_time
     bot_instance = bot
     # Set the start time when the API is initialized
     start_time = time.time()
-    # Initialize commands API with the bot instance
-    initialize_commands_api(bot)
-    # Set up periodic cleanup task if in a production environment
-    try:
-        from apscheduler.schedulers.background import BackgroundScheduler
-        scheduler = BackgroundScheduler()
-        # Run cleanup every hour
-        scheduler.add_job(cleanup_rate_limits, 'interval', hours=1)
-        scheduler.start()
-        logger.info("Rate limit cleanup scheduler started")
-    except ImportError:
-        logger.warning("APScheduler not available, rate limit cleanup will not run automatically")
-    except Exception as e:
-        logger.error(f"Failed to start cleanup scheduler: {e}")
+    logger.info("Ping API initialized")
 
-@app.route('/api/ping', methods=['GET'])
+@ping_api.route('/api/ping', methods=['GET'])
 def ping():
     try:
         if not bot_instance:
@@ -85,5 +70,10 @@ def ping():
         logger.error(f"Error in ping endpoint: {str(e)}")
         return jsonify({"error": f"Internal server error: {str(e)}"}), 500
 
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+# Legacy functions for compatibility
+def initialize_api(bot):
+    """Legacy function for compatibility"""
+    return initialize_ping_api(bot)
+
+# Remove the Flask app creation since we're using Blueprint
+app = None

@@ -4,7 +4,7 @@ import logging
 from datetime import datetime
 import asyncio
 
-from utils.formatting import create_embed
+from src.utils.formatting import create_embed
 
 logger = logging.getLogger('turkoyto.views.events')
 

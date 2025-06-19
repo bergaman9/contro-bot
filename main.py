@@ -16,14 +16,19 @@ import threading
 from typing import Optional
 import json
 
-from utils.core.formatting import create_embed
-from utils.core.logger import logger, setup_logging, LOGS_DIR
-from utils.core.config import ConfigManager
-from api.ping_api import app, initialize_api
-from api import initialize_all_apis
-from utils.database import initialize_async_mongodb, get_async_db, close_async_mongodb, DummyAsyncDatabase
-from utils.community.turkoyto.ticket_views import TicketButton, ServicesView
-from utils.database.db_manager import db_manager
+from src.utils.core.formatting import create_embed
+from src.utils.core.logger import logger, setup_logging, LOGS_DIR
+from src.utils.core.config import ConfigManager
+from src.api.routes.ping_api import app, initialize_api
+from src.api import initialize_all_apis
+from src.utils.database import initialize_async_mongodb, get_async_db, close_async_mongodb, DummyAsyncDatabase
+from src.utils.community.turkoyto.ticket_views import TicketButton, ServicesView
+from src.utils.database.db_manager import db_manager
+from src.bot.client import ControBot
+from src.utils.core.discord_helpers import create_embed
+from src.utils.database.connection import initialize_async_mongodb, DummyAsyncDatabase
+from src.api import initialize_all_apis
+from src.utils.common.error_handler import ErrorHandler, setup_error_handler
 
 # Setup logging early
 setup_logging()
@@ -419,7 +424,7 @@ async def main():
     
     # Load bot version from version_config.json
     try:
-        version_config_path = os.path.join(os.getcwd(), 'config', 'version_config.json')
+        version_config_path = os.path.join(os.getcwd(), 'src', 'config', 'version_config.json')
         if os.path.exists(version_config_path):
             with open(version_config_path, 'r') as f:
                 version_data = json.load(f)
@@ -432,6 +437,12 @@ async def main():
     except Exception as e:
         bot.version = '1.0.0'
         logger.error(f"Error loading version: {e}")
+    
+    # Set up comprehensive error handling and logging
+    ErrorHandler.setup_logging(logging.INFO)
+    error_handler = setup_error_handler(bot)
+    await error_handler.setup()
+    logger.info("Comprehensive error handling system initialized")
     
     # Set up error handlers
     setup_error_handlers(bot)
@@ -569,6 +580,65 @@ async def main():
         print_colored("ℹ️ API server only runs in MAIN mode", "yellow")
     # No cleanup needed here
     
+    # Load persistent panels from database
+    async def load_persistent_panels():
+        """Load registration and ticket panels from database and register their views."""
+        try:
+            from src.utils.database.db_manager import db_manager
+            
+            if not db_manager or not hasattr(bot, 'async_db'):
+                logger.warning("Database not available, skipping persistent panel loading")
+                return
+            
+            db = db_manager.get_database()
+            
+            # Load Registration Panels
+            try:
+                from src.utils.views.settings_views import RegistrationPanelView
+                
+                # Find all guilds that have registration panels
+                registration_panels = await db.registration_settings.find({
+                    "enabled": True,
+                    "panel_sent": True
+                }).to_list(None)
+                
+                for panel in registration_panels:
+                    guild_id = panel.get('guild_id')
+                    if guild_id:
+                        view = RegistrationPanelView(bot, guild_id)
+                        register_persistent_view(view)
+                        logger.debug(f"Registered RegistrationPanelView for guild {guild_id}")
+                
+                logger.info(f"Loaded {len(registration_panels)} registration panel views")
+                
+            except Exception as e:
+                logger.error(f"Error loading registration panels: {e}")
+            
+            # Load Ticket Panels
+            try:
+                from src.utils.views.settings_views import ModernTicketPanelView
+                
+                # Find all guilds that have ticket panels
+                ticket_panels = await db.ticket_settings.find({
+                    "enabled": True,
+                    "panel_sent": True
+                }).to_list(None)
+                
+                for panel in ticket_panels:
+                    guild_id = panel.get('guild_id')
+                    if guild_id:
+                        view = ModernTicketPanelView(bot, guild_id)
+                        register_persistent_view(view)
+                        logger.debug(f"Registered ModernTicketPanelView for guild {guild_id}")
+                
+                logger.info(f"Loaded {len(ticket_panels)} ticket panel views")
+                
+            except Exception as e:
+                logger.error(f"Error loading ticket panels: {e}")
+                
+        except Exception as e:
+            logger.error(f"Error in load_persistent_panels: {e}")
+    
     # Preload persistent views on bot startup for immediate availability
     async def setup_persistent_views():
         # Bot hazır olana kadar bekle
@@ -580,7 +650,7 @@ async def main():
             
             # Import ticket views
             try:
-                from cogs.ticket import TicketButton, TicketCloseButtonView
+                from src.cogs.utility.tickets import TicketButton, TicketCloseButtonView
                 register_persistent_view(TicketButton())
                 register_persistent_view(TicketCloseButtonView())
                 logger.info("Ticket views preloaded")
@@ -589,7 +659,7 @@ async def main():
             
             # Import giveaway views if available
             try:
-                from cogs.giveaways import GiveawayView, GiveawayEditView
+                from src.cogs.fun.giveaways import GiveawayView, GiveawayEditView
                 register_persistent_view(GiveawayView(bot))
                 register_persistent_view(GiveawayEditView(bot))
                 logger.info("Giveaway views preloaded")
@@ -600,7 +670,7 @@ async def main():
             
             # Import TurkOyto ticket views
             try:
-                from utils.ticket_views import TicketButton, ServicesView
+                from src.utils.views.ticket_views import TicketButton, ServicesView
                 register_persistent_view(TicketButton())
                 register_persistent_view(ServicesView())
                 logger.info("Ticket views preloaded")
@@ -615,7 +685,7 @@ async def main():
             # Import registration buttons if available
             try:
                 # Try to import any registration buttons that need to be persistent
-                from cogs.register import RegisterButton
+                from src.cogs.community.registration import RegisterButton
                 # Create a fresh instance of the button
                 register_button = RegisterButton()
                 register_persistent_view(register_button)
@@ -625,11 +695,27 @@ async def main():
             
             # Import TurkOyto registration view
             try:
-                from utils.community.turkoyto.registration_view import RegistrationButtonView
+                from src.utils.community.turkoyto.registration_view import RegistrationButtonView
                 register_persistent_view(RegistrationButtonView())
                 logger.info("TurkOyto registration view preloaded")
             except Exception as e:
                 logger.error(f"Error preloading TurkOyto registration view: {e}")
+            
+            # Import Registration Panel view
+            try:
+                from src.utils.views.settings_views import RegistrationPanelView
+                # Don't create instance here since we need guild_id
+                # This will be registered when panels are created
+                logger.info("Registration Panel view class imported")
+            except Exception as e:
+                logger.error(f"Error importing Registration Panel view: {e}")
+            
+            # Load guild-specific persistent views from database
+            try:
+                logger.info("Loading persistent panel views from database...")
+                await load_persistent_panels()
+            except Exception as e:
+                logger.error(f"Error loading persistent panels: {e}")
                     
             # Register all preloaded views with the bot
             for view in PERSISTENT_VIEWS:
@@ -772,7 +858,7 @@ async def main():
     @commands.is_owner()
     async def load_cog(ctx, cog: str):
         try:
-            await bot.load_extension(f"cogs.{cog}")
+            await bot.load_extension(f"src.cogs.{cog}")
             await ctx.send(f"✅ Loaded cog: `{cog}`")
         except Exception as e:
             await ctx.send(f"❌ Failed to load cog `{cog}`: {e}")
@@ -781,7 +867,7 @@ async def main():
     @commands.is_owner()
     async def unload_cog(ctx, cog: str):
         try:
-            await bot.unload_extension(f"cogs.{cog}")
+            await bot.unload_extension(f"src.cogs.{cog}")
             await ctx.send(f"✅ Unloaded cog: `{cog}`")
         except Exception as e:
             await ctx.send(f"❌ Failed to unload cog `{cog}`: {e}")
@@ -854,7 +940,7 @@ async def main():
             return
         else:
             try:
-                await bot.reload_extension(f"cogs.{cog}")
+                await bot.reload_extension(f"src.cogs.{cog}")
                 await ctx.send(f"✅ Reloaded cog: `{cog}`")
             except Exception as e:
                 await ctx.send(f"❌ Failed to reload cog `{cog}`: {e}")
@@ -877,11 +963,11 @@ async def main():
         async def load_cog(cog_name):
             try:
                 # Check if cog is already loaded and remove it first
-                if f"cogs.{cog_name}" in bot.extensions:
+                if f"src.cogs.{cog_name}" in bot.extensions:
                     logger.warning(f"Cog {cog_name} already loaded, unloading first")
-                    await bot.unload_extension(f"cogs.{cog_name}")
+                    await bot.unload_extension(f"src.cogs.{cog_name}")
                 
-                await bot.load_extension(f"cogs.{cog_name}")
+                await bot.load_extension(f"src.cogs.{cog_name}")
                 logger.info(f"Loaded cog: {cog_name}")
                 return True, cog_name
             except Exception as e:

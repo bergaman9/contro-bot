@@ -7,9 +7,9 @@ from discord import app_commands
 import re
 import asyncio
 
-from utils.core.formatting import create_embed
-from utils.database.connection import initialize_mongodb
-from utils.core.helpers import check_video_url
+from src.utils.core.formatting import create_embed
+from src.utils.database.connection import initialize_mongodb
+from src.utils.core.helpers import check_video_url
 
 TURKISH_PROFANITY_WORDS = ["abaza", "abazan", "ag", "ağzına sıçayım", "ahmak", "allah",
                            "allahsız", "am", "amarım", "ambiti", "am biti", "amcığı",

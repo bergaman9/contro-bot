@@ -12,9 +12,9 @@ import time
 import random
 from dotenv import load_dotenv
 
-from utils.core.formatting import create_embed
-from utils.database.connection import initialize_mongodb, is_db_available
-from utils.settings.perplexity_settings import PerplexitySettingsView
+from src.utils.core.formatting import create_embed
+from src.utils.database.connection import initialize_mongodb, is_db_available
+from src.utils.views.perplexity_settings import PerplexitySettingsView
 
 # Configure logger
 logger = logging.getLogger('perplexity_chat')

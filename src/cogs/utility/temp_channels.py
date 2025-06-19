@@ -3,8 +3,8 @@ from discord.ext import commands
 import logging
 import asyncio
 from typing import Dict, Optional, List
-from utils.database.connection import get_async_db, initialize_mongodb
-from utils.core.formatting import create_embed
+from src.utils.database.connection import get_async_db, initialize_mongodb
+from src.utils.core.formatting import create_embed
 
 logger = logging.getLogger('temp_channels')
 

@@ -8,10 +8,10 @@ from discord import app_commands
 from discord.ext import commands, tasks
 import json
 
-from utils.database.connection import initialize_mongodb
-from utils.core.formatting import create_embed
-from utils.core.class_utils import Paginator
-from utils.core.db import get_document, get_documents, update_document
+from src.utils.database.connection import initialize_mongodb
+from src.utils.core.formatting import create_embed
+from src.utils.core.class_utils import Paginator
+from src.utils.core.db import get_document, get_documents, update_document
 
 # Set up logging
 logger = logging.getLogger('game_stats')

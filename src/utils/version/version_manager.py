@@ -8,10 +8,11 @@ import os
 import subprocess
 import sys
 from datetime import datetime
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Any
 from pathlib import Path
 import asyncio
 import logging
+import aiohttp
 
 logger = logging.getLogger(__name__)
 
@@ -321,3 +322,214 @@ version_manager = VersionManager()
 def get_version_manager() -> VersionManager:
     """Get the global version manager instance"""
     return version_manager
+
+class GitHubVersionManager:
+    """Manages bot version with GitHub integration."""
+    
+    def __init__(self, repo_owner: str = "bergasoft", repo_name: str = "contro-bot"):
+        self.repo_owner = repo_owner
+        self.repo_name = repo_name
+        self.github_api_base = "https://api.github.com"
+        self.version_config_path = os.path.join(os.getcwd(), 'src', 'config', 'version_config.json')
+        self._cache = {}
+        self._cache_timeout = 300  # 5 minutes
+        
+    async def get_current_version(self) -> str:
+        """Get current version from local config."""
+        try:
+            if os.path.exists(self.version_config_path):
+                with open(self.version_config_path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    return data.get('version', '1.0.0')
+            return '1.0.0'
+        except Exception as e:
+            logger.error(f"Error reading version config: {e}")
+            return '1.0.0'
+    
+    async def get_latest_release(self) -> Optional[Dict[str, Any]]:
+        """Get latest release information from GitHub."""
+        cache_key = "latest_release"
+        
+        # Check cache
+        if cache_key in self._cache:
+            cached_data, timestamp = self._cache[cache_key]
+            if (datetime.now().timestamp() - timestamp) < self._cache_timeout:
+                return cached_data
+        
+        try:
+            url = f"{self.github_api_base}/repos/{self.repo_owner}/{self.repo_name}/releases/latest"
+            
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        
+                        # Cache the result
+                        self._cache[cache_key] = (data, datetime.now().timestamp())
+                        
+                        return data
+                    elif response.status == 404:
+                        logger.warning("No releases found on GitHub")
+                        return None
+                    else:
+                        logger.error(f"GitHub API error: {response.status}")
+                        return None
+        except asyncio.TimeoutError:
+            logger.error("GitHub API request timed out")
+            return None
+        except Exception as e:
+            logger.error(f"Error fetching latest release: {e}")
+            return None
+    
+    async def get_all_releases(self, limit: int = 10) -> list:
+        """Get all releases from GitHub."""
+        cache_key = f"all_releases_{limit}"
+        
+        # Check cache
+        if cache_key in self._cache:
+            cached_data, timestamp = self._cache[cache_key]
+            if (datetime.now().timestamp() - timestamp) < self._cache_timeout:
+                return cached_data
+        
+        try:
+            url = f"{self.github_api_base}/repos/{self.repo_owner}/{self.repo_name}/releases"
+            params = {"per_page": limit}
+            
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, params=params, timeout=aiohttp.ClientTimeout(total=10)) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        
+                        # Cache the result
+                        self._cache[cache_key] = (data, datetime.now().timestamp())
+                        
+                        return data
+                    else:
+                        logger.error(f"GitHub API error: {response.status}")
+                        return []
+        except Exception as e:
+            logger.error(f"Error fetching releases: {e}")
+            return []
+    
+    async def check_for_updates(self) -> Dict[str, Any]:
+        """Check if there's a newer version available."""
+        current_version = await self.get_current_version()
+        latest_release = await self.get_latest_release()
+        
+        if not latest_release:
+            return {
+                "update_available": False,
+                "current_version": current_version,
+                "latest_version": None,
+                "error": "Could not fetch latest release"
+            }
+        
+        latest_version = latest_release.get("tag_name", "").lstrip("v")
+        
+        # Simple version comparison (assumes semantic versioning)
+        update_available = self._compare_versions(current_version, latest_version) < 0
+        
+        return {
+            "update_available": update_available,
+            "current_version": current_version,
+            "latest_version": latest_version,
+            "release_url": latest_release.get("html_url"),
+            "release_notes": latest_release.get("body", ""),
+            "published_at": latest_release.get("published_at")
+        }
+    
+    def _compare_versions(self, version1: str, version2: str) -> int:
+        """Compare two version strings. Returns -1 if v1 < v2, 0 if equal, 1 if v1 > v2."""
+        try:
+            v1_parts = [int(x) for x in version1.split('.')]
+            v2_parts = [int(x) for x in version2.split('.')]
+            
+            # Pad shorter version with zeros
+            max_len = max(len(v1_parts), len(v2_parts))
+            v1_parts.extend([0] * (max_len - len(v1_parts)))
+            v2_parts.extend([0] * (max_len - len(v2_parts)))
+            
+            for i in range(max_len):
+                if v1_parts[i] < v2_parts[i]:
+                    return -1
+                elif v1_parts[i] > v2_parts[i]:
+                    return 1
+            
+            return 0
+        except ValueError:
+            # Fallback to string comparison
+            if version1 < version2:
+                return -1
+            elif version1 > version2:
+                return 1
+            return 0
+    
+    async def get_version_info(self) -> Dict[str, Any]:
+        """Get comprehensive version information."""
+        current_version = await self.get_current_version()
+        latest_release = await self.get_latest_release()
+        update_check = await self.check_for_updates()
+        
+        return {
+            "current_version": current_version,
+            "latest_release": latest_release,
+            "update_check": update_check,
+            "repository": f"{self.repo_owner}/{self.repo_name}",
+            "github_url": f"https://github.com/{self.repo_owner}/{self.repo_name}"
+        }
+    
+    async def update_local_version(self, new_version: str, changelog: str = "") -> bool:
+        """Update local version config file."""
+        try:
+            # Read current config
+            config_data = {}
+            if os.path.exists(self.version_config_path):
+                with open(self.version_config_path, 'r', encoding='utf-8') as f:
+                    config_data = json.load(f)
+            
+            # Update version and metadata
+            config_data.update({
+                "version": new_version,
+                "updated_at": datetime.now().isoformat(),
+                "changelog": changelog
+            })
+            
+            # Write updated config
+            os.makedirs(os.path.dirname(self.version_config_path), exist_ok=True)
+            with open(self.version_config_path, 'w', encoding='utf-8') as f:
+                json.dump(config_data, f, indent=2, ensure_ascii=False)
+            
+            # Clear cache
+            self._cache.clear()
+            
+            logger.info(f"Updated local version to {new_version}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error updating local version: {e}")
+            return False
+
+
+# Global instance
+version_manager = GitHubVersionManager()
+
+
+async def get_version_manager() -> GitHubVersionManager:
+    """Get the global version manager instance."""
+    return version_manager
+
+
+# Convenience functions
+async def get_current_version() -> str:
+    """Get current bot version."""
+    return await version_manager.get_current_version()
+
+
+async def check_for_updates() -> Dict[str, Any]:
+    """Check for available updates."""
+    return await version_manager.check_for_updates()
+
+
+async def get_version_info() -> Dict[str, Any]:
+    """Get comprehensive version information."""
+    return await version_manager.get_version_info()

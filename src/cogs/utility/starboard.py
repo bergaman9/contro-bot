@@ -2,8 +2,8 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 
-from utils.database.connection import initialize_mongodb
-from utils.core.formatting import create_embed
+from src.utils.database.connection import initialize_mongodb
+from src.utils.core.formatting import create_embed
 
 class Starboard(commands.Cog):
     def __init__(self, bot):

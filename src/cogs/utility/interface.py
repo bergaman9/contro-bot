@@ -9,9 +9,9 @@ from typing import Dict, Optional, List, Union, Any
 import motor.motor_asyncio
 from pymongo import ReturnDocument
 
-from utils.database.connection import get_async_db, initialize_async_mongodb
-from utils.core.formatting import create_embed
-from utils.steam import SteamAPI
+from src.utils.database.connection import get_async_db, initialize_async_mongodb
+from src.utils.core.formatting import create_embed
+from src.utils.external.steam import SteamAPI
 import os
 
 logger = logging.getLogger('interface')

@@ -25,7 +25,7 @@ class XPManager:
         """Get database instance - async preferred"""
         if self.mongo_db is None:
             # Try to get async database
-            from utils.database.connection import get_async_db
+            from src.utils.database.connection import get_async_db
             # get_async_db() returns a database object directly, don't await it
             self.mongo_db = get_async_db()
         return self.mongo_db

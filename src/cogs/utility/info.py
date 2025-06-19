@@ -23,15 +23,15 @@ from PIL import Image
 from io import BytesIO
 
 # Use consistent import paths
-from utils.core.formatting import create_embed, hex_to_int, calculate_how_long_ago_member_joined, calculate_how_long_ago_member_created
-from utils.database.connection import initialize_mongodb, is_db_available
-from utils.core.db import get_document, get_documents, update_document
+from src.utils.core.formatting import create_embed, hex_to_int, calculate_how_long_ago_member_joined, calculate_how_long_ago_member_created
+from src.utils.database.connection import initialize_mongodb, is_db_available
+from src.utils.core.db import get_document, get_documents, update_document
 
 # Configure logger
 logger = logging.getLogger('utility')
-from utils.core.class_utils import Paginator
-from utils.imaging import circle, download_background
-from utils.content_loader import load_content
+from src.utils.core.class_utils import Paginator
+from src.utils.imaging import circle, download_background
+from src.utils.core.content_loader import load_content
 
 # Standart embed formatları - Contro Bot tarzında
 def contro_embed(title=None, description=None, color=None, footer=None, author=None, thumbnail=None, image=None, timestamp=True):
@@ -110,13 +110,14 @@ class SupportView(discord.ui.View):
         self.add_item(discord.ui.Button(label="Vote Bot", url="https://top.gg/bot/869041978467201280/vote"))
         self.add_item(discord.ui.Button(label="Share Idea", style=discord.ButtonStyle.green, custom_id="idea_button"))
 
-class Utility(commands.Cog):
+class InfoUtility(commands.Cog):
+    """Info and utility commands for the bot."""
     def __init__(self, bot):
         self.bot = bot
         self.mongo_db = initialize_mongodb()
         
         # Add format file path
-        self.format_file_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'format.json')
+        self.format_file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), 'resources', 'data', 'config', 'format.json')
         self.format_variables = self.load_format_variables()
         
     @commands.hybrid_command(name="ping", description="Shows the latency between in the bot and the Discord API.", aliases=["latency"])
@@ -333,150 +334,6 @@ class Utility(commands.Cog):
         embed.set_footer(icon_url=ctx.author.display_avatar, text=f"Requested by {ctx.author}")
         await ctx.send(embed=embed)
 
-    @commands.hybrid_group(name="server", description="Server-related commands")
-    async def server(self, ctx):
-        """Server-related commands"""
-        if ctx.invoked_subcommand is None:
-            # Default to server info
-            await self.server_info(ctx)
-
-    @server.command(name="info", description="Displays detailed server information.")
-    async def server_info(self, ctx):
-        """Displays information about the current server including member counts, boost status, and more."""
-        guild = ctx.guild
-        embed = discord.Embed(title=f"{guild.name} Server Information", color=discord.Color.blue())
-        embed.set_thumbnail(url=guild.icon.url if guild.icon else None)
-        
-        # Basic information
-        embed.add_field(name="Server ID", value=guild.id, inline=True)
-        embed.add_field(name="Owner", value=guild.owner.mention, inline=True)
-        embed.add_field(name="Created", value=discord.utils.format_dt(guild.created_at, style='D'), inline=True)
-        
-        # Member counts
-        total_members = guild.member_count
-        humans = sum(1 for m in guild.members if not m.bot)
-        bots = total_members - humans
-        embed.add_field(name="Members", value=f"Total: {total_members}\nHumans: {humans}\nBots: {bots}", inline=True)
-        
-        # Channels
-        text_channels = len(guild.text_channels)
-        voice_channels = len(guild.voice_channels)
-        categories = len(guild.categories)
-        embed.add_field(name="Channels", value=f"Text: {text_channels}\nVoice: {voice_channels}\nCategories: {categories}", inline=True)
-        
-        # Server boost info
-        boost_level = guild.premium_tier
-        boost_count = guild.premium_subscription_count
-        embed.add_field(name="Boost Status", value=f"Level {boost_level}\n{boost_count} Boosts", inline=True)
-        
-        # Additional info
-        embed.add_field(name="Roles", value=len(guild.roles), inline=True)
-        embed.add_field(name="Emojis", value=len(guild.emojis), inline=True)
-        embed.add_field(name="Verification Level", value=str(guild.verification_level).title(), inline=True)
-        
-        embed.set_footer(text=f"Requested by {ctx.author}", icon_url=ctx.author.display_avatar.url)
-        await ctx.send(embed=embed)
-
-    @server.command(name="games", description="Show the most played games in the server")
-    async def server_games(self, ctx):
-        """Display the top played games on the server with statistics."""
-        try:
-            # Get game stats cog
-            game_stats_cog = self.bot.get_cog("GameStats")
-            if not game_stats_cog or not game_stats_cog.mongodb:
-                embed = discord.Embed(
-                    title="❌ Game Statistics Unavailable",
-                    description="The game statistics system is not available.",
-                    color=discord.Color.red()
-                )
-                return await ctx.send(embed=embed)
-
-            # Get guild stats
-            game_stats = game_stats_cog.mongodb["game_stats"]
-            guild_data = await game_stats.find_one({"guild_id": ctx.guild.id})
-            
-            if not guild_data or not guild_data.get("played_games"):
-                embed = discord.Embed(
-                    title="📊 No Game Statistics",
-                    description="No game statistics available yet. Statistics will appear once members start playing games.",
-                    color=discord.Color.blue()
-                )
-                return await ctx.send(embed=embed)
-
-            # Sort games by total time played
-            played_games = guild_data.get("played_games", [])
-            sorted_games = sorted(played_games, key=lambda x: x.get("total_time_played", 0), reverse=True)
-            
-            # Take top 10 games
-            top_games = sorted_games[:10]
-            
-            embed = discord.Embed(
-                title="🎮 Most Played Games",
-                description=f"Game statistics for {ctx.guild.name}:",
-                color=discord.Color.blue()
-            )
-            
-            if top_games:
-                game_list = []
-                for idx, game in enumerate(top_games, 1):
-                    game_name = game.get("game_name", "Unknown Game")
-                    total_time = game.get("total_time_played", 0)
-                    player_count = len(game.get("players", []))
-                    
-                    # Convert time to hours and minutes
-                    hours = total_time // 60
-                    minutes = total_time % 60
-                    
-                    if hours > 0:
-                        time_str = f"{hours}h {minutes}m" if minutes > 0 else f"{hours}h"
-                    else:
-                        time_str = f"{minutes}m"
-                    
-                    # Add medal emojis for top 3
-                    if idx == 1:
-                        medal = "🥇"
-                    elif idx == 2:
-                        medal = "🥈"
-                    elif idx == 3:
-                        medal = "🥉"
-                    else:
-                        medal = f"{idx}."
-                    
-                    game_list.append(f"{medal} **{game_name}**\n└ ⏱️ {time_str} • 👥 {player_count} players")
-                
-                # Split into chunks if too long
-                game_text = "\n\n".join(game_list)
-                if len(game_text) <= 1024:
-                    embed.add_field(
-                        name="📈 Statistics",
-                        value=game_text,
-                        inline=False
-                    )
-                else:
-                    # Split into multiple fields
-                    for i in range(0, len(game_list), 5):
-                        chunk = game_list[i:i+5]
-                        embed.add_field(
-                            name="📈 Statistics" if i == 0 else "\u200b",
-                            value="\n\n".join(chunk),
-                            inline=False
-                        )
-            
-            # Add footer with additional info
-            total_games_tracked = len(played_games)
-            embed.set_footer(text=f"Tracking {total_games_tracked} different games • Requested by {ctx.author}")
-            
-            await ctx.send(embed=embed)
-            
-        except Exception as e:
-            logger.error(f"Error in server games command: {e}")
-            embed = discord.Embed(
-                title="❌ Error",
-                description="An error occurred while fetching game statistics.",
-                color=discord.Color.red()
-            )
-            await ctx.send(embed=embed)
-
     @commands.hybrid_command(name="members_of_role", description="Lists members with a specific role.")
     @app_commands.describe(role="The role to list members from.")
     async def members_of_role(self, ctx, role: discord.Role):
@@ -633,151 +490,6 @@ class Utility(commands.Cog):
 
         embed.set_thumbnail(url=emoji.url)
         await ctx.send(embed=embed)
-
-    @commands.hybrid_command(
-        name="copy_emoji", 
-        description="Copy an emoji from another server or URL and add it to this server"
-    )
-    @app_commands.describe(
-        source="Discord emoji, image URL, or type for autocomplete suggestions",
-        name="Custom name for the emoji (optional)"
-    )
-    @commands.has_permissions(manage_emojis=True)
-    @commands.cooldown(1, 15, commands.BucketType.user)  # 15 second cooldown per user
-    async def copy_emoji(self, ctx, source: str, name: str = None):
-        """
-        Copy an emoji from another server or URL and add it to this server.
-        
-        Parameters:
-        - source: Can be a Discord emoji, URL to an image, or a predefined emoji name
-        - name: Optional custom name for the emoji (if not provided, uses original name or 'emoji')
-        
-        Examples:
-        - /copy_emoji source:<:emoji:123456789> name:cool_emoji
-        - /copy_emoji source:https://emoji.gg/emoji/6442-snake-pog
-        - /copy_emoji source:pepe_laugh
-        """
-        guild = ctx.guild
-        await ctx.defer()
-        
-        # Dictionary of predefined emoji URLs
-        predefined_emojis = {
-            "pepe_laugh": "https://cdn3.emoji.gg/emojis/6158_PepeLaugh.png",
-            "pepe_hands": "https://cdn3.emoji.gg/emojis/PepeHands.png",
-            "pepe_think": "https://cdn3.emoji.gg/emojis/pepethink.png",
-            "dogge": "https://cdn3.emoji.gg/emojis/1225_doggee.png",
-            "kekw": "https://cdn3.emoji.gg/emojis/99779-kekw.png",
-            "pog": "https://cdn3.emoji.gg/emojis/49759-pog.png",
-        }
-        
-        try:
-            # Check if source is a Discord emoji
-            if source.startswith("<") and source.endswith(">"):
-                # Extract emoji ID
-                emoji_id = int(source.split(":")[-1].replace(">", ""))
-                emoji_name = source.split(":")[-2] if not name else name
-                emoji_url = f"https://cdn.discordapp.com/emojis/{emoji_id}.png"
-            
-            # Check if source is a predefined emoji
-            elif source.lower() in predefined_emojis:
-                emoji_url = predefined_emojis[source.lower()]
-                emoji_name = name if name else source.lower()
-            
-            # Otherwise treat source as a direct URL
-            else:
-                emoji_url = source
-                emoji_name = name if name else "emoji"
-                
-            # Download and add the emoji
-            async with aiohttp.ClientSession() as session:
-                async with session.get(emoji_url) as resp:
-                    if resp.status != 200:
-                        return await ctx.send(
-                            embed=create_embed(description=f"Could not download emoji from {emoji_url}. Invalid source or URL.", color=discord.Color.red()))
-                    
-                    data = io.BytesIO(await resp.read())
-                    image_data = data.getvalue()
-                    
-                    # Sanitize emoji name - remove special characters and ensure valid length
-                    emoji_name = ''.join(c for c in emoji_name if c.isalnum() or c == '_')
-                    emoji_name = emoji_name[:32] if len(emoji_name) > 32 else emoji_name
-                    if not emoji_name:  # If name ended up empty after sanitization
-                        emoji_name = "emoji"
-                    
-                    try:
-                        new_emoji = await guild.create_custom_emoji(name=emoji_name, image=image_data)
-                        embed = discord.Embed(
-                            title="Emoji Added Successfully!",
-                            description=f"Added emoji {new_emoji} to the server.",
-                            color=discord.Color.green()
-                        )
-                        embed.add_field(name="Name", value=emoji_name, inline=True)
-                        embed.add_field(name="Source", value="Discord Emoji" if source.startswith("<") else 
-                                        ("Predefined Emoji" if source.lower() in predefined_emojis else "URL"), inline=True)
-                        embed.set_footer(text="You can use this command again in 15 seconds")
-                        embed.set_thumbnail(url=emoji_url)
-                        await ctx.send(embed=embed)
-                    except discord.HTTPException as e:
-                        await ctx.send(embed=create_embed(
-                            description=f"Error adding emoji: {str(e)}. The image might be too large or in an unsupported format.",
-                            color=discord.Color.red()
-                        ))
-        
-        except Exception as e:
-            error_details = traceback.format_exc()
-            print(f"Emoji Error: {error_details}")  # Log detailed error to console
-            
-            await ctx.send(embed=create_embed(
-                description=f"Failed to process emoji: {str(e)}\n\n"
-                           f"Usage: `/copy_emoji <emoji/url/preset> [name]`\n"
-                           f"Available presets: {', '.join(predefined_emojis.keys())}\n"
-                           f"You can also use any image URL or emoji.gg link",
-                color=discord.Color.red()
-            ))
-
-    # Add autocomplete for emoji sources
-    @copy_emoji.autocomplete("source")
-    async def emoji_source_autocomplete(self, interaction: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:
-        # Dictionary of predefined emoji suggestions with descriptions
-        predefined_emojis = {
-            "pepe_laugh": "PepeLaugh Emote",
-            "pepe_hands": "PepeHands Emote",
-            "pepe_think": "PepeThink Emote",
-            "dogge": "Dogge Emote",
-            "kekw": "KEKW Laughing Emote",
-            "pog": "PogChamp Emote",
-        }
-
-        # Filter suggestions based on current input
-        suggestions = [
-            app_commands.Choice(name=f"{key} - {value}", value=key)
-            for key, value in predefined_emojis.items() 
-            if current.lower() in key.lower() or current.lower() in value.lower()
-        ]
-        
-        # If the current input looks like a URL, add it as a suggestion
-        if current.startswith(("http://", "https://")) and len(current) > 10:
-            suggestions.insert(0, app_commands.Choice(name=f"Custom URL: {current[:30]}...", value=current))
-            
-        # If current looks like a Discord emoji, add it as a suggestion
-        if current.startswith("<") and ":" in current:
-            suggestions.insert(0, app_commands.Choice(name=f"Discord Emoji: {current}", value=current))
-            
-        # Return up to 25 suggestions (Discord limit)
-        return suggestions[:25]
-
-    @copy_emoji.error
-    async def copy_emoji_error(self, ctx, error):
-        if isinstance(error, commands.CommandOnCooldown):
-            await ctx.send(embed=create_embed(
-                description=f"You're on cooldown! Try again in {error.retry_after:.1f} seconds.",
-                color=discord.Color.orange()
-            ), ephemeral=True)
-        else:
-            await ctx.send(embed=create_embed(
-                description=f"An error occurred: {str(error)}",
-                color=discord.Color.red()
-            ), ephemeral=True)
 
     # Role management commands
     # REMOVED: This command is now integrated into the unified /settings panel (Status Roles section)
@@ -1163,7 +875,7 @@ class Config(commands.Cog):
             # Only sync if we're in the primary bot instance to avoid rate limiting
             if getattr(self.bot, 'is_primary_instance', True):
                 await self.bot.tree.sync()
-                print("Command tree successfully synced")
+                logger.info("Command tree successfully synced")
         except Exception as e:
             print(f"Error syncing command tree: {e}")
 
@@ -1294,5 +1006,5 @@ class Config(commands.Cog):
 
 async def setup(bot):
     """Load the cog."""
-    bot.add_cog(Utility(bot))
-    bot.add_cog(Config(bot))
+    await bot.add_cog(InfoUtility(bot))
+    await bot.add_cog(Config(bot))

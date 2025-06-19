@@ -4,8 +4,8 @@ import logging
 import datetime
 import re
 
-from utils.formatting import create_embed
-from utils.database.db_manager import get_collection
+from src.utils.formatting import create_embed
+from src.utils.database.db_manager import get_collection
 
 logger = logging.getLogger('turkoyto.views.registration')
 

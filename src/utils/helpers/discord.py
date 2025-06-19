@@ -1,5 +1,6 @@
 """Discord-specific helper utilities."""
 import discord
+from discord.ext import commands
 from typing import Optional, Union, List
 import re
 
@@ -83,7 +84,7 @@ def parse_role_mention(mention: str) -> Optional[int]:
     return int(match.group(1)) if match else None
 
 
-async def get_or_fetch_user(bot: discord.Bot, user_id: int) -> Optional[discord.User]:
+async def get_or_fetch_user(bot: commands.Bot, user_id: int) -> Optional[discord.User]:
     """Get a user from cache or fetch from API."""
     user = bot.get_user(user_id)
     if user is None:
@@ -105,7 +106,7 @@ async def get_or_fetch_member(guild: discord.Guild, member_id: int) -> Optional[
     return member
 
 
-async def get_or_fetch_channel(bot: discord.Bot, channel_id: int) -> Optional[discord.abc.GuildChannel]:
+async def get_or_fetch_channel(bot: commands.Bot, channel_id: int) -> Optional[discord.abc.GuildChannel]:
     """Get a channel from cache or fetch from API."""
     channel = bot.get_channel(channel_id)
     if channel is None:

@@ -11,8 +11,8 @@ import math
 import colorsys
 import numpy as np
 
-from utils.database import initialize_mongodb
-from utils.community.turkoyto.xp_manager import XPManager
+from src.utils.database import initialize_mongodb
+from src.utils.community.turkoyto.xp_manager import XPManager
 
 def add_glow(img, amount=3, color=(255, 0, 255)):
     """Add neon glow effect to an image"""
@@ -149,7 +149,7 @@ class Spin(commands.Cog):
             fill=(40, 20, 60, 255), outline=self.synthwave_pink[:3], width=2
         )
         try:
-            font_path = "data/fonts/Gotham-Black.otf"
+            font_path = "resources/fonts/Gotham-Black.otf"
             if os.path.exists(font_path):
                 font = ImageFont.truetype(font_path, 24)
             else:
@@ -334,7 +334,7 @@ class Spin(commands.Cog):
         
         # Add extra text
         try:
-            font_path = "data/fonts/Gotham-Black.otf"
+            font_path = "resources/fonts/Gotham-Black.otf"
             if os.path.exists(font_path):
                 big_font = ImageFont.truetype(font_path, 36)
                 small_font = ImageFont.truetype(font_path, 20)
@@ -571,7 +571,7 @@ class SpinButton(discord.ui.View):
         banner_draw = ImageDraw.Draw(banner)
         
         try:
-            font_path = "data/fonts/Gotham-Black.otf"
+            font_path = "resources/fonts/Gotham-Black.otf"
             if os.path.exists(font_path):
                 prize_font = ImageFont.truetype(font_path, 36)
                 info_font = ImageFont.truetype(font_path, 24)

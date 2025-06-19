@@ -1,489 +1,275 @@
-# 🤖 CONTRO - Advanced Discord Bot Management System
+# 🤖 Contro Discord Bot
 
-[![Version](https://img.shields.io/badge/version-1.1.1-blue.svg)](https://github.com/bergaman9/contro-bot)
-[![Python](https://img.shields.io/badge/python-3.10+-green.svg)](https://python.org)
-[![MongoDB](https://img.shields.io/badge/database-MongoDB-47A248.svg)](https://mongodb.com)
-[![Discord.py](https://img.shields.io/badge/discord.py-2.3.2-7289DA.svg)](https://discordpy.readthedocs.io/)
-[![Raspberry Pi](https://img.shields.io/badge/hosting-Raspberry%20Pi%205-C51A4A.svg)](https://raspberrypi.org)
+A powerful, modular Discord bot built for scalability and advanced features. Now with AI-powered server design and comprehensive security framework.
 
-**CONTRO** is an advanced, production-ready Discord bot with comprehensive server management capabilities, featuring modern async MongoDB integration, beautiful UI systems, and robust automated version control.
+## 🚀 Features
 
-## ✨ Core Features Overview
+### ✅ Core Features (Completed)
+- **🛡️ Advanced Moderation System** - Comprehensive moderation tools with AI assistance
+- **👋 Welcome & Goodbye System** - Customizable welcome/goodbye with dynamic images
+- **📈 Leveling & XP System** - Advanced XP system with voice chat tracking
+- **🎟️ Ticket System** - Professional support ticket management
+- **⚙️ Unified Settings Panel** - All configurations in one place (`/settings`)
+- **🏗️ Server Setup Wizard** - Complete server setup with templates (`/setup`)
+- **🎮 Fun & Games** - Mini-games, economy, and entertainment features
+- **📊 Analytics & Logging** - Comprehensive logging and analytics system
 
-<!-- Bot Features Showcase -->
-<div align="center">
-  <img src="https://raw.githubusercontent.com/bergaman9/contro-bot/main/images/backgrounds/welcome_blue.png" alt="CONTRO Bot Welcome System" width="400">
-  <img src="https://raw.githubusercontent.com/bergaman9/contro-bot/main/images/register_card_d563575f-39ba-45e2-b306-30e1e0af7cb3.png" alt="Registration Card Example" width="400">
-</div>
+### 🆕 Phase 5 Features (NEW)
+- **🤖 AI-Powered Server Designer** - Natural language server creation with Perplexity AI
+- **🛡️ Modular Security Framework** - Advanced security modules with threat detection
+- **🔧 Bot Invitation System** - One-click invitation for popular bots (Carl-bot, ProBot, etc.)
+- **🏭 Raspberry Pi 5 Deployment** - Optimized for ARM64 with Docker containerization
+- **📊 Advanced Monitoring** - Prometheus, Grafana, and real-time performance tracking
+- **🔄 Multi-Client Architecture** - Support for multiple bot instances with shared security
 
-### 🎯 **Perfect Registration System** ✅
-- **Advanced Registration Modal** - Comprehensive user registration with game preferences
-- **Age Verification** - Automatic age role assignment with zodiac integration
-- **Game Matching** - Find users with similar gaming interests  
-- **Role Automation** - Intelligent role assignment based on registration data
-- **Custom Interfaces** - Personalized registration experiences
-- **Data Validation** - Robust input validation and error handling
+## 🎯 AI Integration
 
-### 📈 **Flawless Level System** ✅
-- **XP Management** - Advanced experience tracking for messages and voice activity
-- **Beautiful Level Cards** - Custom-generated level cards with backgrounds
-- **Voice Activity Tracking** - XP rewards for voice channel participation
-- **Registration Bonuses** - Extra XP incentives for community registration
-- **Leaderboards** - Server-wide XP rankings with pagination
-- **Smart Caching** - Optimized performance with intelligent data caching
-- **Async MongoDB** - Modern async database operations for better performance
+### Perplexity AI Features
+- **Server Designer**: Describe your server in natural language, get complete structure
+- **Smart Recommendations**: AI-powered optimization suggestions
+- **Content Analysis**: Intelligent content moderation and safety analysis
+- **Bot Suggestions**: Automatic bot recommendations based on server type
 
-### 🎫 **Advanced Ticket System** ✅
-- **Multi-Category Support** - Organized ticket categories for different support types
-- **Support Role Management** - Designated helper roles with proper permissions
-- **Automated Management** - Smart ticket creation, archiving, and cleanup
-- **Custom Interfaces** - Personalized ticket creation with interactive buttons
-- **Persistent Views** - Tickets survive bot restarts and maintain functionality
-- **Detailed Logging** - Comprehensive ticket activity tracking
+### Example AI Commands
+```
+/design description:"Create a gaming community server for Turkish players with voice channels and tournaments"
+/analyze - Get AI-powered optimization suggestions for your server
+/ask question:"How do I set up a ticket system?" - AI assistant for help
+```
 
-### 👋 **Beautiful Welcome System** ✅
-- **Custom Welcome Cards** - Stunning welcome images with user avatars
-- **Advanced Background System** - Multiple preset backgrounds or custom uploads
-- **Message Templates** - Dynamic variables: {mention}, {name}, {server}, {count}
-- **Dual Welcome/Goodbye** - Separate systems for arrivals and departures
-- **Image Optimization** - Efficient image processing and caching
-- **Role Integration** - Automatic role assignment for new members
-### 🔧 **Advanced Feature Management System**
-- **Granular Toggle Control** - Enable/disable any bot feature per server
-- **Visual Status Dashboard** - See all feature states at a glance with beautiful UI
-- **Category Organization** - Features organized by system (Moderation, Community, Fun)
-- **Reset to Defaults** - Easily restore default configurations
-- **Permission Management** - Role-based feature access control
-- **Real-time Updates** - Instant feature state changes without restarts
+## 🏗️ Installation & Deployment
 
-### 🎮 **Comprehensive Server Management**
-- **One-Click Setup** - `/setup` command with complete server configuration wizard
-- **Template System** - Multiple pre-designed server templates for different communities
-- **Discord Template Import** - Import and apply official Discord server templates
-- **Settings Dashboard** - `/settings` for organized configuration management
-- **Multi-language Support** - Full Turkish and English language support
-- **Custom Branding** - Server-specific embed colors and bot personality
+### Quick Setup
 
-### 🎉 **Interactive Giveaway System**
-- **Button-based Participation** - Modern Discord UI with interactive buttons
-- **Role Restrictions** - Limit participation to specific roles or member types
-- **Automatic Winner Selection** - Fair random selection with reroll capabilities
-- **Persistent Management** - Giveaways survive bot restarts and maintain state
-- **Advanced Scheduling** - Set custom duration and end times
-- **Winner Notifications** - Automatic DM notifications to winners
-
-### ⭐ **Smart Starboard System**
-- **Popular Message Highlighting** - Showcase community favorites automatically
-- **Custom Reaction Thresholds** - Set minimum reaction counts per server
-- **Multiple Emoji Support** - Choose from various reaction triggers
-- **Duplicate Prevention** - Smart filtering to avoid spam
-- **Channel Restrictions** - Control which channels feed the starboard
-
-### 🎮 **Game Statistics & Tracking**
-- **Real-time Activity Monitoring** - Track what games members are playing
-- **Server Game Analytics** - See most popular games with detailed statistics
-- **Play Time Tracking** - Monitor total time spent in different games
-- **Intelligent Caching** - Optimized performance with smart data management
-- **Historical Data** - Track gaming trends over time
-- **Integration Ready** - Steam profile and game data integration
-
-### 🛡️ **Comprehensive Auto Moderation**
-- **Advanced Word Filtering** - Intelligent content moderation with context awareness
-- **Automated Role Management** - Smart role assignment based on user behavior
-- **Action Logging** - Complete audit trail of all moderation actions
-- **Punishment Escalation** - Progressive punishment system (warn → timeout → ban)
-- **Whitelist System** - Exception handling for trusted users and roles
-- **Custom Responses** - Personalized moderation messages
-
-### 🎂 **Birthday & Zodiac System**
-- **Automatic Birthday Tracking** - Smart birthday detection and announcements
-- **Zodiac Role Assignment** - Automatic astrological sign roles based on birth dates
-- **Age Calculation** - Intelligent age verification and role management
-- **Custom Birthday Messages** - Personalized birthday greetings with mentions
-- **Birthday Calendar** - Track upcoming birthdays in your server
-- **Timezone Support** - Handle different timezones for accurate celebrations
-
-### 🔨 **Advanced Utility Features**
-- **Temporary Voice Channels** - Auto-creating and managing temporary voice rooms
-- **Multi-server Bump Automation** - Automatic server bumping across platforms
-- **Dynamic Content Loading** - Flexible content management system
-- **Steam Integration** - Rich Steam profile and game data integration
-- **Crypto Price Tracking** - Real-time cryptocurrency price monitoring
-- **Reddit Integration** - Fetch and display content from subreddits
-
-### 🎭 **Entertainment & Fun Commands**
-- **AI-Powered Interactions** - OpenAI and Perplexity integration for smart responses
-- **Entertainment Recommendations** - Movie, game, and music suggestions
-- **Interactive Games** - 8ball, love calculator, word definitions, and more
-- **Meme Generation** - Reddit meme fetching with filtering
-- **Trivia Systems** - Knowledge-based games and competitions
-- **Social Features** - User interaction commands and community building tools
-
-### 📊 **Comprehensive Logging System**
-- **Event Tracking** - Complete server activity monitoring
-- **Action Auditing** - Detailed logs of all moderation and administrative actions
-- **User Activity Logs** - Track member join/leave, role changes, and interactions
-- **Error Monitoring** - Automatic error detection and reporting
-- **Log Rotation** - Intelligent log file management to prevent disk overflow
-- **Export Capabilities** - Easy log export for external analysis
-
-### 🚀 **Performance & Technical Features**
-- **Async MongoDB Integration** - Modern async database operations (migrated from deprecated Motor)
-- **Intelligent Caching System** - Multi-layer caching for optimal performance
-- **Resource Management** - Automatic cleanup and memory optimization
-- **Rate Limiting Protection** - Built-in API abuse prevention
-- **Load Distribution** - Efficient async operation handling
-- **Error Recovery** - Graceful error handling with automatic recovery
-- **Raspberry Pi 5 Optimized** - Specifically optimized for Raspberry Pi hosting
-
-## 🚀 Quick Start Guide
-
-### Prerequisites
-- **Python 3.10+** (Python 3.11 recommended for optimal performance)
-- **MongoDB** (Local or cloud instance)
-- **Discord Bot Token** (from Discord Developer Portal)
-- **Raspberry Pi 5** (or any Linux/Windows server)
-
-### Installation Steps
-
-1. **Clone & Setup**
-   ```bash
-   git clone https://github.com/bergaman9/contro-bot.git
-   cd contro-bot
-   pip install -r requirements.txt
-   ```
-
-2. **Environment Configuration**
-   ```bash
-   # Copy the example environment file
-   cp .env.example .env
-   ```
-   
-   Edit `.env` file with your actual values:
-   ```env
-   # Required: Discord Bot Token
-   CONTRO_MAIN_TOKEN=your_discord_bot_token_here
-   
-   # Required: Admin User ID
-   ADMIN_USER_ID=your_discord_user_id
-   
-   # Required: Database Configuration
-   DB=contro-bot-db
-   MONGODB_CONNECTION_STRING=mongodb://localhost:27017/contro-bot-db
-   # OR for MongoDB Atlas:
-   # MONGODB_CONNECTION_STRING=mongodb+srv://username:password@cluster.mongodb.net/database
-   
-   # Optional: Additional Bot Tokens (for dev/premium versions)
-   CONTRO_DEV_TOKEN=your_dev_token_here
-   CONTRO_PREMIUM_TOKEN=your_premium_token_here
-   
-   # Optional: API Keys for Enhanced Features
-   PERPLEXITY_API_KEY=your_perplexity_key_here
-   OPENAI_API_KEY=your_openai_key_here
-   ```
-
-3. **Database Setup**
-   ```bash
-   # MongoDB will auto-initialize collections on first run
-   # No manual database setup required
-   ```
-
-4. **Launch Bot**
-   ```bash
-   python main.py
-   ```
-
-### Quick Configuration
-
-1. **Invite Bot** - Use Discord Developer Portal to invite with necessary permissions
-2. **Server Setup** - Run `/setup` in your Discord server
-3. **Feature Configuration** - Use `/settings` to customize all features
-4. **Registration Setup** - Configure `/register_settings` for your community
-
-## 🛠️ Raspberry Pi 5 Deployment
-
-### System Requirements
-- **Raspberry Pi 5** with at least 4GB RAM (8GB recommended)
-- **64GB+ MicroSD Card** (Class 10 or better)
-- **Stable Internet Connection**
-- **Raspberry Pi OS** (64-bit recommended)
-
-### Optimization for Pi 5
+1. **Clone and Configure**
 ```bash
-# System optimization
-sudo apt update && sudo apt upgrade -y
-sudo apt install python3.11 python3.11-pip mongodb git -y
+git clone https://github.com/bergasoft/contro-bot.git
+cd contro-bot
 
-# Performance tuning
-echo 'vm.swappiness=10' | sudo tee -a /etc/sysctl.conf
-echo 'net.core.rmem_max = 134217728' | sudo tee -a /etc/sysctl.conf
-
-# Start services
-sudo systemctl enable mongodb
-sudo systemctl start mongodb
+# Copy and configure environment file
+cp .env.example .env
+nano .env  # Edit with your tokens and settings
 ```
 
-### Auto-Start Configuration
+2. **Development Setup**
 ```bash
-# Create systemd service
-sudo nano /etc/systemd/system/contro-bot.service
+# Install dependencies
+pip install -r requirements.txt
+
+# Run bot
+python main.py
 ```
 
-Service file content:
-```ini
-[Unit]
-Description=CONTRO Discord Bot
-After=network.target mongodb.service
+### Raspberry Pi 5 (Recommended for Production)
 
-[Service]
-Type=simple
-User=pi
-WorkingDirectory=/home/pi/contro-project/bot
-ExecStart=/usr/bin/python3.11 main.py
-Restart=always
-RestartSec=10
-Environment=PYTHONPATH=/home/pi/contro-project/bot
-
-[Install]
-WantedBy=multi-user.target
-```
-
-Enable service:
 ```bash
-sudo systemctl daemon-reload
-sudo systemctl enable contro-bot
-sudo systemctl start contro-bot
+# Clone repository first
+git clone https://github.com/bergasoft/contro-bot.git
+cd contro-bot
+
+# Configure environment
+cp .env.example .env
+nano .env  # Add your Discord tokens and API keys
+
+# Download and run installation script
+curl -fsSL https://raw.githubusercontent.com/bergasoft/contro-bot/main/deployment/scripts/install.sh | bash
+
+# Deploy with Docker
+cd ~/contro-bot
+./deployment/scripts/deploy.sh
 ```
 
-## 🔧 Recent Updates & Improvements (v1.1.1)
+### Docker Deployment
 
-### ✅ **Centralized Database Management:**
-- **Single Database Manager** - Unified database connection handling through DatabaseManager singleton
-- **Async MongoDB Support** - Full async/await support with motor for better performance
-- **Connection Pooling** - Optimized connection management with proper pooling
-- **Automatic Retry Logic** - Built-in retry mechanisms for better reliability
-- **Legacy Support** - Sync database connections for backward compatibility
+```bash
+# Ensure .env file is configured
+cp .env.example .env
+nano .env  # Configure your settings
 
-### ✅ **Settings System Overhaul:**
-- **Full English UI** - Complete English translation of all settings interfaces
-- **Unified Command** - Single `/settings` command with comprehensive button-based navigation
-- **Real-time Status Display** - See current configuration status in embed messages
-- **All Features Accessible** - Every bot feature configurable through the settings panel
-- **No Extra Commands** - Removed redundant settings commands for cleaner interface
+# Build and run with Docker Compose
+docker-compose -f deployment/docker/docker-compose.pi.yml up -d
 
-### ✅ **Enhanced Feature Management:**
-- **Feature Toggle Dashboard** - Visual status display of all features at a glance
-- **Granular Control** - Enable/disable individual features per server
-- **Persistent Configuration** - Settings saved in MongoDB and persist across restarts
-- **Reset Functionality** - Easy reset to default configurations
-
-### ✅ **Code Cleanup & Organization:**
-- **Removed Duplicate Commands** - Fixed all command registration conflicts
-- **Clean Root Directory** - Removed unnecessary files for cleaner project structure
-- **Fixed Bot Settings Cog** - Resolved loading issues with proper command structure
-- **Improved Error Handling** - Better error messages and fallback mechanisms
-
-### ✅ **Performance Optimizations:**
-- **Reduced Database Calls** - Centralized connection eliminates redundant connections
-- **Better Resource Management** - Proper connection pooling and cleanup
-- **Async Operations** - Full async support for non-blocking operations
-- **Memory Efficiency** - Singleton pattern reduces memory overhead
-
-## 📁 Project Structure
-
-```
-bot/
-├── main.py                     # Bot entry point with cog loading
-├── cogs/                       # Main cog files (17 total)
-│   ├── settings.py             # Settings management system ✅
-│   ├── server_setup.py         # Server setup with templates ✅
-│   ├── welcomer.py             # Welcome/goodbye system ✅
-│   ├── register.py             # Registration system ✅
-│   ├── giveaways.py            # Giveaway management ✅
-│   ├── ticket.py               # Support ticket system ✅
-│   ├── moderation.py           # Moderation tools ✅
-│   ├── levelling.py            # XP and leveling ✅
-│   ├── spin.py                 # Spin wheel games ✅
-│   ├── game_stats.py           # Game activity tracking ✅
-│   ├── fun.py                  # Entertainment commands ✅
-│   ├── utility.py              # General utilities ✅
-│   ├── starboard.py            # Starboard system ✅
-│   ├── logging.py              # Event logging ✅
-│   ├── temp_channels.py        # Temporary voice channels ✅
-│   ├── bump.py                 # Auto server bumping ✅
-│   └── interface.py            # User interface components ✅
-├── utils/                      # Organized utility modules
-│   ├── database/               # Database management ✅
-│   │   ├── __init__.py
-│   │   └── connection.py       # MongoDB connection with error handling
-│   ├── community/              # Community-specific features
-│   │   └── turkoyto/           # TurkOyto community integration
-│   │       ├── xp_manager.py   # XP management system ✅
-│   │       └── registration_view.py # Registration modal views
-│   ├── core/                   # Core utilities
-│   │   ├── formatting.py       # Embed creation helpers
-│   │   └── class_utils.py      # Utility classes
-│   ├── settings/               # Settings system components
-│   └── content_loader.py       # Dynamic content loading
-├── data/                       # Data storage
-│   ├── templates/              # Server templates (JSON)
-│   ├── Backgrounds/            # Welcome image backgrounds
-│   └── fonts/                  # Custom fonts
-└── logs/                       # Log files
+# Check status
+docker logs contro-bot
 ```
 
-## 🛠️ Installation
+## ⚙️ Configuration
 
-1. Clone the repository
-2. Install dependencies: `pip install -r requirements.txt`
-3. Configure environment variables (.env file):
-   ```
-   BOT_TOKEN=your_bot_token
-   MONGODB_CONNECTION_STRING=your_mongodb_url
-   OPENAI_API_KEY=your_openai_key (optional)
-   PERPLEXITY_API_KEY=your_perplexity_key (optional)
-   ```
-4. Run the bot: `python main.py`
+### Environment Variables (.env file)
 
-## 🎯 Usage Examples
+Copy `.env.example` to `.env` and configure the following:
 
-### Settings Management
-```
-/settings
-```
-- Access comprehensive settings panel
-- Configure by category (Server, Welcome, Moderation, etc.)
-- View current settings anytime
-- Remove or modify existing configurations
-- Toggle features on/off with Feature Management
+```env
+# Required: Discord Bot Tokens
+CONTRO_MAIN_TOKEN=your_main_bot_token
+CONTRO_DEV_TOKEN=your_dev_bot_token (optional)
+CONTRO_PREMIUM_TOKEN=your_premium_bot_token (optional)
 
-### Server Setup
-```
-/setup
-```
-- Complete server setup wizard
-- Choose from pre-built templates
-- Import Discord templates
-- Configure all essential features
+# Required: Database
+MONGO_DB=your_mongodb_connection_string
 
-### Registration System
-```
-/register_settings
-```
-- Configure age roles and verification
-- Set up registration channels
-- Customize registration messages
+# Required: AI Integration
+PERPLEXITY_API_KEY=your_perplexity_api_key
 
-### Quick Commands
-```
-/topgames          # Show most played games on server
-/giveaway create   # Create interactive giveaways
-/birthday         # Set birthday and get zodiac role
-/crypto bitcoin   # Get cryptocurrency prices
+# Optional: Additional APIs
+OPENAI_API_KEY=your_openai_api_key
+SPOTIFY_CLIENT_ID=your_spotify_client_id
+REDDIT_CLIENT_ID=your_reddit_client_id
+
+# Bot Configuration
+BOT_ENV=development  # or production
+DEFAULT_PREFIX=>
+LOG_LEVEL=INFO
 ```
 
-## 🔄 Error Handling & Stability
+### Security Notes
 
-### Database Connection
-- **Graceful Fallbacks** - Bot continues operating even with database issues
-- **Connection Retries** - Automatic reconnection attempts
-- **Error Logging** - Comprehensive logging for troubleshooting
-- **Null Checking** - Proper validation before database operations
+- The `.env` file is gitignored for security
+- Use `.env.example` as a template
+- Never commit real tokens to version control
+- Deployment scripts automatically secure .env permissions (600)
 
-### Command Registration
-- **Duplicate Prevention** - Automatic handling of existing command instances
-- **Clean Reloading** - Proper cog reloading without conflicts
-- **State Management** - Consistent bot state across restarts
+### Production Configuration
 
-### Cog Loading
-- **All 17 cogs load successfully** - Fixed indentation and import errors
-- **Dependency Management** - Proper handling of cog dependencies
-- **Graceful Failures** - Individual cog failures don't crash the bot
+For production deployment:
+- Set `BOT_ENV=production` in .env
+- Use strong MongoDB credentials
+- Enable monitoring with `PROMETHEUS_ENABLED=true`
+- Set up SSL certificates for HTTPS
 
-## 🌐 Language Support
+## 🛡️ Security Features
 
-The bot supports both Turkish and English interfaces:
-- All UI components are bilingual
-- Language selection at startup
-- Contextual help in selected language
-- Community-specific features for Turkish gaming communities
+### Modular Security System
+- **Anti-Spam Protection** - Advanced spam detection with ML
+- **Anti-Raid Protection** - Automated raid detection and response
+- **Role Guard** - Role hierarchy protection and auditing
+- **Channel Guard** - Channel permission monitoring
+- **AI Threat Detection** - Behavioral analysis and content scanning
 
-## 📊 Performance Features
+### Security Dashboard
+Access comprehensive security controls via `/security` command:
+- Real-time threat monitoring
+- Security module configuration
+- Incident response management
+- Alert configuration
 
-### Caching System
-- **Game Statistics Caching** - Reduces database queries
-- **User Data Caching** - Faster XP calculations
-- **Template Caching** - Improved setup performance
+## 🤖 Bot Management
 
-### Database Optimization
-- **Batch Operations** - Efficient bulk updates
-- **Index Usage** - Optimized queries
-- **Connection Pooling** - Better resource management
+### Multi-Bot Invitation System
+Easily invite popular bots to enhance your server:
 
-### Load Distribution
-- **Async Operations** - Non-blocking command execution
-- **Rate Limiting** - Prevents API abuse
-- **Resource Management** - Automatic cleanup of resources
+```
+/bots invite carl - Invite Carl-bot for advanced moderation
+/bots invite probot - Invite ProBot for leveling system
+/bots invite mee6 - Invite MEE6 for XP and music
+/bots recommend gaming - Get bot recommendations for gaming servers
+```
 
-## 📋 Complete Features Summary
+### Supported Bots
+- **Carl-bot** - Advanced automoderation and custom commands
+- **ProBot** - Leveling, welcome messages, and statistics
+- **MEE6** - XP system, moderation, and music
+- **Dyno** - Comprehensive moderation and server management
+- **Groovy/Rythm** - High-quality music streaming
+- **Ticket Tool** - Professional ticket system
 
-✅ **All Issues Fixed:**
-- **Indentation errors resolved** - XP Manager created with proper structure
-- **Database connection errors** - Proper null checking and error handling
-- **Command registration conflicts** - Clean cog loading system
-- **All 17 cogs loading successfully** - No more startup errors
+## 📊 Monitoring & Analytics
 
-✅ **Fully Implemented Systems:**
-- **Feature toggle system** with granular control for all features
-- **Complete settings UI** with category-based organization
-- **Server setup with templates** and Discord template import
-- **Welcome/goodbye with custom card generation**
-- **Advanced registration system** with game matching
-- **Comprehensive giveaway system** with persistent views
-- **Ticket system** with multi-category support
-- **Moderation tools** (auto roles, word filter, logging)
-- **XP and leveling system** with voice tracking
-- **Game statistics tracking** with intelligent caching
-- **Birthday system** with zodiac role automation
-- **Utility features** (temp channels, bump automation)
-- **Entertainment commands** with external API integration
-- **Dual language support** (Turkish/English)
-- **Clean modular architecture** with organized file structure
-- **Comprehensive error handling** and logging
-- **Performance optimizations** with caching and async operations
+### Real-time Dashboards
+- **Grafana Dashboard**: http://localhost:3000
+- **Prometheus Metrics**: http://localhost:9091
+- **Bot Health Check**: http://localhost:8080/health
+- **API Endpoint**: http://localhost:8000/api
 
-## 🚀 Production Ready
+### Performance Metrics
+- System resource usage (CPU, RAM, Storage)
+- Discord API rate limit monitoring
+- Database connection health
+- AI API usage and costs
+- Security incident tracking
 
-This is a complete, production-ready Discord bot system with:
-- **Zero startup errors** - All cogs load successfully
-- **Comprehensive feature set** - 17 different cog modules
-- **Advanced UI system** - Interactive settings management
-- **Database integration** - MongoDB with proper error handling
-- **External integrations** - OpenAI, Steam, Reddit, Crypto APIs
-- **Performance optimized** - Caching, async operations, rate limiting
-- **Community features** - Special TurkOyto gaming community integration
-- **Template system** - Quick server setup with pre-configured templates
+## 🎮 Commands Overview
 
-The bot is ready for deployment and can handle multiple servers simultaneously with full feature sets for each community.
+### Administrative Commands
+- `/settings` - Unified settings panel for all configurations
+- `/setup` - Complete server setup wizard with templates
+- `/security` - Comprehensive security dashboard
+- `/bots` - Bot invitation and management system
+
+### AI-Powered Commands
+- `/design` - AI server designer with natural language input
+- `/analyze` - Server optimization suggestions
+- `/ask` - AI assistant for help and guidance
+
+### Community Features
+- `/register` - User registration system
+- `/level` - Check XP and ranking
+- `/leaderboard` - Server XP leaderboard
+- `/ticket` - Create support tickets
+
+### Fun & Games
+- `/spin` - Spin wheel game with rewards
+- `/games` - Various mini-games and entertainment
+- `/giveaway` - Create and manage giveaways
+
+## 🏆 Performance Optimizations
+
+### Raspberry Pi 5 Optimizations
+- ARM64 native Docker images
+- Memory usage under 1GB
+- CPU temperature monitoring
+- Automatic performance scaling
+- Storage optimization with log rotation
+
+### Production Features
+- Auto-restart on failure
+- Health check endpoints
+- Graceful shutdown handling
+- SSL/TLS certificate automation
+- Firewall configuration (UFW)
+
+## 📈 Development Roadmap
+
+### Phase 6: Advanced AI Features (In Progress)
+- [ ] Advanced AI content generation
+- [ ] Predictive server analytics
+- [ ] Smart auto-moderation with learning
+- [ ] Voice recognition and processing
+- [ ] Advanced threat prediction
+
+### Phase 7: Enterprise Features (Planned)
+- [ ] Multi-server management dashboard
+- [ ] Advanced analytics and reporting
+- [ ] White-label bot deployment
+- [ ] Custom AI model training
+- [ ] Enterprise security compliance
 
 ## 🤝 Contributing
 
-This project maintains a clean, modular architecture that makes it easy to:
-- Add new features as separate cogs
-- Extend existing functionality
-- Customize for specific communities
-- Deploy across multiple servers
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-## 📝 License
+## 📜 License
 
-This project is available under the MIT License. See the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 📊 Bot Showcase
+## 📞 Support
 
-![CONTRO Bot](https://raw.githubusercontent.com/bergaman9/contro-bot/main/images/contro_bot_showcase.png)
+- **Discord Server**: [Join our support server](https://discord.gg/your-server)
+- **Documentation**: [Full documentation](https://docs.contro-bot.com)
+- **Issues**: [GitHub Issues](https://github.com/bergasoft/contro-bot/issues)
+- **Email**: support@contro-bot.com
 
-## 🔗 Links
+## 🙏 Acknowledgments
 
-- [Discord Bot](https://top.gg/tr/bot/783064615012663326)
-- [GitHub Repository](https://github.com/bergaman9/contro-bot)
-- [Documentation](https://github.com/bergaman9/contro-bot/wiki)
+- Discord.py community for the excellent framework
+- Perplexity AI for intelligent server design capabilities
+- Open source community for various tools and libraries
+- Raspberry Pi Foundation for affordable computing solutions
+
+---
+
+**Made with ❤️ by [Bergasoft](https://github.com/bergasoft)**

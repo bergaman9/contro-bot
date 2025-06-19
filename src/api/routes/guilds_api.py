@@ -7,7 +7,7 @@ import  discord
 
 # Add the parent directory to sys.path to import from the project root
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from utils.database import initialize_mongodb
+from src.utils.database import initialize_mongodb
 
 # Load environment variables
 load_dotenv()

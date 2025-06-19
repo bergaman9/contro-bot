@@ -91,7 +91,7 @@ def is_feature_enabled(guild_id: int, feature: str, mongo_db=None) -> bool:
         bool: True if feature is enabled, False otherwise
     """
     if mongo_db is None:
-        from utils.database import initialize_mongodb
+        from src.utils.database import initialize_mongodb
         mongo_db = initialize_mongodb()
     
     # Default feature states
@@ -123,7 +123,7 @@ def feature_required(feature_name: str):
         async def wrapper(self, ctx, *args, **kwargs):
             if hasattr(ctx, 'guild') and ctx.guild:
                 if not is_feature_enabled(ctx.guild.id, feature_name):
-                    from utils.core.formatting import create_embed
+                    from src.utils.core.formatting import create_embed
                     
                     embed = create_embed(
                         description=f"❌ The {feature_name.replace('_', ' ').title()} feature is disabled on this server.",
@@ -151,7 +151,7 @@ async def get_guild_features(guild_id: int, mongo_db=None) -> Dict[str, bool]:
         dict: Dictionary of feature names and their states
     """
     if mongo_db is None:
-        from utils.database import initialize_mongodb
+        from src.utils.database import initialize_mongodb
         mongo_db = initialize_mongodb()
     
     default_features = {

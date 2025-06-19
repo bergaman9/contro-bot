@@ -1,43 +1,63 @@
 {
     "default_prefix": ">",
     "owners": [336615299694460933],    "active_cogs": [
-        "settings",
-        "server_setup", 
-        "welcomer",
-        "register",
-        "giveaways",
-        "ticket",
-        "moderation",
-        "levelling",
-        "spin",
-        "game_stats",
-        "fun",
-        "utility",
-        "starboard",
-        "logging",
-        "temp_channels",
-        "bump",
-        "interface",
-        "version_control",
-        "bot_settings",
-        "invites",
-        "perplexity_chat",
-        "updater"
+        "admin.settings",
+        "admin.server_setup",
+        "admin.bot_management",
+        "community.welcomer",
+        "community.register",
+        "community.levelling",
+        "fun.giveaways",
+        "fun.games",
+        "fun.spin",
+        "moderation.actions",
+        "moderation.logging",
+        "utility.general",
+        "utility.info",
+        "utility.interface",
+        "utility.temp_channels",
+        "utility.bump",
+        "utility.starboard",
+        "utility.tickets",
+        "utility.invites",
+        "utility.perplexity_chat"
     ],
     "client_settings": {
+        "main": {
+            "name": "Contro Bot",
+            "prefix": ">",
+            "enabled_cogs": [
+                "admin.settings",
+                "admin.server_setup",
+                "admin.bot_management",
+                "moderation.actions",
+                "community.welcome",
+                "community.leveling",
+                "community.registration",
+                "utility.info",
+                "utility.general",
+                "fun.games"
+            ]
+        },
         "dev": {
             "name": "Contro Dev",
-            "enabled_cogs": "all",
-            "prefix": ">>"
+            "prefix": ">>",
+            "enabled_cogs": [
+                "admin.settings",
+                "admin.server_setup",
+                "utility.info"
+            ]
         },
-        "main": {
-            "name": "Contro",
-            "enabled_cogs": "all",
-            "prefix": ">"
-        },        "premium": {
+        "premium": {
             "name": "Contro Premium",
-            "enabled_cogs": ["utility", "settings", "version_control"],
-            "prefix": "!"
+            "prefix": "!!",
+            "enabled_cogs": [
+                "admin.settings",
+                "admin.server_setup",
+                "utility.info",
+                "fun.games"
+            ]
         }
-    }
+    },
+    "default_client": "main"
 }

@@ -7,8 +7,8 @@ import time
 from discord import app_commands
 
 # Fix imports - replace utils with core modules
-from utils.core.formatting import create_embed
-from utils.database.connection import initialize_mongodb
+from src.utils.core.formatting import create_embed
+from src.utils.database.connection import initialize_mongodb
 
 # Set up logging
 logger = logging.getLogger('invites')

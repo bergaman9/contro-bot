@@ -18,7 +18,7 @@ class ModerationActions(BaseCog):
     def __init__(self, bot):
         super().__init__(bot)
     
-    async def can_moderate(self, ctx: Union[discord.ApplicationContext, commands.Context], target: discord.Member) -> bool:
+    async def can_moderate(self, ctx: commands.Context, target: discord.Member) -> bool:
         """Check if the user can moderate the target."""
         if target.id == ctx.author.id:
             await ctx.send(embed=create_embed(
@@ -42,8 +42,8 @@ class ModerationActions(BaseCog):
                 description="You cannot moderate someone with a higher or equal role.",
                 color=Colors.ERROR
             ))
-            return False
-        
+        return False
+
         if target.top_role.position >= ctx.guild.me.top_role.position:
             await ctx.send(embed=create_embed(
                 title="Error",
@@ -54,15 +54,20 @@ class ModerationActions(BaseCog):
         
         return True
     
-    @discord.slash_command(
+    @commands.hybrid_command(
         name="kick",
         description="Kick a member from the server"
     )
-    @discord.default_permissions(kick_members=True)
+    @commands.has_permissions(kick_members=True)
+    @app_commands.describe(
+        member="The member to kick",
+        reason="The reason for kicking"
+    )
     async def kick(
         self,
-        ctx: discord.ApplicationContext,
+        ctx: commands.Context,
         member: discord.Member,
+        *,
         reason: Optional[str] = "No reason provided"
     ):
         """Kick a member from the server."""
@@ -95,32 +100,38 @@ class ModerationActions(BaseCog):
             embed.add_field(name="Reason", value=reason, inline=False)
             embed.set_footer(text=f"Kicked by {ctx.author}")
             
-            await ctx.respond(embed=embed)
+            await ctx.send(embed=embed)
             
         except discord.Forbidden:
-            await ctx.respond(embed=create_embed(
+            await ctx.send(embed=create_embed(
                 title="Error",
                 description="I don't have permission to kick that member.",
                 color=Colors.ERROR
             ))
         except Exception as e:
-            await ctx.respond(embed=create_embed(
+            await ctx.send(embed=create_embed(
                 title="Error",
                 description=f"An error occurred: {str(e)}",
                 color=Colors.ERROR
             ))
     
-    @discord.slash_command(
+    @commands.hybrid_command(
         name="ban", 
         description="Ban a member from the server"
     )
-    @discord.default_permissions(ban_members=True)
+    @commands.has_permissions(ban_members=True)
+    @app_commands.describe(
+        member="The member to ban",
+        reason="The reason for banning",
+        delete_messages="Number of days of messages to delete (0-7)"
+    )
     async def ban(
         self,
-        ctx: discord.ApplicationContext,
+        ctx: commands.Context,
         member: discord.Member,
-        reason: Optional[str] = "No reason provided",
-        delete_messages: Optional[int] = 0
+        delete_messages: Optional[int] = 0,
+        *,
+        reason: Optional[str] = "No reason provided"
     ):
         """Ban a member from the server."""
         if not await self.can_moderate(ctx, member):
@@ -157,30 +168,35 @@ class ModerationActions(BaseCog):
                 embed.add_field(name="Messages Deleted", value=f"Last {delete_messages} days", inline=True)
             embed.set_footer(text=f"Banned by {ctx.author}")
             
-            await ctx.respond(embed=embed)
+            await ctx.send(embed=embed)
             
         except discord.Forbidden:
-            await ctx.respond(embed=create_embed(
+            await ctx.send(embed=create_embed(
                 title="Error",
                 description="I don't have permission to ban that member.",
                 color=Colors.ERROR
             ))
         except Exception as e:
-            await ctx.respond(embed=create_embed(
+            await ctx.send(embed=create_embed(
                 title="Error",
                 description=f"An error occurred: {str(e)}",
                 color=Colors.ERROR
             ))
     
-    @discord.slash_command(
+    @commands.hybrid_command(
         name="unban",
         description="Unban a user from the server"
     )
-    @discord.default_permissions(ban_members=True)
+    @commands.has_permissions(ban_members=True)
+    @app_commands.describe(
+        user_id="The ID of the user to unban",
+        reason="The reason for unbanning"
+    )
     async def unban(
         self,
-        ctx: discord.ApplicationContext,
+        ctx: commands.Context,
         user_id: str,
+        *,
         reason: Optional[str] = "No reason provided"
     ):
         """Unban a user from the server."""
@@ -198,43 +214,49 @@ class ModerationActions(BaseCog):
             embed.add_field(name="Reason", value=reason, inline=False)
             embed.set_footer(text=f"Unbanned by {ctx.author}")
             
-            await ctx.respond(embed=embed)
+            await ctx.send(embed=embed)
             
         except ValueError:
-            await ctx.respond(embed=create_embed(
+            await ctx.send(embed=create_embed(
                 title="Error",
                 description="Please provide a valid user ID.",
                 color=Colors.ERROR
             ))
         except discord.NotFound:
-            await ctx.respond(embed=create_embed(
+            await ctx.send(embed=create_embed(
                 title="Error",
                 description=f"Could not find a banned user with ID: {user_id}",
                 color=Colors.ERROR
             ))
         except discord.Forbidden:
-            await ctx.respond(embed=create_embed(
+            await ctx.send(embed=create_embed(
                 title="Error",
                 description="I don't have permission to unban users.",
                 color=Colors.ERROR
             ))
         except Exception as e:
-            await ctx.respond(embed=create_embed(
+            await ctx.send(embed=create_embed(
                 title="Error",
                 description=f"An error occurred: {str(e)}",
                 color=Colors.ERROR
             ))
     
-    @discord.slash_command(
+    @commands.hybrid_command(
         name="mute",
         description="Timeout a member"
     )
-    @discord.default_permissions(moderate_members=True)
+    @commands.has_permissions(moderate_members=True)
+    @app_commands.describe(
+        member="The member to mute",
+        duration="The duration of the mute (e.g., 1d2h30m)",
+        reason="The reason for muting"
+    )
     async def mute(
         self,
-        ctx: discord.ApplicationContext,
+        ctx: commands.Context,
         member: discord.Member,
         duration: str,
+        *,
         reason: Optional[str] = "No reason provided"
     ):
         """Timeout a member for a specified duration."""
@@ -246,15 +268,15 @@ class ModerationActions(BaseCog):
         time_delta = parse_time_string(duration)
         
         if not time_delta:
-            await ctx.respond(embed=create_embed(
+            await ctx.send(embed=create_embed(
                 title="Error",
                 description="Invalid duration format. Use: 1d2h30m",
                 color=Colors.ERROR
             ))
             return
-        
+            
         if time_delta > timedelta(days=28):
-            await ctx.respond(embed=create_embed(
+            await ctx.send(embed=create_embed(
                 title="Error",
                 description="Timeout duration cannot exceed 28 days.",
                 color=Colors.ERROR
@@ -289,30 +311,35 @@ class ModerationActions(BaseCog):
             embed.add_field(name="Reason", value=reason, inline=False)
             embed.set_footer(text=f"Muted by {ctx.author}")
             
-            await ctx.respond(embed=embed)
+            await ctx.send(embed=embed)
             
         except discord.Forbidden:
-            await ctx.respond(embed=create_embed(
+            await ctx.send(embed=create_embed(
                 title="Error",
                 description="I don't have permission to timeout that member.",
                 color=Colors.ERROR
             ))
         except Exception as e:
-            await ctx.respond(embed=create_embed(
+            await ctx.send(embed=create_embed(
                 title="Error",
                 description=f"An error occurred: {str(e)}",
                 color=Colors.ERROR
             ))
     
-    @discord.slash_command(
+    @commands.hybrid_command(
         name="unmute",
         description="Remove timeout from a member"
     )
-    @discord.default_permissions(moderate_members=True)
+    @commands.has_permissions(moderate_members=True)
+    @app_commands.describe(
+        member="The member to unmute",
+        reason="The reason for unmuting"
+    )
     async def unmute(
         self,
-        ctx: discord.ApplicationContext,
+        ctx: commands.Context,
         member: discord.Member,
+        *,
         reason: Optional[str] = "No reason provided"
     ):
         """Remove timeout from a member."""
@@ -327,30 +354,35 @@ class ModerationActions(BaseCog):
             embed.add_field(name="Reason", value=reason, inline=False)
             embed.set_footer(text=f"Unmuted by {ctx.author}")
             
-            await ctx.respond(embed=embed)
+            await ctx.send(embed=embed)
             
         except discord.Forbidden:
-            await ctx.respond(embed=create_embed(
+            await ctx.send(embed=create_embed(
                 title="Error",
                 description="I don't have permission to remove timeout from that member.",
                 color=Colors.ERROR
             ))
         except Exception as e:
-            await ctx.respond(embed=create_embed(
+            await ctx.send(embed=create_embed(
                 title="Error",
                 description=f"An error occurred: {str(e)}",
                 color=Colors.ERROR
             ))
     
-    @discord.slash_command(
+    @commands.hybrid_command(
         name="warn",
         description="Warn a member"
     )
-    @discord.default_permissions(moderate_members=True)
+    @commands.has_permissions(moderate_members=True)
+    @app_commands.describe(
+        member="The member to warn",
+        reason="The reason for the warning"
+    )
     async def warn(
         self,
-        ctx: discord.ApplicationContext,
+        ctx: commands.Context,
         member: discord.Member,
+        *,
         reason: str
     ):
         """Warn a member."""
@@ -395,33 +427,36 @@ class ModerationActions(BaseCog):
                 embed.add_field(name="Total Warnings", value=str(warning_count), inline=True)
                 embed.set_footer(text=f"Warned by {ctx.author}")
                 
-                await ctx.respond(embed=embed)
+                await ctx.send(embed=embed)
             else:
-                await ctx.respond(embed=create_embed(
+                await ctx.send(embed=create_embed(
                     title="Error",
                     description="Failed to add warning to database.",
                     color=Colors.ERROR
                 ))
         else:
-            await ctx.respond(embed=create_embed(
+            await ctx.send(embed=create_embed(
                 title="Error",
                 description="Warning system is not available.",
                 color=Colors.ERROR
             ))
     
-    @discord.slash_command(
+    @commands.hybrid_command(
         name="warnings",
         description="View warnings for a member"
     )
-    @discord.default_permissions(moderate_members=True)
+    @commands.has_permissions(moderate_members=True)
+    @app_commands.describe(
+        member="The member whose warnings to view"
+    )
     async def warnings(
         self,
-        ctx: discord.ApplicationContext,
+        ctx: commands.Context,
         member: discord.Member
     ):
         """View warnings for a member."""
         if not self.bot.member_service:
-            await ctx.respond(embed=create_embed(
+            await ctx.send(embed=create_embed(
                 title="Error",
                 description="Warning system is not available.",
                 color=Colors.ERROR
@@ -456,29 +491,36 @@ class ModerationActions(BaseCog):
                     inline=False
                 )
         
-        await ctx.respond(embed=embed)
+        await ctx.send(embed=embed)
     
-    @discord.slash_command(
+    @commands.hybrid_command(
         name="purge",
         description="Delete multiple messages"
     )
-    @discord.default_permissions(manage_messages=True)
+    @commands.has_permissions(manage_messages=True)
+    @app_commands.describe(
+        amount="The number of messages to delete (1-100)",
+        user="Delete messages only from this user (optional)"
+    )
     async def purge(
         self,
-        ctx: discord.ApplicationContext,
+        ctx: commands.Context,
         amount: int,
         user: Optional[discord.Member] = None
     ):
         """Delete multiple messages."""
         if amount < 1 or amount > 100:
-            await ctx.respond(embed=create_embed(
+            await ctx.send(embed=create_embed(
                 title="Error",
                 description="Please provide a number between 1 and 100.",
                 color=Colors.ERROR
             ), ephemeral=True)
             return
         
-        await ctx.defer(ephemeral=True)
+        # Delete the invocation message if it's a prefix command
+        if ctx.interaction is None:
+            await ctx.message.delete()
+            amount -= 1  # Reduce amount since we deleted the command message
         
         try:
             def check(message):
@@ -487,26 +529,30 @@ class ModerationActions(BaseCog):
             deleted = await ctx.channel.purge(limit=amount, check=check)
             
             user_text = f" from {user.mention}" if user else ""
-            await ctx.followup.send(embed=create_embed(
+            msg = await ctx.send(embed=create_embed(
                 title=f"{Emojis.SUCCESS} Messages Deleted",
                 description=f"Successfully deleted {len(deleted)} messages{user_text}.",
                 color=Colors.SUCCESS
-            ), ephemeral=True)
+            ))
+            
+            # Delete the success message after 5 seconds
+            await asyncio.sleep(5)
+            await msg.delete()
             
         except discord.Forbidden:
-            await ctx.followup.send(embed=create_embed(
+            await ctx.send(embed=create_embed(
                 title="Error",
                 description="I don't have permission to delete messages.",
                 color=Colors.ERROR
-            ), ephemeral=True)
+            ))
         except discord.HTTPException as e:
-            await ctx.followup.send(embed=create_embed(
+            await ctx.send(embed=create_embed(
                 title="Error",
                 description=f"Failed to delete messages: {str(e)}",
                 color=Colors.ERROR
-            ), ephemeral=True)
+            ))
 
 
-def setup(bot):
+async def setup(bot):
     """Load the cog."""
-    bot.add_cog(ModerationActions(bot))
+    await bot.add_cog(ModerationActions(bot))

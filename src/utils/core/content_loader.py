@@ -1,7 +1,7 @@
 import os
 import asyncio
 import logging
-from utils.database.content_manager import content_manager
+from src.utils.database.content_manager import content_manager
 
 logger = logging.getLogger(__name__)
 

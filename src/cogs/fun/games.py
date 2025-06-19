@@ -20,8 +20,8 @@ from discord.ext import commands, tasks
 from spotipy.oauth2 import SpotifyClientCredentials
 from translate import Translator
 
-from utils.database.connection import initialize_mongodb
-from utils.core.formatting import create_embed
+from src.utils.database.connection import initialize_mongodb
+from src.utils.core.formatting import create_embed
 
 tmdb.API_KEY = os.getenv("TMDB_API_KEY")
 openai.api_key = os.getenv("OPENAI_API_KEY")

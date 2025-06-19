@@ -9,8 +9,8 @@ import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 
-from utils.database.connection import initialize_mongodb
-from utils.core.formatting import calculate_how_long_ago_member_created, calculate_how_long_ago_member_joined, create_embed
+from src.utils.database.connection import initialize_mongodb
+from src.utils.core.formatting import calculate_how_long_ago_member_created, calculate_how_long_ago_member_joined, create_embed
 
 # Set up logging
 logger = logging.getLogger(__name__)

@@ -6,7 +6,7 @@ import logging
 import asyncio
 from datetime import datetime
 
-from ..database.connection import get_async_db
+from src.utils.database.connection import get_async_db
 from ..utils.common.errors import BotError
 
 
@@ -22,8 +22,12 @@ class BaseCog(commands.Cog):
     async def cog_load(self):
         """Called when the cog is loaded."""
         self.logger.info(f"{self.__class__.__name__} cog loaded")
-        # Initialize database connection
-        self._db = await get_async_db()
+        # Initialize database connection from bot instance
+        if hasattr(self.bot, 'async_db'):
+            self._db = self.bot.async_db
+        else:
+            # Fallback to get_async_db if bot.async_db is not available
+            self._db = get_async_db()
         self._ready.set()
         
     async def cog_unload(self):

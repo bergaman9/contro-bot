@@ -1,0 +1,9 @@
+{
+  "extends": "stylelint-config-standard",
+  "rules": {
+    "indentation": 2,
+    "selector-max-type": 2,
+    "no-missing-end-of-source-newline": true,
+    "color-hex-length": "short"
+  }
+}

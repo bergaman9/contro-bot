@@ -4,10 +4,12 @@ from discord.ext import commands, tasks
 from typing import Optional, List, Tuple, Union, Dict, Any
 import traceback
 import logging
+import os
 
-from utils.database.connection import initialize_mongodb, is_db_available
-from utils.core.formatting import create_embed
-from utils.core.error_handler import handle_interaction_error
+from src.utils.database.connection import initialize_mongodb, is_db_available
+from src.utils.core.formatting import create_embed
+from src.utils.core.error_handler import handle_interaction_error
+from src.utils.community.turkoyto.card_renderer import create_register_card
 
 # Set up logging
 logger = logging.getLogger('register')
@@ -229,6 +231,45 @@ class RegisterModal(discord.ui.Modal, title="Kayıt Formu"):
             
             # Log the registration
             logger.info(f"User registered: {interaction.user} (ID: {interaction.user.id}) in {interaction.guild.name} with roles {roles_text}")
+            
+            # Create and send registration statistics card
+            try:
+                card_path = await create_register_card(interaction.client, interaction.guild, self.mongo_db)
+                if card_path:
+                    # Send the card to the channel where registration panel was sent (if configured)
+                    settings = self.mongo_db["register"].find_one({"guild_id": interaction.guild.id})
+                    panel_channel_id = settings.get("panel_channel_id")
+                    if panel_channel_id:
+                        panel_channel = interaction.guild.get_channel(int(panel_channel_id))
+                        if panel_channel:
+                            # Create embed with updated statistics
+                            stats_embed = create_embed(
+                                title="📊 Kayıt İstatistikleri Güncellendi",
+                                description="Kayıt sayıları güncellenmiştir.",
+                                color=discord.Color.blue()
+                            )
+                            
+                            # Send updated card to the panel channel
+                            await panel_channel.send(
+                                embed=stats_embed,
+                                file=discord.File(card_path, filename="register_stats.png")
+                            )
+                            
+                            # Clean up the image file
+                            try:
+                                os.remove(card_path)
+                            except Exception:
+                                pass
+                            
+                            logger.info(f"Registration statistics card sent to channel {panel_channel.name}")
+                        else:
+                            logger.warning(f"Panel channel {panel_channel_id} not found for guild {interaction.guild.id}")
+                    else:
+                        logger.debug(f"No panel channel configured for registration stats in guild {interaction.guild.id}")
+                else:
+                    logger.warning("Failed to create registration statistics card")
+            except Exception as card_error:
+                logger.error(f"Error creating/sending registration card: {card_error}", exc_info=True)
             
         except Exception as e:
             logger.error(f"Registration error: {e}\n{traceback.format_exc()}")
@@ -697,7 +738,7 @@ class Register(commands.Cog):
 async def setup(bot):
     # Import the error_handler at setup time
     try:
-        from utils.core.error_handler import setup_error_handlers
+        from src.utils.core.error_handler import setup_error_handlers
         setup_error_handlers(bot)
         logger.info("Error handlers set up")
     except Exception as e:

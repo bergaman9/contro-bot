@@ -11,10 +11,10 @@ from typing import Optional, Dict, Any
 import logging
 import pathlib
 
-from utils.core.formatting import create_embed
-from utils.content_loader import load_content
-from utils.setup import LanguageSelectView
-from utils.database.connection import initialize_mongodb
+from src.utils.core.formatting import create_embed
+from src.utils.content_loader import load_content
+from src.utils.setup import LanguageSelectView
+from src.utils.database.connection import initialize_mongodb
 
 dotenv.load_dotenv()
 
@@ -27,7 +27,7 @@ class ServerSetup(commands.Cog):
         
         # JSON dosya yolları
         self.templates_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'templates')
-        self.format_file_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'format.json')
+        self.format_file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'resources', 'data', 'config', 'format.json')
         
         # Dizinleri oluştur
         os.makedirs(self.templates_dir, exist_ok=True)

@@ -7,8 +7,8 @@ import json
 import os
 import datetime
 
-from utils.core.formatting import create_embed
-from utils.database.connection import initialize_mongodb, is_db_available
+from src.utils.core.formatting import create_embed
+from src.utils.database.connection import initialize_mongodb, is_db_available
 
 # Set up logging
 logger = logging.getLogger('bot_settings')

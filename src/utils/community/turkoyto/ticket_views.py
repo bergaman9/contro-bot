@@ -1,13 +1,16 @@
 import discord
+from discord.ext import commands
 import asyncio
 import logging
 import re
 import datetime
 import os
+import json
 import io
 from discord.ui import Button, View, Select
 
-from utils.core.formatting import create_embed
+from src.utils.core.formatting import create_embed
+from src.utils.database.connection import initialize_mongodb
 from .card_renderer import get_level_scheme
 
 logger = logging.getLogger('turkoyto.ticket_views')
@@ -907,8 +910,8 @@ class TicketCreationModal(discord.ui.Modal, title="Create Support Ticket"):
             
             # Generate and send level card
             try:
-                from utils.community.turkoyto.card_renderer import render_level_card
-                from utils.community.turkoyto.xp_manager import XPManager
+                from src.utils.community.turkoyto.card_renderer import render_level_card
+                from src.utils.community.turkoyto.xp_manager import XPManager
                 
                 xp_manager = XPManager()
                 user_data = await xp_manager.get_user_data(interaction.guild.id, interaction.user.id)

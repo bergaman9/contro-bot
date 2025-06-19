@@ -109,8 +109,8 @@ async def generate_card_preview(bot, member, config, is_welcome=True):
             member_font_size = config.get("member_font_size", 42)
             
             # Try to load fonts
-            welcome_font = ImageFont.truetype("data/fonts/GothamNarrow-Bold.otf", welcome_font_size)
-            member_font = ImageFont.truetype("data/fonts/GothamNarrow-Bold.otf", member_font_size)
+            welcome_font = ImageFont.truetype("resources/fonts/GothamNarrow-Bold.otf", welcome_font_size)
+            member_font = ImageFont.truetype("resources/fonts/GothamNarrow-Bold.otf", member_font_size)
         except Exception as e:
             logger.error(f"Failed to load fonts: {e}")
             # Fall back to default font

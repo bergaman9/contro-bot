@@ -3034,31 +3034,31 @@ class MaintenanceConfigView(discord.ui.View):
         await interaction.response.send_message("🚧 Maintenance configuration coming soon!", ephemeral=True)
 
 
-class RegistrationPanelModal(discord.ui.Modal, title="Kayıt Paneli Gönder"):
+class RegistrationPanelModal(discord.ui.Modal, title="Send Registration Panel"):
     """Modal for sending registration panel."""
     
     channel_id = discord.ui.TextInput(
-        label="Kanal ID (Boş bırakırsanız mevcut kanal)",
-        placeholder="Kayıt panelinin gönderileceği kanalın ID'si",
+        label="Channel ID (Leave empty for current channel)",
+        placeholder="Channel ID where registration panel will be sent",
         max_length=20,
         required=False
     )
     
     panel_title = discord.ui.TextInput(
-        label="Panel Başlığı",
-        placeholder="Sunucu Kayıt Sistemi",
-        default="📝 Sunucu Kayıt Sistemi",
+        label="Panel Title",
+        placeholder="Server Registration System",
+        default="📝 Server Registration System",
         max_length=100,
         required=False
     )
     
     panel_description = discord.ui.TextInput(
-        label="Panel Açıklaması",
-        placeholder="Sunucumuza hoş geldiniz! Aşağıdaki butona tıklayarak kayıt olabilirsiniz.",
+        label="Panel Description",
+        placeholder="Welcome to our server! Click the button below to register.",
         style=discord.TextStyle.paragraph,
         max_length=1000,
         required=False,
-        default="Sunucumuza hoş geldiniz! Aşağıdaki butona tıklayarak kayıt olabilirsiniz."
+        default="Welcome to our server! Click the button below to register."
     )
     
     def __init__(self, bot, guild_id: int, settings: dict):
@@ -3091,7 +3091,7 @@ class RegistrationPanelModal(discord.ui.Modal, title="Kayıt Paneli Gönder"):
         except Exception as e:
             embed = create_embed(
                 title="❌ Hata",
-                description=f"Kayıt paneli gönderilirken hata oluştu: {str(e)}",
+                description=f"An error occurred while sending registration panel: {str(e)}",
                 color=Colors.ERROR
             )
             await interaction.response.send_message(embed=embed, ephemeral=True)
@@ -3125,19 +3125,19 @@ class RegistrationPanelModal(discord.ui.Modal, title="Kayıt Paneli Gönder"):
 
         # Create main embed
         embed = create_embed(
-        title=self.panel_title.value or "📝 Sunucu Kayıt Sistemi",
-        description=self.panel_description.value or "Sunucumuza hoş geldiniz! Aşağıdaki butona tıklayarak kayıt olabilirsiniz.",
+                    title=self.panel_title.value or "📝 Server Registration System",
+            description=self.panel_description.value or "Welcome to our server! Click the button below to register.",
         color=0x5865F2  # Discord Blurple
         )
 
         # Add instructions field
         embed.add_field(
-        name="📋 Nasıl Kayıt Olursunuz?",
-        value="Kaydınızı tamamlamak için aşağıdaki adımları takip edin:\n"
-              "• **Kayıt Ol** butonuna tıklayın\n"
-              "• İsminizi ve yaşınızı girin\n"
-              "• Cinsiyet bilginizi seçin (Erkek/Kadın)\n"
-              "• Formu göndererek kaydınızı tamamlayın",
+        name="📋 How to Register?",
+        value="Follow these steps to complete your registration:\n"
+              "• Click the **Register** button\n"
+              "• Enter your name and age\n"
+              "• Select your gender (Male/Female)\n"
+              "• Submit the form to complete registration",
         inline=False
         )
 
@@ -3147,7 +3147,7 @@ class RegistrationPanelModal(discord.ui.Modal, title="Kayıt Paneli Gönder"):
 
         # Add footer
         embed.set_footer(
-        text="Butona tıklayarak kayıt formunu açabilirsiniz • Contro",
+        text="Click the button to open the registration form • Contro",
         icon_url=self.bot.user.avatar.url if self.bot.user.avatar else None
         )
 
@@ -3179,8 +3179,8 @@ class RegistrationPanelModal(discord.ui.Modal, title="Kayıt Paneli Gönder"):
 
         # Confirm to admin
         success_embed = create_embed(
-        title="✅ Kayıt Paneli Gönderildi",
-        description=f"Kayıt paneli {channel.mention} kanalına başarıyla gönderildi.",
+        title="✅ Registration Panel Sent",
+        description=f"Registration panel successfully sent to {channel.mention}.",
         color=Colors.SUCCESS
         )
         await interaction.response.send_message(embed=success_embed, ephemeral=True)
@@ -3196,7 +3196,7 @@ class RegistrationPanelView(discord.ui.View):
         self.db = db_manager.get_database()
     
     @discord.ui.button(
-        label="Kayıt Ol", 
+        label="Register", 
         style=discord.ButtonStyle.primary, 
         emoji="📝",
         custom_id="registration_panel_register"
@@ -3215,8 +3215,8 @@ class RegistrationPanelView(discord.ui.View):
             
             if existing_member:
                 embed = create_embed(
-                    title="⚠️ Zaten Kayıtlısınız",
-                    description="Bu sunucuda zaten kayıtlı durumdasınız!",
+                    title="⚠️ Already Registered",
+                    description="You are already registered on this server!",
                     color=Colors.WARNING
                 )
                 await interaction.response.send_message(embed=embed, ephemeral=True)
@@ -3232,7 +3232,7 @@ class RegistrationPanelView(discord.ui.View):
             error_traceback = traceback.format_exc()
             logger.error(f"Registration panel error for user {interaction.user.id}: {e}\n{error_traceback}")
         
-        error_msg = f"Kayıt işlemi başlatılırken bir hata oluştu.\n\n**Hata Detayı:** {str(e)[:100]}...\n\nLütfen bir yetkiliyle iletişime geçin."
+        error_msg = f"An error occurred while starting registration.\n\n**Error Details:** {str(e)[:100]}...\n\nPlease contact an administrator."
         
         embed = create_embed(
             title="❌ Hata",
@@ -3249,41 +3249,41 @@ class RegistrationPanelView(discord.ui.View):
             logger.error(f"Failed to respond to registration error: {respond_error}")
 
 
-class UserRegistrationModal(discord.ui.Modal, title="Sunucu Kaydı"):
+class UserRegistrationModal(discord.ui.Modal, title="Server Registration"):
     """Modal for user registration with configurable fields."""
     
     name = discord.ui.TextInput(
-        label="İsim",
-        placeholder="Örnek: Ahmet",
+        label="Name",
+        placeholder="Example: John",
         max_length=30,
         required=True
     )
     
     age = discord.ui.TextInput(
-        label="Yaş",
-        placeholder="Örnek: 20",
+        label="Age",
+        placeholder="Example: 20",
         max_length=2,
         required=True
     )
     
     gender = discord.ui.TextInput(
-        label="Cinsiyet (Erkek/Kadın)",
-        placeholder="Erkek veya Kadın",
+        label="Gender (Male/Female)",
+        placeholder="Male or Female",
         max_length=10,
         required=True
     )
     
     games = discord.ui.TextInput(
-        label="Oynadığınız Oyunlar (İsteğe bağlı)",
-        placeholder="CS2, Valorant, LOL, vb...",
+        label="Games You Play (Optional)",
+        placeholder="CS2, Valorant, LOL, etc...",
         style=discord.TextStyle.paragraph,
         max_length=200,
         required=False
     )
     
     extra_field = discord.ui.TextInput(
-        label="Ek Bilgi (İsteğe bağlı)",
-        placeholder="Diğer bilgiler...",
+        label="Additional Info (Optional)",
+        placeholder="Any other information...",
         style=discord.TextStyle.paragraph,
         max_length=100,
         required=False
@@ -3307,8 +3307,8 @@ class UserRegistrationModal(discord.ui.Modal, title="Sunucu Kaydı"):
             name = self.name.value.strip()
             if len(name) < 2:
                 embed = create_embed(
-                    title="❌ Geçersiz İsim",
-                    description="İsim en az 2 karakter olmalıdır!",
+                    title="❌ Invalid Name",
+                    description="Name must be at least 2 characters long!",
                     color=Colors.ERROR
                 )
                 await interaction.followup.send(embed=embed, ephemeral=True)
@@ -3321,8 +3321,8 @@ class UserRegistrationModal(discord.ui.Modal, title="Sunucu Kaydı"):
                     raise ValueError()
             except ValueError:
                 embed = create_embed(
-                    title="❌ Geçersiz Yaş",
-                    description="Yaş 13-99 arasında bir sayı olmalıdır!",
+                    title="❌ Invalid Age",
+                    description="Age must be a number between 13-99!",
                     color=Colors.ERROR
                 )
                 await interaction.followup.send(embed=embed, ephemeral=True)
@@ -3330,16 +3330,20 @@ class UserRegistrationModal(discord.ui.Modal, title="Sunucu Kaydı"):
             
             # Validate gender
             gender_input = self.gender.value.lower().strip()
-            if gender_input not in ['erkek', 'kadın', 'erkek', 'kadin']:
+            if gender_input not in ['male', 'female', 'erkek', 'kadın', 'kadin']:
                 embed = create_embed(
-                    title="❌ Geçersiz Cinsiyet",
-                    description="Cinsiyet 'Erkek' veya 'Kadın' olmalıdır!",
+                    title="❌ Invalid Gender",
+                    description="Gender must be 'Male' or 'Female'!",
                     color=Colors.ERROR
                 )
                 await interaction.followup.send(embed=embed, ephemeral=True)
                 return
             
-            gender = "Erkek" if gender_input in ['erkek'] else "Kadın"
+            # Map to English
+            if gender_input in ['male', 'erkek']:
+                gender = "Male"
+            else:
+                gender = "Female"
             is_18_plus = age >= 18
             
             # Save to database
@@ -3380,25 +3384,25 @@ class UserRegistrationModal(discord.ui.Modal, title="Sunucu Kaydı"):
             
             # Success message
             embed = create_embed(
-                title="✅ Kayıt Başarılı!",
-                description=f"Hoş geldin **{name}**!\n\n"
-                           f"**Yaş:** {age}\n"
-                           f"**Cinsiyet:** {gender}",
+                title="✅ Registration Successful!",
+                description=f"Welcome **{name}**!\n\n"
+                           f"**Age:** {age}\n"
+                           f"**Gender:** {gender}",
                 color=Colors.SUCCESS
             )
             
             if self.games.value:
-                embed.add_field(name="🎮 Oyunlar", value=self.games.value, inline=False)
+                embed.add_field(name="🎮 Games", value=self.games.value, inline=False)
                 
             if self.extra_field.value:
-                embed.add_field(name="ℹ️ Ek Bilgi", value=self.extra_field.value, inline=False)
+                embed.add_field(name="ℹ️ Additional Info", value=self.extra_field.value, inline=False)
             
             await interaction.followup.send(embed=embed, ephemeral=True)
             
         except Exception as e:
             embed = create_embed(
-                title="❌ Kayıt Hatası",
-                description=f"Kayıt işlemi sırasında bir hata oluştu: {str(e)}",
+                title="❌ Registration Error",
+                description=f"An error occurred during registration: {str(e)}",
                 color=Colors.ERROR
             )
             await interaction.followup.send(embed=embed, ephemeral=True)
@@ -3432,12 +3436,12 @@ class UserRegistrationModal(discord.ui.Modal, title="Sunucu Kaydı"):
             
             # Gender-based roles (if configured)
             gender_roles = register_settings.get('gender_roles', {})
-            if gender == "Erkek" and gender_roles.get('male_role_id'):
+            if gender == "Male" and gender_roles.get('male_role_id'):
                 male_role = guild.get_role(gender_roles['male_role_id'])
                 if male_role:
                     await member.add_roles(male_role, reason="Male gender role")
                     applied_roles.append(male_role)
-            elif gender == "Kadın" and gender_roles.get('female_role_id'):
+            elif gender == "Female" and gender_roles.get('female_role_id'):
                 female_role = guild.get_role(gender_roles['female_role_id'])
                 if female_role:
                     await member.add_roles(female_role, reason="Female gender role")
@@ -3465,37 +3469,37 @@ class UserRegistrationModal(discord.ui.Modal, title="Sunucu Kaydı"):
         
         # Create log embed
         embed = create_embed(
-            title="🎉 Yeni Kayıt",
+            title="🎉 New Registration",
             color=Colors.SUCCESS
         )
         
         embed.add_field(
-            name="👤 Kullanıcı",
+            name="👤 User",
             value=f"{interaction.user.mention} ({interaction.user})",
             inline=False
         )
         
         embed.add_field(
-            name="📝 Kayıt Bilgileri",
-            value=f"**İsim:** {name}\n**Yaş:** {age}\n**Cinsiyet:** {gender}",
+            name="📝 Registration Info",
+            value=f"**Name:** {name}\n**Age:** {age}\n**Gender:** {gender}",
             inline=True
         )
         
-        role_mentions = [role.mention for role in applied_roles] if applied_roles else ["Rol verilmedi"]
+        role_mentions = [role.mention for role in applied_roles] if applied_roles else ["No roles given"]
         embed.add_field(
-            name="🎭 Verilen Roller",
+            name="🎭 Assigned Roles",
             value="\n".join(role_mentions),
             inline=True
         )
         
         embed.add_field(
-            name="📅 Kayıt Zamanı",
+            name="📅 Registration Time",
             value=f"<t:{int(datetime.utcnow().timestamp())}:F>",
             inline=False
         )
         
         embed.set_thumbnail(url=interaction.user.display_avatar.url)
-        embed.set_footer(text=f"Kullanıcı ID: {interaction.user.id}")
+        embed.set_footer(text=f"User ID: {interaction.user.id}")
         
         # Send log message
         try:
@@ -3539,7 +3543,7 @@ class RegistrationLogChannelView(discord.ui.View):
         
         # Channel select
         channel_select = discord.ui.ChannelSelect(
-        placeholder="Kayıt logları için kanal seçin",
+        placeholder="Select channel for registration logs",
         channel_types=[discord.ChannelType.text],
         max_values=1
         )
@@ -3563,8 +3567,8 @@ class RegistrationLogChannelView(discord.ui.View):
             
             channel = interaction.guild.get_channel(channel_id)
             embed = create_embed(
-                title="✅ Log Kanalı Ayarlandı",
-                description=f"Kayıt logları artık {channel.mention} kanalına gönderilecek.",
+                title="✅ Log Channel Set",
+                description=f"Registration logs will now be sent to {channel.mention}.",
                 color=Colors.SUCCESS
             )
             
@@ -3572,8 +3576,8 @@ class RegistrationLogChannelView(discord.ui.View):
             
         except Exception as e:
             embed = create_embed(
-                title="❌ Hata",
-                description=f"Log kanalı kaydedilirken bir hata oluştu: {str(e)}",
+                title="❌ Error",
+                description=f"An error occurred while saving log channel: {str(e)}",
                 color=Colors.ERROR
             )
             await interaction.response.send_message(embed=embed, ephemeral=True)

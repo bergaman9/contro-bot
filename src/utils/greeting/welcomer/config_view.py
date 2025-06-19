@@ -1,6 +1,6 @@
 import discord
 from discord.ui import View, Button, Select, Modal, TextInput
-from utils.formatting import create_embed
+from src.utils.formatting import create_embed
 import base64
 import os
 import asyncio
@@ -45,7 +45,7 @@ class BaseConfigView(View):
         """Process uploaded image data for welcome/byebye backgrounds"""
         try:
             # Try to import the function from image_utils
-            from utils.greeting.welcomer.image_utils import process_uploaded_image
+            from src.utils.greeting.welcomer.image_utils import process_uploaded_image
             return process_uploaded_image(image_data)
         except Exception as e:
             logger.error(f"Failed to process uploaded image: {e}")
@@ -88,7 +88,7 @@ class BaseConfigView(View):
         """Get background options from image_utils or use fallback options"""
         try:
             # Try to import the function from image_utils
-            from utils.greeting.welcomer.image_utils import get_predefined_backgrounds
+            from src.utils.greeting.welcomer.image_utils import get_predefined_backgrounds
             return get_predefined_backgrounds(category=self.config_type)
         except Exception as e:
             logger.error(f"Failed to get backgrounds from image_utils: {e}")

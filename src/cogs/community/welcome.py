@@ -1,5 +1,3 @@
-
-
 import discord, asyncio, os, json, logging
 from ordinal import ordinal
 from discord.ext import commands
@@ -14,19 +12,55 @@ import io
 from typing import Optional, List, Union
 
 # Updated imports for new organization
-from utils.core.formatting import create_embed, hex_to_int
-from utils.database.connection import initialize_mongodb 
-from utils.greeting.imaging import download_background
+from src.utils.core.formatting import create_embed, hex_to_int
+from src.utils.database.connection import initialize_mongodb 
+from src.utils.greeting.imaging import download_background
 
 # Import new view components from updated paths
-from utils.greeting.welcomer.config_view import WelcomerConfigView, ByeByeConfigView
-from utils.greeting.welcomer.image_utils import (
+from src.utils.greeting.welcomer.config_view import WelcomerConfigView, ByeByeConfigView
+from src.utils.greeting.welcomer.image_utils import (
     circle_avatar, add_text_with_outline, 
     apply_blur_background, get_predefined_backgrounds,
     resize_and_crop_image
 )
 
 logger = logging.getLogger('welcomer')
+
+def load_font_safe(size):
+    """Load font safely with fallback to default and Unicode path support"""
+    font_paths = [
+        # Try relative paths from different possible locations
+        os.path.join('resources', 'fonts', 'GothamNarrow-Bold.otf'),
+        os.path.join('..', 'resources', 'fonts', 'GothamNarrow-Bold.otf'),
+        os.path.join('..', '..', 'resources', 'fonts', 'GothamNarrow-Bold.otf'),
+        
+        # Try alternative font names
+        os.path.join('resources', 'fonts', 'Gotham-Black.otf'),
+        
+        # System fonts as fallback
+        'C:/Windows/Fonts/arial.ttf',
+        'C:/Windows/Fonts/Arial.ttf',
+        'C:/Windows/Fonts/calibri.ttf',
+        'C:/Windows/Fonts/Calibri.ttf',
+        '/System/Library/Fonts/Arial.ttf',  # macOS
+        '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf',  # Linux
+    ]
+    
+    for path in font_paths:
+        try:
+            # Use os.path.abspath to handle Unicode properly
+            full_path = os.path.abspath(path)
+            if os.path.exists(full_path):
+                return ImageFont.truetype(full_path, size)
+        except Exception as e:
+            logger.debug(f"Error loading font {path}: {e}")
+            continue
+    
+    # Fallback to default font
+    try:
+        return ImageFont.load_default()
+    except Exception:
+        return ImageFont.load_default()
 
 class Welcomer(commands.Cog):
     def __init__(self, bot):
@@ -36,9 +70,9 @@ class Welcomer(commands.Cog):
         self.predefined_backgrounds = get_predefined_backgrounds()
         
         # Create directories for temporary files if they don't exist
-        os.makedirs("data/Backgrounds", exist_ok=True)
-        os.makedirs("data/Temp", exist_ok=True)
-        os.makedirs("data/fonts", exist_ok=True)
+        os.makedirs("resources/images/backgrounds", exist_ok=True)
+        os.makedirs("resources/data/Temp", exist_ok=True)
+        os.makedirs("resources/fonts", exist_ok=True)
         
         # Ensure default background exists
         self.ensure_default_background()
@@ -132,8 +166,8 @@ class Welcomer(commands.Cog):
             member_font_size = config.get("member_font_size", 42)
             
             try:
-                welcome_font = ImageFont.truetype("data/fonts/GothamNarrow-Bold.otf", welcome_font_size)
-                member_font = ImageFont.truetype("data/fonts/GothamNarrow-Bold.otf", member_font_size)
+                welcome_font = load_font_safe(welcome_font_size)
+                member_font = load_font_safe(member_font_size)
             except Exception as e:
                 logger.warning(f"Failed to load custom fonts, using default: {e}")
                 try:

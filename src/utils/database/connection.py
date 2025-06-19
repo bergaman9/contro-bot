@@ -82,7 +82,7 @@ class AsyncMongoManager:
             self.connection_string = connection_string
               # Create Motor AsyncIOMotorClient with optimal settings
             if "+srv" in connection_string:
-                logger.info("MongoDB Atlas SRV connection detected, configuring SSL/TLS")
+                logger.debug("MongoDB Atlas SRV connection detected, configuring SSL/TLS")
                 
                 # SSL/TLS için ek ayarlar - PyMongo'nun yeni versiyonlarıyla uyumlu
                 ssl_options = {
@@ -279,7 +279,7 @@ def initialize_mongodb() -> Any:
             
             # Check if this is an Atlas connection (srv connection string)
             if "+srv" in connection_string:
-                logger.info("MongoDB Atlas SRV connection detected for sync connection, configuring SSL/TLS")
+                logger.debug("MongoDB Atlas SRV connection detected for sync connection, configuring SSL/TLS")
                 
                 # Additional SSL/TLS settings for modern pymongo versions
                 client = MongoClient(

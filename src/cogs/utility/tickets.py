@@ -1,3 +1,6 @@
+"""
+Ticket system cog with advanced features
+"""
 import discord
 from discord.ext import commands
 from discord import app_commands
@@ -8,9 +11,16 @@ import random
 import io
 from datetime import datetime
 
-from utils.core.formatting import create_embed, hex_to_int
-from utils.database.connection import initialize_mongodb
-from utils.core.class_utils import DynamicView, DynamicButton
+from src.utils.core.formatting import create_embed, hex_to_int
+from src.utils.database.connection import initialize_mongodb
+from src.utils.core.class_utils import DynamicView, DynamicButton
+from src.utils.database import get_async_db
+from src.utils.views.ticket_views import (
+    TicketDepartmentsView, DepartmentSelectView, TicketDepartment,
+    TicketStatsView, TicketStatistics, TicketAutoClose,
+    update_ticket_activity, increment_ticket_messages
+)
+from src.utils.common import error_embed, success_embed, info_embed
 
 TEXT_STYLE_MAPPING = {
     "short": discord.TextStyle.short,
@@ -58,78 +68,13 @@ class TicketModal(discord.ui.Modal):
 
 
 class TicketCloseButton(discord.ui.Button):
-    def __init__(self, **kwargs):
-        self.mongo_db = initialize_mongodb()
-        super().__init__(
-            style=discord.ButtonStyle.green,
-            label="Kapat",
-            emoji="<:lock:1147769998866133022>",
-            custom_id="close_ticket",
-            **kwargs
-        )
+    def __init__(self):
+        super().__init__(style=discord.ButtonStyle.danger, label="Close", emoji="🔒", custom_id="ticket_close_button")
 
-    async def close_ticket(self, interaction: discord.Interaction):
-        support_roles_data = self.mongo_db['settings'].find_one({"guild_id": interaction.guild.id})
-        user_has_permission = False
-
-        if support_roles_data and 'support_roles' in support_roles_data:
-            support_roles = support_roles_data['support_roles']
-
-            for role_id in support_roles:
-                role = discord.utils.get(interaction.guild.roles, id=role_id)
-                if role and role in interaction.user.roles:
-                    user_has_permission = True
-                    break
-
-        if not user_has_permission:
-            default_support_role = discord.utils.get(interaction.guild.roles, name='Destek')
-            if default_support_role and default_support_role in interaction.user.roles:
-                user_has_permission = True
-
-        if user_has_permission:
-            channel = interaction.channel
-            channel_id = channel.id
-
-            record = self.mongo_db["logger"].find_one({"guild_id": interaction.guild.id})
-
-            if not record:
-                print("Veritabanından kayıt bulunamadı!")
-                return
-
-            logs_channel_id = record.get("channel_id")
-            print(f"Logs Channel ID: {logs_channel_id}")
-
-            logs_channel = interaction.guild.get_channel(logs_channel_id)
-
-            if not logs_channel:
-                print(f"{logs_channel_id} ID'sine sahip bir kanal bulunamadı!")
-                return
-
-            print(logs_channel)
-
-            closing_time = datetime.now().strftime("%Y-%m-%d %H-%M-%S")
-
-            transcript = ""
-            async for message in channel.history(limit=100):  # Adjust limit as needed
-                transcript += f"{message.author}: {message.content}\n"
-
-            transcript_file = discord.File(io.StringIO(transcript),
-                                           filename=f"transcript{channel.name}-{closing_time}.txt")
-
-            if logs_channel:
-                embed = discord.Embed(title="Ticket Silindi",
-                                      description=f"Ticket kanalı {interaction.user.mention} tarafından silindi.",
-                                      color=discord.Color.red())
-                await logs_channel.send(embed=embed, file=transcript_file)
-
-            self.mongo_db["tickets"].delete_one({"_id": channel_id})
-
-            await interaction.channel.delete()
-            return
-        else:
-            await interaction.response.send_message(
-                embed=create_embed(description="Bu işlemi gerçekleştirmek için yetkiniz yok.",
-                                   color=discord.Color.red()), ephemeral=True)
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.send_message("This ticket will be closed in 5 seconds...", ephemeral=True)
+        await asyncio.sleep(5)
+        await interaction.channel.delete()
 
 
 class TicketCloseButtonView(discord.ui.View):
@@ -143,35 +88,190 @@ class TicketButton(discord.ui.View):
         super().__init__(timeout=None)
         self.add_item(discord.ui.Button(label="Create Ticket", style=discord.ButtonStyle.primary, custom_id="create_ticket"))
 
+
 class TicketClose(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
         self.add_item(discord.ui.Button(label="Close Ticket", style=discord.ButtonStyle.danger, custom_id="close_ticket"))
 
+
 class Ticket(commands.Cog):
     """
-    Create and manage support tickets with customizable settings
+    Create and manage support tickets with advanced features
     """
     
     def __init__(self, bot):
         self.bot = bot
         self.mongodb = initialize_mongodb()
         
-    # REMOVED: This command is now integrated into the unified /settings panel (Ticket System section)
-    # @commands.hybrid_command(
-    #     name="send_ticket_message",
-    #     description="Send the ticket creation button",
-    #     help="Sends a message with a button that allows users to create support tickets."
-    # )
-    # @commands.has_permissions(administrator=True)
-    # @app_commands.describe(
-    #     title="The title of the ticket embed",
-    #     description="The description of the ticket embed"
-    # )
-    # async def send_ticket_message(self, ctx, title: str = "Support Tickets", *, description: str = "Click the button below to create a support ticket"):
-    #     """Send the ticket creation button"""
-    #     # Command implementation would be here
-    #     pass
+    @app_commands.command(
+        name="ticket_panel",
+        description="Create an advanced ticket panel with departments"
+    )
+    @app_commands.describe(
+        channel="Channel to send the ticket panel to (defaults to current channel)"
+    )
+    @commands.has_permissions(manage_guild=True)
+    async def ticket_panel(self, interaction: discord.Interaction, channel: discord.TextChannel = None):
+        """Create an advanced ticket panel."""
+        target_channel = channel or interaction.channel
+        
+        # Get departments for this guild
+        departments = await TicketDepartment.get_all(interaction.guild.id)
+        
+        if not departments:
+            await interaction.response.send_message(
+                embed=error_embed(
+                    "No ticket departments found. Please create departments first using `/ticket departments`.",
+                    title="❌ No Departments"
+                ),
+                ephemeral=True
+            )
+            return
+        
+        # Create the panel
+        view = DepartmentSelectView(departments)
+        embed = create_embed(
+            title="🎫 Support Tickets",
+            description=(
+                "Welcome to our support system!\n\n"
+                "**How to create a ticket:**\n"
+                "1️⃣ Select a department below\n"
+                "2️⃣ Fill out the ticket form\n"
+                "3️⃣ Wait for staff assistance\n\n"
+                "Our support team will respond as soon as possible."
+            ),
+            color=discord.Color.blue()
+        )
+        embed.set_footer(text="Click the dropdown below to get started")
+        
+        await target_channel.send(embed=embed, view=view)
+        
+        await interaction.response.send_message(
+            embed=success_embed(
+                f"✅ Advanced ticket panel created in {target_channel.mention}",
+                title="Panel Created"
+            ),
+            ephemeral=True
+        )
+    
+    @app_commands.command(
+        name="ticket_departments",
+        description="Manage ticket departments"
+    )
+    @commands.has_permissions(manage_guild=True)
+    async def ticket_departments(self, interaction: discord.Interaction):
+        """Manage ticket departments."""
+        view = TicketDepartmentsView(interaction.guild.id)
+        embed = create_embed(
+            title="✈️ Ticket Departments Management",
+            description="Create and manage ticket departments for your server.",
+            color=discord.Color.blue()
+        )
+        
+        # Show existing departments
+        departments = await TicketDepartment.get_all(interaction.guild.id)
+        if departments:
+            dept_list = []
+            for dept in departments[:10]:  # Limit to first 10
+                staff_roles = [f"<@&{role_id}>" for role_id in dept.staff_roles[:3]]  # First 3 roles
+                dept_list.append(
+                    f"**{dept.emoji} {dept.name}**\n"
+                    f"Staff: {', '.join(staff_roles) if staff_roles else 'None'}\n"
+                    f"Max tickets per user: {dept.max_tickets_per_user}"
+                )
+            
+            embed.add_field(
+                name="📋 Existing Departments",
+                value="\n\n".join(dept_list),
+                inline=False
+            )
+        else:
+            embed.add_field(
+                name="📋 Existing Departments",
+                value="No departments created yet.",
+                inline=False
+            )
+        
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+    
+    @app_commands.command(
+        name="ticket_stats",
+        description="View ticket statistics and analytics"
+    )
+    @commands.has_permissions(manage_guild=True)
+    async def ticket_stats(self, interaction: discord.Interaction):
+        """View comprehensive ticket statistics."""
+        view = TicketStatsView(interaction.guild.id)
+        embed = create_embed(
+            title="📊 Ticket Statistics Dashboard",
+            description="Access comprehensive ticket analytics for your server.",
+            color=discord.Color.blue()
+        )
+        embed.add_field(
+            name="📈 Available Statistics",
+            value=(
+                "• **Guild Stats** - Overall server ticket metrics\n"
+                "• **My Stats** - Your personal ticket history\n"
+                "• **Auto-Close Check** - Manual inactive ticket cleanup"
+            ),
+            inline=False
+        )
+        
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+    
+    @app_commands.command(
+        name="ticket_autoclose",
+        description="Configure automatic closing of inactive tickets"
+    )
+    @app_commands.describe(
+        hours="Hours of inactivity before auto-closing (0 to disable)"
+    )
+    @commands.has_permissions(manage_guild=True)
+    async def ticket_autoclose(self, interaction: discord.Interaction, hours: int):
+        """Configure auto-close for all departments."""
+        if hours < 0:
+            await interaction.response.send_message(
+                embed=error_embed("Hours must be 0 or positive.", title="❌ Invalid Input"),
+                ephemeral=True
+            )
+            return
+        
+        # Update all departments in this guild
+        mongo_db = get_async_db()
+        result = await mongo_db.ticket_departments.update_many(
+            {"guild_id": interaction.guild.id},
+            {"$set": {"auto_close_hours": hours}}
+        )
+        
+        if result.modified_count > 0:
+            status = f"enabled (after {hours} hours)" if hours > 0 else "disabled"
+            await interaction.response.send_message(
+                embed=success_embed(
+                    f"Auto-close has been {status} for {result.modified_count} departments.",
+                    title="✅ Auto-Close Updated"
+                ),
+                ephemeral=True
+            )
+        else:
+            await interaction.response.send_message(
+                embed=info_embed(
+                    "No departments found to update. Create departments first.",
+                    title="ℹ️ No Changes"
+                ),
+                ephemeral=True
+            )
+    
+    @commands.Cog.listener()
+    async def on_message(self, message):
+        """Track ticket activity."""
+        if message.author.bot or not message.guild:
+            return
+        
+        # Check if this is a ticket channel
+        if message.channel.name.startswith(("ticket-", "🔵ticket-", "🟢ticket-", "🟠ticket-", "🔴ticket-")):
+            await update_ticket_activity(message.channel.id)
+            await increment_ticket_messages(message.channel.id)
     
     @commands.Cog.listener()
     async def on_interaction(self, interaction: discord.Interaction):
@@ -369,8 +469,10 @@ class Ticket(commands.Cog):
         except Exception as e:
             await interaction.followup.send(embed=create_embed(f"An error occurred while closing the ticket: {str(e)}", discord.Color.red()))
 
+
 async def setup(bot):
     await bot.add_cog(Ticket(bot))
+
 
 def fetch_fields_by_data_source(data_source: str, guild_id: str):
     """Fetch form fields for ticket modal from database"""

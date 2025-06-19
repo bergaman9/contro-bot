@@ -1,0 +1,1 @@
+"""Fun cogs module."""

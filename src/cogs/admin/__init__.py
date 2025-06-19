@@ -1,0 +1,1 @@
+"""Admin cogs module."""

@@ -223,7 +223,7 @@ class ModernTicketFormModal(discord.ui.Modal, title="Create Support Ticket"):
         
         # Main ticket embed
         embed = discord.Embed(
-            description="Destek talebiniz oluşturuldu. Ekibimiz en kısa sürede sizinle iletişime geçecektir.",
+            description="Your support request has been created. Our team will contact you as soon as possible.",
             color=embed_color,
             timestamp=datetime.utcnow()
         )

@@ -7,8 +7,8 @@ import random
 from datetime import datetime
 from typing import Optional, Dict, Any, List
 
-from utils.core.formatting import create_embed
-from utils.database.connection import initialize_mongodb
+from src.utils.core.formatting import create_embed
+from src.utils.database.connection import initialize_mongodb
 
 logger = logging.getLogger('giveaways')
 logger.setLevel(logging.INFO)
