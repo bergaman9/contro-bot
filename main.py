@@ -480,7 +480,12 @@ async def main():
         
         # Run API server in separate thread
         from threading import Thread
-        import uvicorn
+        try:
+            import uvicorn
+        except ImportError:
+            logger.error("uvicorn not installed - API server will not start")
+            print_colored("⚠️ uvicorn not installed - install with: pip install uvicorn", "yellow")
+            return
         
         def run_api():
             uvicorn.run(api_app, host="0.0.0.0", port=8080, log_level="info")

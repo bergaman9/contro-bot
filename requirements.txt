@@ -11,6 +11,8 @@ dnspython>=2.4.2
 flask>=3.0.0
 flask-cors>=4.0.0
 gunicorn>=21.2.0
+uvicorn>=0.24.0
+fastapi>=0.104.0
 
 # HTTP Requests
 aiohttp>=3.9.1
