@@ -7,10 +7,29 @@ import logging
 from typing import Optional
 import asyncio
 import os
-from pymongo import AsyncMongoClient
-from pymongo.asynchronous.database import AsyncDatabase
-from pymongo.asynchronous.collection import AsyncCollection
+from pymongo import MongoClient
 from dotenv import load_dotenv
+
+# PyMongo async imports - modern pymongo version
+try:
+    from pymongo.asynchronous.client import AsyncMongoClient
+    from pymongo.asynchronous.database import AsyncDatabase
+    from pymongo.asynchronous.collection import AsyncCollection
+    PYMONGO_ASYNC_AVAILABLE = True
+except ImportError:
+    # Fallback for older pymongo versions
+    try:
+        from pymongo import AsyncMongoClient
+        from pymongo.database import Database as AsyncDatabase
+        from pymongo.collection import Collection as AsyncCollection
+        PYMONGO_ASYNC_AVAILABLE = True
+    except ImportError:
+        # Use motor as fallback
+        import motor.motor_asyncio
+        AsyncMongoClient = motor.motor_asyncio.AsyncIOMotorClient
+        AsyncDatabase = motor.motor_asyncio.AsyncIOMotorDatabase
+        AsyncCollection = motor.motor_asyncio.AsyncIOMotorCollection
+        PYMONGO_ASYNC_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -31,23 +50,34 @@ class DatabaseManager:
         """Initialize the async database connection"""
         if self._db is None:
             try:
-                self._client = AsyncMongoClient(
-                    connection_string,
-                    serverSelectionTimeoutMS=30000,
-                    connectTimeoutMS=30000,
-                    socketTimeoutMS=60000,
-                    tls=True,
-                    retryWrites=True,
-                    w='majority'
-                )
+                # Create AsyncMongoClient with appropriate settings
+                if PYMONGO_ASYNC_AVAILABLE:
+                    self._client = AsyncMongoClient(
+                        connection_string,
+                        serverSelectionTimeoutMS=30000,
+                        connectTimeoutMS=30000,
+                        socketTimeoutMS=60000,
+                        maxPoolSize=50,
+                        minPoolSize=10
+                    )
+                else:
+                    # Motor fallback
+                    self._client = AsyncMongoClient(
+                        connection_string,
+                        serverSelectionTimeoutMS=30000,
+                        connectTimeoutMS=30000,
+                        socketTimeoutMS=60000,
+                        maxPoolSize=50,
+                        minPoolSize=10
+                    )
                 
                 # Get database name from environment or use provided
-                db_name = os.getenv("DB", database_name)
+                db_name = os.getenv("DB_NAME") or os.getenv("DB", database_name)
                 self._db = self._client[db_name]
                 
                 # Test the connection
                 await self._client.admin.command('ping')
-                logger.info(f"Successfully connected to MongoDB database: {db_name}")
+                logger.info(f"Successfully connected to MongoDB database: {db_name} (PyMongo async: {PYMONGO_ASYNC_AVAILABLE})")
                 
             except Exception as e:
                 logger.error(f"Failed to connect to MongoDB: {e}")
@@ -67,24 +97,34 @@ class DatabaseManager:
                     logger.error("MONGO_DB environment variable not set")
                     return None
                 
-                # Create async client
-                self._client = AsyncMongoClient(
-                    mongo_uri,
-                    serverSelectionTimeoutMS=30000,
-                    connectTimeoutMS=30000,
-                    socketTimeoutMS=60000,
-                    tls=True,
-                    retryWrites=True,
-                    w='majority'
-                )
+                # Create async client with proper error handling
+                if PYMONGO_ASYNC_AVAILABLE:
+                    self._client = AsyncMongoClient(
+                        mongo_uri,
+                        serverSelectionTimeoutMS=30000,
+                        connectTimeoutMS=30000,
+                        socketTimeoutMS=60000,
+                        maxPoolSize=50,
+                        minPoolSize=10
+                    )
+                else:
+                    # Motor fallback
+                    self._client = AsyncMongoClient(
+                        mongo_uri,
+                        serverSelectionTimeoutMS=30000,
+                        connectTimeoutMS=30000,
+                        socketTimeoutMS=60000,
+                        maxPoolSize=50,
+                        minPoolSize=10
+                    )
                 
                 # Get database name from environment or use default
-                db_name = os.getenv("DB", "contro-bot-db")
+                db_name = os.getenv("DB_NAME") or os.getenv("DB", "contro-bot-db")
                 self._db = self._client[db_name]
                 
                 # Note: We can't test connection here since this is sync method
                 # Connection will be tested on first use
-                logger.info(f"Async MongoDB client created for database: {db_name}")
+                logger.info(f"Async MongoDB client created for database: {db_name} (PyMongo async: {PYMONGO_ASYNC_AVAILABLE})")
                 
             except Exception as e:
                 logger.error(f"Failed to create async MongoDB client: {e}")

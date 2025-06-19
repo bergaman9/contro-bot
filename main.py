@@ -19,15 +19,14 @@ import json
 from src.utils.core.formatting import create_embed
 from src.utils.core.logger import logger, setup_logging, LOGS_DIR
 from src.utils.core.config import ConfigManager
-from src.api.routes.ping_api import app, initialize_api
-from src.api import initialize_all_apis
+# Import API components
+from src.api.app import create_api_app
 from src.utils.database import initialize_async_mongodb, get_async_db, close_async_mongodb, DummyAsyncDatabase
 from src.utils.community.turkoyto.ticket_views import TicketButton, ServicesView
 from src.utils.database.db_manager import db_manager
 from src.bot.client import ControBot
 from src.utils.core.discord_helpers import create_embed
 from src.utils.database.connection import initialize_async_mongodb, DummyAsyncDatabase
-from src.api import initialize_all_apis
 from src.utils.common.error_handler import ErrorHandler, setup_error_handler
 
 # Setup logging early
@@ -118,8 +117,7 @@ def parse_arguments():
                         help="Client ID to use (main, dev, premium, or client name)")
     parser.add_argument("--list", action="store_true",
                         help="List available client configurations and exit")
-    parser.add_argument("--no-api", action="store_true",
-                        help="Don't start the API server")
+# API argument removed - dashboard now handles API
     parser.add_argument("--debug", action="store_true",
                         help="Enable debug mode with additional logging")
     parser.add_argument("--skip-token-verification", action="store_true",
@@ -395,8 +393,6 @@ async def main():
     # Set up signal handlers for graceful shutdown
     def signal_handler(sig, frame):
         logger.info("Shutdown signal received, cleaning up...")
-        # Signal API server to shutdown
-        shutdown_event.set()
             
         # Close the bot connection and cleanup async database
         async def cleanup():
@@ -477,108 +473,26 @@ async def main():
         bot.async_db = db
         bot.db_manager = None
     
-    # Function to start the API server in a separate thread
-    def start_api_server():
-        def run_api():
-            try:
-                # Try importing required packages first
-                try:
-                    import flask
-                    from werkzeug.serving import run_simple
-                    import socket
-                    import traceback  # Add for detailed error reporting
-                except ImportError as e:
-                    logger.error(f"API server required modules missing: {e}")
-                    print_colored(f"⚠️ API server failed: Missing required modules - {e}", "red")
-                    print_colored("Try installing dependencies: pip install flask werkzeug", "yellow")
-                    return
-                    
-                # Initialize the API with the bot instance
-                try:
-                    logger.info("Creating API Flask app...")
-                    flask_app = initialize_all_apis(bot)
-                    
-                    if not flask_app:
-                        logger.error("API initialization failed - returned None")
-                        print_colored("⚠️ API initialization failed - no app returned", "red")
-                        return
-                        
-                    logger.info("API app created successfully")
-                except Exception as e:
-                    logger.error(f"Failed to initialize API: {str(e)}")
-                    print_colored(f"⚠️ API initialization error: {str(e)}", "red")
-                    # Print full traceback for debugging
-                    logger.error(traceback.format_exc())
-                    return
-                
-                # Find available port
-                port = 8000
-                while port < 8100:  # Try ports up to 8099
-                    try:
-                        # Check if port is available
-                        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                        sock.settimeout(1)
-                        result = sock.connect_ex(('127.0.0.1', port))
-                        sock.close()
-                        
-                        if result != 0:  # Port is available
-                            break
-                        
-                        port += 1
-                    except:
-                        port += 1
-                
-                if port >= 8100:
-                    logger.error("Failed to find an available port")
-                    print_colored("⚠️ API server failed: Couldn't find available port", "red")
-                    return
-                
-                # Log that we're starting (only once)
-                
-                # Start the Flask app with debugging disabled
-                try:
-                    flask_app.run(host='0.0.0.0', port=port, debug=False)
-                    # Note: This will block, but since we're in a separate thread, it's OK
-                except KeyboardInterrupt:
-                    logger.info("API server stopped by keyboard interrupt")
-                    print_colored("API server stopped by keyboard interrupt", "yellow")
-                except Exception as e:
-                    logger.error(f"API server error: {str(e)}")
-                    print_colored(f"⚠️ API server error: {str(e)}", "red")
-                    logger.error(traceback.format_exc())
-                    
-            except Exception as e:
-                logger.error(f"Unhandled exception in API server: {str(e)}")
-                print_colored(f"⚠️ API server fatal error: {str(e)}", "red")
-                logger.error(traceback.format_exc())
+    # Initialize API server
+    try:
+        api_app = create_api_app(bot)
+        bot.api_app = api_app
         
-        # Start in a daemon thread so it will be automatically terminated when main thread exits
-        api_thread = threading.Thread(target=run_api, daemon=True)
+        # Run API server in separate thread
+        from threading import Thread
+        import uvicorn
+        
+        def run_api():
+            uvicorn.run(api_app, host="0.0.0.0", port=8080, log_level="info")
+        
+        api_thread = Thread(target=run_api, daemon=True)
         api_thread.start()
-        return api_thread
-    
-    # Create a Flask server shutdown event for proper API server handling
-    shutdown_event = threading.Event()
-    
-    # Start API server immediately if this is the main client (don't wait for on_ready)
-    api_thread = None
-    if not args.no_api and client_id == "main":
-        try:
-            logger.info("Starting API server immediately (main client only)")
-            print_colored("Starting API server...", "cyan")
-            api_thread = start_api_server()
-            # Let's wait a brief moment to see if it starts correctly
-            await asyncio.sleep(1)
-            if api_thread and api_thread.is_alive():
-                print_colored("✅ API server thread started", "green")
-            else:
-                print_colored("⚠️ API server thread failed to start", "red")
-        except Exception as e:
-            logger.error(f"Exception when starting API server: {e}")
-            print_colored(f"⚠️ API server startup error: {e}", "red")
-    elif not args.no_api and client_id != "main":
-        print_colored("ℹ️ API server only runs in MAIN mode", "yellow")
-    # No cleanup needed here
+        logger.info("API server started on port 8080")
+        print_colored("✅ API server started on port 8080", "green")
+        
+    except Exception as e:
+        logger.error(f"Failed to start API server: {e}")
+        print_colored(f"⚠️ API server startup failed: {e}", "yellow")
     
     # Load persistent panels from database
     async def load_persistent_panels():
@@ -1000,7 +914,6 @@ async def main():
     try:
         print_colored(f"\nStarting {client_id.upper()} bot using {token_source}...", "cyan", "bold")
         logger.info(f"Starting {client_id} client with token from {token_source}...")
-        # API server already started above, no need to start again
                 
         # Connect to Discord
         await bot.start(token)
