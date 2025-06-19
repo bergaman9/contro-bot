@@ -3,8 +3,8 @@ from typing import Dict, List, Optional, Union
 import logging
 import asyncio
 from discord import ui
-from utils.database.connection import get_async_db
-from utils.common import error_embed, success_embed, info_embed, warning_embed
+from src.utils.database.connection import get_async_db
+from src.utils.common import error_embed, success_embed, info_embed, warning_embed
 
 # Configure logger
 logger = logging.getLogger('temp_channels_settings')

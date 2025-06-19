@@ -15,8 +15,8 @@ except ImportError:
     Sinkaf = None
     logging.warning("Sinkaf library not found. AI profanity detection will be disabled.")
 
-from utils.database.connection import get_async_db
-from utils.core.formatting import create_embed
+from src.utils.database.connection import get_async_db
+from src.utils.core.formatting import create_embed
 
 
 class AIProfanityDetector:

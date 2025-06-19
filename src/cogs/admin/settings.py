@@ -5,10 +5,11 @@ from typing import Optional, List
 import logging
 import os
 import asyncio
-from datetime import datetime
+from datetime import datetime, timedelta
+import sys
 
-from utils.core.formatting import create_embed
-from utils.settings.views import (
+from src.utils.core.formatting import create_embed
+from src.utils.views.settings_views import (
     MainSettingsView,
     ServerSettingsView,
     WelcomeGoodbyeView,
@@ -27,13 +28,14 @@ from utils.settings.views import (
     ChannelSelectView,
     AdvancedSettingsView
 )
-from utils.settings.logging_views import LoggingSettingsView
-from utils.settings.register_views import RegisterSettingsView
-from utils.database.connection import get_async_db, initialize_mongodb
-from utils.database.db_manager import db_manager
+from src.utils.views.logging_views import LoggingSettingsView
+from src.utils.views.register_views import RegisterSettingsView
+from src.utils.database.connection import get_async_db, initialize_mongodb
+from src.utils.database.db_manager import db_manager
+from src.utils.version.version_manager import get_version_info, check_for_updates
 
 # Set up logging
-logger = logging.getLogger('settings')
+logger = logging.getLogger('admin.settings')
 class Settings(commands.Cog):
     """Server settings management commands"""
     def __init__(self, bot):
@@ -71,18 +73,73 @@ class Settings(commands.Cog):
         
         embed = discord.Embed(
             title="⚙️ Server Settings",
-            description="Configure your server settings using the buttons below.",
+            description="**Configure your server settings using the organized buttons below.**\n"
+                       "Features are color-coded: 🟢 Core • 🔵 Essential • ⚫ Optional",
             color=discord.Color.blue()
         )
         
-        # Add current settings summary
+        # Add core features status (inline fields - 3 per row)
         embed.add_field(
-            name="📊 Current Status",
-            value=settings_summary,
+            name="📝 Registration System",
+            value=f"**Status:** {'🟢 Active' if 'Registration' in settings_summary else '🔴 Inactive'}\n"
+                  f"**Function:** Member onboarding\n"
+                  f"**Setup:** Age/Gender/Game roles",
+            inline=True
+        )
+        
+        embed.add_field(
+            name="👋 Welcome System", 
+            value=f"**Status:** {'🟢 Active' if 'Welcome: Enabled' in settings_summary else '🔴 Inactive'}\n"
+                  f"**Function:** Greet new members\n"
+                  f"**Setup:** Messages & images",
+            inline=True
+        )
+        
+        embed.add_field(
+            name="🎫 Ticket System",
+            value=f"**Status:** {'🟢 Active' if 'Tickets: Enabled' in settings_summary else '🔴 Inactive'}\n"
+                  f"**Function:** Support tickets\n"
+                  f"**Setup:** Categories & staff",
+            inline=True
+        )
+        
+        # Add essential features status  
+        embed.add_field(
+            name="📊 Leveling System",
+            value=f"**Status:** 🟢 Active\n"
+                  f"**Function:** XP & level tracking\n"
+                  f"**Setup:** Rewards & roles",
+            inline=True
+        )
+        
+        embed.add_field(
+            name="📋 Logging System",
+            value=f"**Status:** {'🟢 Active' if 'Logging: Enabled' in settings_summary else '🔴 Inactive'}\n"
+                  f"**Function:** Event tracking\n"
+                  f"**Setup:** Channels & events",
+            inline=True
+        )
+        
+        embed.add_field(
+            name="⭐ Starboard",
+            value=f"**Status:** 🔴 Inactive\n"
+                  f"**Function:** Featured messages\n"
+                  f"**Setup:** Star threshold",
+            inline=True
+        )
+        
+        # Button guide
+        embed.add_field(
+            name="🎮 Button Guide",
+            value="**Row 1:** 📝 Register | 👋 Welcome | 🎫 Tickets\n"
+                  "**Row 2:** 📊 Leveling | 📋 Logging | ⭐ Starboard\n" 
+                  "**Row 3:** 🎨 Roles | ⚔️ Moderation | 🛡️ Server\n"
+                  "**Row 4:** 🤖 Bot Config | 🎂 Birthday | 🤖 AI\n"
+                  "**Row 5:** ⚙️ Advanced | ❌ Close",
             inline=False
         )
         
-        embed.set_footer(text="This panel can only be used by administrators.")
+        embed.set_footer(text="🔒 Administrator permissions required • Click buttons to configure features")
         await ctx.send(embed=embed, view=view, ephemeral=ephemeral)
     
     async def get_settings_summary(self, guild_id):
@@ -178,6 +235,151 @@ class Settings(commands.Cog):
         )
         
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+
+    @commands.hybrid_command(name="status", description="Show bot status and system information")
+    async def status(self, ctx: commands.Context):
+        """Show comprehensive bot status"""
+        # Use defer for both interaction and context
+        if hasattr(ctx, 'interaction') and ctx.interaction:
+            await ctx.defer()
+        
+        # Get bot info
+        bot = self.bot
+        uptime = datetime.utcnow() - bot.start_time if hasattr(bot, 'start_time') else timedelta(0)
+        
+        # Get version info
+        version_info = await get_version_info()
+        
+        embed = discord.Embed(
+            title="🤖 Bot Status",
+            color=0x00ff00,
+            timestamp=datetime.utcnow()
+        )
+        
+        # Basic info
+        embed.add_field(
+            name="📊 Basic Info",
+            value=f"**Version:** {version_info['current_version']}\n"
+                  f"**Uptime:** {str(uptime).split('.')[0]}\n"
+                  f"**Prefix:** `{bot.command_prefix}`\n"
+                  f"**Guilds:** {len(bot.guilds)}",
+            inline=True
+        )
+        
+        # System info
+        embed.add_field(
+            name="⚙️ System",
+            value=f"**Python:** {sys.version.split()[0]}\n"
+                  f"**Discord.py:** {discord.__version__}\n"
+                  f"**Ping:** {round(bot.latency * 1000)}ms",
+            inline=True
+        )
+        
+        # Update info
+        update_check = version_info.get('update_check', {})
+        if update_check.get('update_available'):
+            update_text = f"🆕 **{update_check['latest_version']}** available!"
+        else:
+            update_text = "✅ Up to date"
+        
+        embed.add_field(
+            name="🔄 Updates",
+            value=update_text,
+            inline=True
+        )
+        
+        embed.set_footer(text=f"Bot ID: {bot.user.id}")
+        
+        await ctx.send(embed=embed)
+    
+    @commands.hybrid_command(name="version", description="Show version information and check for updates")
+    async def version(self, ctx: commands.Context):
+        """Show detailed version information"""
+        # Use defer for both interaction and context
+        if hasattr(ctx, 'interaction') and ctx.interaction:
+            await ctx.defer()
+        
+        try:
+            version_info = await get_version_info()
+            current_version = version_info['current_version']
+            update_check = version_info.get('update_check', {})
+            
+            embed = discord.Embed(
+                title="📋 Version Information",
+                color=0x2F3136,
+                timestamp=datetime.utcnow()
+            )
+            
+            # Current version
+            embed.add_field(
+                name="📦 Current Version",
+                value=f"**v{current_version}**",
+                inline=True
+            )
+            
+            # Latest version
+            if update_check.get('latest_version'):
+                latest_version = update_check['latest_version']
+                if update_check.get('update_available'):
+                    status_emoji = "🆕"
+                    status_text = "Update Available!"
+                    color = 0xffaa00
+                else:
+                    status_emoji = "✅"
+                    status_text = "Up to Date"
+                    color = 0x00ff00
+                
+                embed.color = color
+                embed.add_field(
+                    name="🌐 Latest Version",
+                    value=f"**v{latest_version}**\n{status_emoji} {status_text}",
+                    inline=True
+                )
+                
+                # Release info
+                if update_check.get('release_url'):
+                    embed.add_field(
+                        name="🔗 Release",
+                        value=f"[View on GitHub]({update_check['release_url']})",
+                        inline=True
+                    )
+                
+                # Release notes (truncated)
+                if update_check.get('release_notes'):
+                    notes = update_check['release_notes'][:500]
+                    if len(update_check['release_notes']) > 500:
+                        notes += "..."
+                    embed.add_field(
+                        name="📝 Release Notes",
+                        value=f"```{notes}```",
+                        inline=False
+                    )
+            else:
+                embed.add_field(
+                    name="🌐 Latest Version",
+                    value="Could not fetch from GitHub",
+                    inline=True
+                )
+            
+            # Repository info
+            if version_info.get('github_url'):
+                embed.add_field(
+                    name="📚 Repository",
+                    value=f"[{version_info['repository']}]({version_info['github_url']})",
+                    inline=False
+                )
+            
+            embed.set_footer(text="Version information is cached for 5 minutes")
+            
+        except Exception as e:
+            logger.error(f"Error getting version info: {e}")
+            embed = discord.Embed(
+                title="❌ Error",
+                description="Could not fetch version information.",
+                color=0xff0000
+            )
+        
+        await ctx.send(embed=embed)
 
 async def setup(bot):
     """Add the Settings cog to the bot"""

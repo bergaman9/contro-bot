@@ -3,8 +3,8 @@ from discord import ui
 import logging
 from typing import Optional, List
 import asyncio
-from utils.core.formatting import create_embed
-from utils.database.connection import get_async_db, ensure_async_db, initialize_mongodb
+from src.utils.core.formatting import create_embed
+from src.utils.database.connection import get_async_db, ensure_async_db, initialize_mongodb
 
 # Setup logger
 logger = logging.getLogger('logging_views')

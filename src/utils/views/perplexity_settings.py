@@ -1,8 +1,8 @@
 import discord
 import logging
 from discord.ext import commands
-from utils.core.formatting import create_embed
-from utils.database.connection import initialize_mongodb
+from src.utils.core.formatting import create_embed
+from src.utils.database.connection import initialize_mongodb
 
 # Configure logger
 logger = logging.getLogger('perplexity_settings')

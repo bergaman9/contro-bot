@@ -5,10 +5,13 @@ import logging
 import datetime
 from pathlib import Path
 import os
+import pymongo
+from src.utils.database.connection import initialize_mongodb
+from src.utils.views.channel_selector import ChannelSelectView
 
-from utils.database.connection import get_collection
-from utils.database.db_manager import db_manager
-from utils.core.formatting import create_embed, hex_to_int
+from src.utils.database.connection import get_collection
+from src.utils.database.db_manager import db_manager
+from src.utils.core.formatting import create_embed, hex_to_int
 
 # Set up logging
 logger = logging.getLogger('register_settings')
@@ -611,7 +614,7 @@ class ButtonCustomizationView(discord.ui.View):
         """Create registration button with default settings"""
         try:
             # Create the registration button view
-            from utils.community.turkoyto.registration_view import RegistrationButtonView
+            from src.utils.community.turkoyto.registration_view import RegistrationButtonView
             register_view = RegistrationButtonView()
             
             # Create the embed
@@ -665,7 +668,7 @@ class RegisterMessageSendView(discord.ui.View):
     
     async def select_channel(self, interaction: discord.Interaction):
         """Show channel selection"""
-        from utils.settings.channel_selector import ChannelSelectView
+        from src.utils.settings.channel_selector import ChannelSelectView
         
         channels = [ch for ch in interaction.guild.text_channels if ch.permissions_for(interaction.guild.me).send_messages]
         

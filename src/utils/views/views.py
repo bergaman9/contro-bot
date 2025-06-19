@@ -3,12 +3,12 @@ from discord import ui
 import asyncio
 import json
 import logging
-from utils.core.content_loader import load_content, async_load_content, async_set_content
-from utils import create_embed
+from src.utils.core.content_loader import load_content, async_load_content, async_set_content
+from src.utils import create_embed
 from .templates import get_builtin_template
-from utils.database.content_manager import content_manager
-from utils.core.formatting import create_embed
-from utils.common.pagination import Paginator
+from src.utils.database.content_manager import content_manager
+from src.utils.core.formatting import create_embed
+from src.utils.common.pagination import Paginator
 
 class LanguageSelectView(discord.ui.View):
     def __init__(self, bot):
@@ -542,7 +542,7 @@ class BusinessCommandsView(discord.ui.View):
     @discord.ui.button(label="Select Channel", style=discord.ButtonStyle.secondary, emoji="📌")
     async def select_channel(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Mesajların gönderileceği kanalı seçer"""
-        from utils.common import PaginatedChannelSelector
+        from src.utils.common import PaginatedChannelSelector
         
         # Get text channels only
         text_channels = [ch for ch in interaction.guild.channels if isinstance(ch, discord.TextChannel)]

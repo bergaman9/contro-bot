@@ -5,7 +5,7 @@ This module provides specialized managers for different aspects of bot configura
 
 import discord
 from typing import Dict, List, Optional, Any
-from utils.database.connection import get_async_db
+from src.utils.database.connection import get_async_db
 
 
 class BaseSettingsManager:
