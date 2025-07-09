@@ -1,0 +1,44 @@
+{
+  "version": "1.1.2",
+  "auto_increment": true,
+  "version_format": "semantic",
+  "track_git_commits": true,
+  "auto_changelog": true,
+  "notification_webhook": null,
+  "backup_versions": true,
+  "raspberry_pi_optimized": true,
+  "features_tracking": {
+    "registration_system": true,
+    "level_system": true,
+    "ticket_system": true,
+    "welcome_system": true,
+    "moderation_system": true,
+    "giveaway_system": true,
+    "game_stats": true,
+    "fun_commands": true,
+    "starboard_system": true,
+    "birthday_system": true,
+    "utility_features": true,
+    "logging_system": true,
+    "temp_channels": true,
+    "bump_automation": true
+  },
+  "deployment": {
+    "platform": "raspberry_pi_5",
+    "auto_restart": true,
+    "health_checks": true,
+    "performance_monitoring": true
+  },
+  "database": {
+    "type": "mongodb",
+    "async_enabled": true,
+    "connection_string": "mongodb://localhost:27017/contro_bot",
+    "backup_enabled": true
+  },
+  "integrations": {
+    "discord_webhooks": true,
+    "git_integration": true,
+    "changelog_generation": true,
+    "performance_metrics": true
+  }
+}

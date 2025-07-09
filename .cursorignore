@@ -1,1 +1,12 @@
 !.env
+!.env.example
+!.env.example.txt
+!.env.example.md
+!.env.example.json
+!.env.example.yaml
+!.env.example.yml
+!.env.example.ini
+!.env.example.conf
+!.env.example.cfg
+!.env.example.config
+!.env.new
