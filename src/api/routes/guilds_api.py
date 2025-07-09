@@ -1,83 +1,104 @@
+"""
+Guilds API endpoints for Contro Discord Bot
+"""
+
 from flask import Blueprint, jsonify, request
-import os
-import sys
-from dotenv import load_dotenv
+from ...core.config import get_config
+from ...core.logger import get_logger
+from ...core.database import get_database_manager
+from ..middleware.auth import require_auth
 
-import  discord
+guilds_bp = Blueprint('guilds', __name__)
+logger = get_logger("guilds_api")
 
-# Add the parent directory to sys.path to import from the project root
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from src.utils.database import initialize_mongodb
 
-# Load environment variables
-load_dotenv()
-GUILDS_API_KEY = os.getenv("GUILDS_API_KEY", "default_key_please_change")  # Get API key from environment variables
-
-guilds_api = Blueprint('guilds_api', __name__)
-bot_instance = None
-mongo_db = initialize_mongodb()
-
-def initialize_guilds_api(bot):
-    """Initialize the guilds API with a bot instance"""
-    global bot_instance
-    bot_instance = bot
-
-def check_auth(request):
-    """Check if the request has valid authorization"""
-    auth_header = request.headers.get('Authorization')
-    if not auth_header or auth_header != f"Bearer {GUILDS_API_KEY}":
-        return False
-    return True
-
-@guilds_api.route('/api/guilds', methods=['GET'])
-def get_guilds():
-    if not bot_instance:
-        return jsonify({"error": "Bot instance not initialized"}), 500
-    
-    guilds_data = []
-    
-    for guild in bot_instance.guilds:
-        guilds_data.append({
-            "id": str(guild.id),
-            "name": guild.name,
-            "member_count": guild.member_count,
-            "icon_url": str(guild.icon.url) if guild.icon else None,
-            "owner_id": str(guild.owner_id),
-            "region": "Turkey",  # This is a placeholder since Discord removed regions
-            "created_at": guild.created_at.isoformat()
+@guilds_bp.route('/', methods=['GET'])
+@require_auth
+async def get_guilds():
+    """Get all guilds."""
+    try:
+        db_manager = await get_database_manager()
+        collection = db_manager.get_collection("guilds")
+        
+        guilds = await collection.find({}).to_list(length=None)
+        
+        return jsonify({
+            'success': True,
+            'guilds': guilds,
+            'count': len(guilds)
         })
-    
-    return jsonify({"guilds": guilds_data})
+        
+    except Exception as e:
+        logger.error(f"Failed to get guilds: {e}")
+        return jsonify({
+            'success': False,
+            'error': 'Failed to get guilds'
+        }), 500
 
-@guilds_api.route('/api/guilds/<guild_id>', methods=['GET'])
-def get_guild(guild_id):
-    if not bot_instance:
-        return jsonify({"error": "Bot instance not initialized"}), 500
-    
-    guild = bot_instance.get_guild(int(guild_id))
-    
-    if not guild:
-        return jsonify({"error": "Guild not found"}), 404
-    
-    # Get additional data from MongoDB if available
-    guild_config = mongo_db["register"].find_one({"guild_id": int(guild_id)})
-    logging_config = mongo_db["logger"].find_one({"guild_id": int(guild_id)})
-    
-    guild_data = {
-        "id": str(guild.id),
-        "name": guild.name,
-        "member_count": guild.member_count,
-        "icon_url": str(guild.icon.url) if guild.icon else None,
-        "owner_id": str(guild.owner_id),
-        "region": "Turkey",  # Placeholder
-        "created_at": guild.created_at.isoformat(),
-        "text_channels": len(guild.text_channels),
-        "voice_channels": len(guild.voice_channels),
-        "roles": len(guild.roles),
-        "emojis": len(guild.emojis),
-        "features": guild.features,
-        "has_registration_setup": guild_config is not None,
-        "has_logging_setup": logging_config is not None
-    }
-    
-    return jsonify(guild_data)
+
+@guilds_bp.route('/<guild_id>', methods=['GET'])
+@require_auth
+async def get_guild(guild_id):
+    """Get a specific guild."""
+    try:
+        db_manager = await get_database_manager()
+        collection = db_manager.get_collection("guilds")
+        
+        guild = await collection.find_one({"guild_id": guild_id})
+        
+        if not guild:
+            return jsonify({
+                'success': False,
+                'error': 'Guild not found'
+            }), 404
+        
+        return jsonify({
+            'success': True,
+            'guild': guild
+        })
+        
+    except Exception as e:
+        logger.error(f"Failed to get guild {guild_id}: {e}")
+        return jsonify({
+            'success': False,
+            'error': 'Failed to get guild'
+        }), 500
+
+
+@guilds_bp.route('/<guild_id>', methods=['PUT'])
+@require_auth
+async def update_guild(guild_id):
+    """Update a guild."""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({
+                'success': False,
+                'error': 'No data provided'
+            }), 400
+        
+        db_manager = await get_database_manager()
+        collection = db_manager.get_collection("guilds")
+        
+        result = await collection.update_one(
+            {"guild_id": guild_id},
+            {"$set": data}
+        )
+        
+        if result.matched_count == 0:
+            return jsonify({
+                'success': False,
+                'error': 'Guild not found'
+            }), 404
+        
+        return jsonify({
+            'success': True,
+            'message': 'Guild updated successfully'
+        })
+        
+    except Exception as e:
+        logger.error(f"Failed to update guild {guild_id}: {e}")
+        return jsonify({
+            'success': False,
+            'error': 'Failed to update guild'
+        }), 500

@@ -13,8 +13,8 @@ class ConfirmationView(ui.View):
         timeout: int = 60,
         confirm_callback: Optional[Callable] = None,
         cancel_callback: Optional[Callable] = None,
-        confirm_label: str = "Onayla",
-        cancel_label: str = "İptal",
+        confirm_label: str = "Confirm",
+        cancel_label: str = "Cancel",
         confirm_style: discord.ButtonStyle = discord.ButtonStyle.danger,
         cancel_style: discord.ButtonStyle = discord.ButtonStyle.secondary
     ):
@@ -45,7 +45,7 @@ class ConfirmationView(ui.View):
         """Handle confirmation"""
         if interaction.user.id != self.user.id:
             await interaction.response.send_message(
-                embed=error_embed("Bu onay diyaloğunu sadece komutu kullanan kişi kullanabilir."),
+                embed=error_embed("Only the user who initiated this command can use this confirmation dialog."),
                 ephemeral=True
             )
             return
@@ -57,7 +57,7 @@ class ConfirmationView(ui.View):
             await self.confirm_callback(interaction)
         else:
             await interaction.response.edit_message(
-                embed=success_embed("İşlem onaylandı."),
+                embed=success_embed("Operation confirmed."),
                 view=None
             )
     
@@ -65,7 +65,7 @@ class ConfirmationView(ui.View):
         """Handle cancellation"""
         if interaction.user.id != self.user.id:
             await interaction.response.send_message(
-                embed=error_embed("Bu onay diyaloğunu sadece komutu kullanan kişi kullanabilir."),
+                embed=error_embed("Only the user who initiated this command can use this confirmation dialog."),
                 ephemeral=True
             )
             return
@@ -77,7 +77,7 @@ class ConfirmationView(ui.View):
             await self.cancel_callback(interaction)
         else:
             await interaction.response.edit_message(
-                embed=error_embed("İşlem iptal edildi."),
+                embed=error_embed("Operation cancelled."),
                 view=None
             )
     
@@ -104,8 +104,8 @@ class DangerConfirmationView(ConfirmationView):
             timeout=timeout,
             confirm_callback=confirm_callback,
             cancel_callback=cancel_callback,
-            confirm_label="Evet, Devam Et",
-            cancel_label="Hayır, İptal",
+            confirm_label="Yes, Continue",
+            cancel_label="No, Cancel",
             confirm_style=discord.ButtonStyle.danger,
             cancel_style=discord.ButtonStyle.secondary
         )
@@ -114,8 +114,8 @@ class DangerConfirmationView(ConfirmationView):
 
 async def confirm_action(
     interaction: discord.Interaction,
-    title: str = "⚠️ Onay Gerekli",
-    description: str = "Bu işlemi gerçekleştirmek istediğinizden emin misiniz?",
+    title: str = "⚠️ Confirmation Required",
+    description: str = "Are you sure you want to perform this action?",
     confirm_callback: Optional[Callable] = None,
     cancel_callback: Optional[Callable] = None,
     danger: bool = False,

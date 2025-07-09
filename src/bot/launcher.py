@@ -10,8 +10,8 @@ from discord.ext import commands
 
 from .client import ControBot
 from .constants import *
-from ..database.connection import DatabaseConnection
-from ..utils.common.logger import setup_logging
+from src.utils.core.manager import initialize_manager, cleanup_manager
+from src.utils.common.logger import setup_logger
 
 # Add parent directory to path for imports
 sys.path.append(str(Path(__file__).parent.parent.parent))
@@ -25,48 +25,54 @@ class BotLauncher:
     def __init__(self):
         """Initialize the launcher."""
         self.bot = None
-        self.db = None
         
-    async def setup_database(self):
-        """Setup database connection."""
-        # Get MongoDB connection string from environment
-        mongo_uri = os.getenv('MONGODB_URI')
-        if not mongo_uri:
-            raise ValueError("MONGODB_URI environment variable not set")
+    async def setup_manager(self):
+        """Setup central manager with database and views."""
+        # Initialize central manager with the bot
+        success = await initialize_manager(self.bot, db_mode="auto")
+        if not success:
+            raise RuntimeError("Failed to initialize central manager")
         
-        # Create database connection
-        self.db = DatabaseConnection(
-            connection_string=mongo_uri,
-            database_name=os.getenv('MONGODB_DATABASE', 'contro_bot')
-        )
-        
-        # Connect to database
-        await self.db.connect()
-        
-        # Create indexes
-        await self.db.create_indexes()
-        
-        logger.info("Database setup complete")
+        logger.info("Central manager setup complete")
         
     async def load_extensions(self):
         """Load bot extensions/cogs."""
-        # Define cogs to load
-        cogs = [
+        # Define cogs to load - scan directory for actual cogs
+        base_cogs = [
+            'src.cogs.community.registration',
             'src.cogs.utility.ping',
-            # Add more cogs as they're created
+            # Add more cogs as they're discovered
         ]
         
-        for cog in cogs:
+        # Try to auto-discover additional cogs
+        cogs_dir = Path(__file__).parent.parent / 'cogs'
+        if cogs_dir.exists():
+            for category_dir in cogs_dir.iterdir():
+                if category_dir.is_dir() and not category_dir.name.startswith('__'):
+                    for cog_file in category_dir.iterdir():
+                        if cog_file.is_file() and cog_file.suffix == '.py' and not cog_file.name.startswith('__'):
+                            cog_path = f'src.cogs.{category_dir.name}.{cog_file.stem}'
+                            if cog_path not in base_cogs:
+                                base_cogs.append(cog_path)
+        
+        loaded_count = 0
+        failed_count = 0
+        
+        for cog in base_cogs:
             try:
-                self.bot.load_extension(cog)
+                await self.bot.load_extension(cog)
                 logger.info(f"Loaded cog: {cog}")
+                loaded_count += 1
             except Exception as e:
                 logger.error(f"Failed to load cog {cog}: {e}")
+                failed_count += 1
+                
+        logger.info(f"Cog loading complete: {loaded_count} loaded, {failed_count} failed")
                 
     async def start(self):
         """Start the bot."""
         # Setup logging
-        setup_logging()
+        setup_logger()
         
         logger.info("Starting ControBot...")
         
@@ -81,16 +87,10 @@ class BotLauncher:
         intents.members = True
         intents.guilds = True
         
-        self.bot = ControBot(
-            intents=intents,
-            db=self.db
-        )
+        self.bot = ControBot(intents=intents)
         
-        # Setup database
-        await self.setup_database()
-        
-        # Pass database to bot
-        self.bot.db = self.db
+        # Setup central manager (database + persistent views)
+        await self.setup_manager()
         
         # Load extensions
         await self.load_extensions()
@@ -112,8 +112,8 @@ class BotLauncher:
         if self.bot:
             await self.bot.close()
             
-        if self.db:
-            await self.db.disconnect()
+        # Cleanup central manager
+        await cleanup_manager()
             
         logger.info("Cleanup complete")
 

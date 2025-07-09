@@ -4,32 +4,49 @@ Provides a singleton pattern to ensure only one connection is used throughout th
 """
 
 import logging
-from typing import Optional
+from typing import Optional, Any
 import asyncio
 import os
 from pymongo import MongoClient
 from dotenv import load_dotenv
 
-# PyMongo async imports - modern pymongo version
+# PyMongo async imports with fallback
 try:
+    # Try modern pymongo async
     from pymongo.asynchronous.client import AsyncMongoClient
     from pymongo.asynchronous.database import AsyncDatabase
     from pymongo.asynchronous.collection import AsyncCollection
     PYMONGO_ASYNC_AVAILABLE = True
+    AsyncClientType = AsyncMongoClient
+    AsyncDatabaseType = AsyncDatabase
+    AsyncCollectionType = AsyncCollection
 except ImportError:
-    # Fallback for older pymongo versions
     try:
+        # Try older pymongo async
         from pymongo import AsyncMongoClient
         from pymongo.database import Database as AsyncDatabase
         from pymongo.collection import Collection as AsyncCollection
         PYMONGO_ASYNC_AVAILABLE = True
+        AsyncClientType = AsyncMongoClient
+        AsyncDatabaseType = AsyncDatabase
+        AsyncCollectionType = AsyncCollection
     except ImportError:
         # Use motor as fallback
-        import motor.motor_asyncio
-        AsyncMongoClient = motor.motor_asyncio.AsyncIOMotorClient
-        AsyncDatabase = motor.motor_asyncio.AsyncIOMotorDatabase
-        AsyncCollection = motor.motor_asyncio.AsyncIOMotorCollection
-        PYMONGO_ASYNC_AVAILABLE = False
+        try:
+            import motor.motor_asyncio
+            AsyncMongoClient = motor.motor_asyncio.AsyncIOMotorClient
+            AsyncDatabase = motor.motor_asyncio.AsyncIOMotorDatabase
+            AsyncCollection = motor.motor_asyncio.AsyncIOMotorCollection
+            PYMONGO_ASYNC_AVAILABLE = False
+            AsyncClientType = motor.motor_asyncio.AsyncIOMotorClient
+            AsyncDatabaseType = motor.motor_asyncio.AsyncIOMotorDatabase
+            AsyncCollectionType = motor.motor_asyncio.AsyncIOMotorCollection
+        except ImportError:
+            # No async support available
+            PYMONGO_ASYNC_AVAILABLE = False
+            AsyncClientType = Any
+            AsyncDatabaseType = Any
+            AsyncCollectionType = Any
 
 logger = logging.getLogger(__name__)
 
@@ -38,38 +55,41 @@ class DatabaseManager:
     """Singleton database manager for MongoDB connections using PyMongo async"""
     
     _instance = None
-    _db: Optional[AsyncDatabase] = None
-    _client: Optional[AsyncMongoClient] = None
+    _db: Optional[AsyncDatabaseType] = None
+    _client: Optional[AsyncClientType] = None
     
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super(DatabaseManager, cls).__new__(cls)
         return cls._instance
     
-    async def initialize(self, connection_string: str, database_name: str = "contro_bot") -> AsyncDatabase:
+    async def initialize(self, connection_string: str, database_name: str = "contro_bot") -> AsyncDatabaseType:
         """Initialize the async database connection"""
         if self._db is None:
             try:
                 # Create AsyncMongoClient with appropriate settings
                 if PYMONGO_ASYNC_AVAILABLE:
-                    self._client = AsyncMongoClient(
-                        connection_string,
-                        serverSelectionTimeoutMS=30000,
-                        connectTimeoutMS=30000,
-                        socketTimeoutMS=60000,
-                        maxPoolSize=50,
-                        minPoolSize=10
-                    )
+                    if hasattr(AsyncMongoClient, '__call__'):
+                        self._client = AsyncMongoClient(
+                            connection_string,
+                            serverSelectionTimeoutMS=30000,
+                            connectTimeoutMS=30000,
+                            socketTimeoutMS=60000,
+                            maxPoolSize=50,
+                            minPoolSize=10
+                        )
+                    else:
+                        # Motor fallback
+                        self._client = AsyncMongoClient(
+                            connection_string,
+                            serverSelectionTimeoutMS=30000,
+                            connectTimeoutMS=30000,
+                            socketTimeoutMS=60000,
+                            maxPoolSize=50,
+                            minPoolSize=10
+                        )
                 else:
-                    # Motor fallback
-                    self._client = AsyncMongoClient(
-                        connection_string,
-                        serverSelectionTimeoutMS=30000,
-                        connectTimeoutMS=30000,
-                        socketTimeoutMS=60000,
-                        maxPoolSize=50,
-                        minPoolSize=10
-                    )
+                    raise ImportError("No async MongoDB client available")
                 
                 # Get database name from environment or use provided
                 db_name = os.getenv("DB_NAME") or os.getenv("DB", database_name)
@@ -85,7 +105,7 @@ class DatabaseManager:
         
         return self._db
     
-    def get_database(self) -> Optional[AsyncDatabase]:
+    def get_database(self) -> Optional[AsyncDatabaseType]:
         """Get the async database instance"""
         if self._db is None:
             # Try to initialize from environment
@@ -99,24 +119,28 @@ class DatabaseManager:
                 
                 # Create async client with proper error handling
                 if PYMONGO_ASYNC_AVAILABLE:
-                    self._client = AsyncMongoClient(
-                        mongo_uri,
-                        serverSelectionTimeoutMS=30000,
-                        connectTimeoutMS=30000,
-                        socketTimeoutMS=60000,
-                        maxPoolSize=50,
-                        minPoolSize=10
-                    )
+                    if hasattr(AsyncMongoClient, '__call__'):
+                        self._client = AsyncMongoClient(
+                            mongo_uri,
+                            serverSelectionTimeoutMS=30000,
+                            connectTimeoutMS=30000,
+                            socketTimeoutMS=60000,
+                            maxPoolSize=50,
+                            minPoolSize=10
+                        )
+                    else:
+                        # Motor fallback
+                        self._client = AsyncMongoClient(
+                            mongo_uri,
+                            serverSelectionTimeoutMS=30000,
+                            connectTimeoutMS=30000,
+                            socketTimeoutMS=60000,
+                            maxPoolSize=50,
+                            minPoolSize=10
+                        )
                 else:
-                    # Motor fallback
-                    self._client = AsyncMongoClient(
-                        mongo_uri,
-                        serverSelectionTimeoutMS=30000,
-                        connectTimeoutMS=30000,
-                        socketTimeoutMS=60000,
-                        maxPoolSize=50,
-                        minPoolSize=10
-                    )
+                    logger.error("No async MongoDB client available")
+                    return None
                 
                 # Get database name from environment or use default
                 db_name = os.getenv("DB_NAME") or os.getenv("DB", "contro-bot-db")
@@ -132,7 +156,7 @@ class DatabaseManager:
         
         return self._db
     
-    def get_collection(self, collection_name: str) -> Optional[AsyncCollection]:
+    def get_collection(self, collection_name: str) -> Optional[AsyncCollectionType]:
         """Get a specific collection from the database"""
         db = self.get_database()
         if db is not None:
@@ -142,7 +166,8 @@ class DatabaseManager:
     async def close(self):
         """Close the database connection"""
         if self._client:
-            self._client.close()
+            if hasattr(self._client, 'close'):
+                self._client.close()
             self._client = None
             self._db = None
             logger.info("MongoDB connection closed")
@@ -152,11 +177,11 @@ class DatabaseManager:
 db_manager = DatabaseManager()
 
 
-def get_db() -> Optional[AsyncDatabase]:
+def get_db() -> Optional[AsyncDatabaseType]:
     """Convenience function to get database instance"""
     return db_manager.get_database()
 
 
-def get_collection(collection_name: str) -> Optional[AsyncCollection]:
+def get_collection(collection_name: str) -> Optional[AsyncCollectionType]:
     """Convenience function to get a collection"""
     return db_manager.get_collection(collection_name) 

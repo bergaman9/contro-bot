@@ -90,10 +90,6 @@ def is_feature_enabled(guild_id: int, feature: str, mongo_db=None) -> bool:
     Returns:
         bool: True if feature is enabled, False otherwise
     """
-    if mongo_db is None:
-        from src.utils.database import initialize_mongodb
-        mongo_db = initialize_mongodb()
-    
     # Default feature states
     default_features = {
         "welcome_system": True,
@@ -106,6 +102,20 @@ def is_feature_enabled(guild_id: int, feature: str, mongo_db=None) -> bool:
     }
     
     try:
+        if mongo_db is None:
+            from src.utils.database import initialize_mongodb
+            mongo_db = initialize_mongodb()
+        
+        # Check if mongo_db is still None after initialization
+        if mongo_db is None:
+            logging.warning("MongoDB connection not available, using default feature states")
+            return default_features.get(feature, True)
+        
+        # Check if feature_toggles collection exists
+        if not hasattr(mongo_db, 'feature_toggles') or mongo_db.feature_toggles is None:
+            logging.warning("feature_toggles collection not available, using default feature states")
+            return default_features.get(feature, True)
+        
         features = mongo_db.feature_toggles.find_one({"guild_id": guild_id}) or {}
         return features.get(feature, default_features.get(feature, True))
     except Exception as e:
@@ -150,10 +160,6 @@ async def get_guild_features(guild_id: int, mongo_db=None) -> Dict[str, bool]:
     Returns:
         dict: Dictionary of feature names and their states
     """
-    if mongo_db is None:
-        from src.utils.database import initialize_mongodb
-        mongo_db = initialize_mongodb()
-    
     default_features = {
         "welcome_system": True,
         "leveling_system": True,
@@ -165,6 +171,20 @@ async def get_guild_features(guild_id: int, mongo_db=None) -> Dict[str, bool]:
     }
     
     try:
+        if mongo_db is None:
+            from src.utils.database import initialize_mongodb
+            mongo_db = initialize_mongodb()
+        
+        # Check if mongo_db is still None after initialization
+        if mongo_db is None:
+            logging.warning("MongoDB connection not available, using default feature states")
+            return default_features
+        
+        # Check if feature_toggles collection exists
+        if not hasattr(mongo_db, 'feature_toggles') or mongo_db.feature_toggles is None:
+            logging.warning("feature_toggles collection not available, using default feature states")
+            return default_features
+        
         features = mongo_db.feature_toggles.find_one({"guild_id": guild_id}) or {}
         
         # Merge with defaults

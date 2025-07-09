@@ -26,6 +26,7 @@ from io import BytesIO
 from src.utils.core.formatting import create_embed, hex_to_int, calculate_how_long_ago_member_joined, calculate_how_long_ago_member_created
 from src.utils.database.connection import initialize_mongodb, is_db_available
 from src.utils.core.db import get_document, get_documents, update_document
+from src.utils.database.utility_stats import increment_utility_stat
 
 # Configure logger
 logger = logging.getLogger('utility')
@@ -414,6 +415,8 @@ class Utility(commands.Cog):
                         embed.set_footer(text="You can use this command again in 15 seconds")
                         embed.set_thumbnail(url=emoji_url)
                         await ctx.send(embed=embed)
+                        await increment_utility_stat(ctx.guild.id, 'messagesProcessed', 1)
+                        await increment_utility_stat(ctx.guild.id, 'activeTools', 1)
                     except discord.HTTPException as e:
                         await ctx.send(embed=create_embed(
                             description=f"Error adding emoji: {str(e)}. The image might be too large or in an unsupported format.",

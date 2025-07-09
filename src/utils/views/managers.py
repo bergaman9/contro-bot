@@ -17,7 +17,10 @@ class BaseSettingsManager:
     
     async def get_guild_settings(self, guild_id: int, collection: str) -> Dict[str, Any]:
         """Get settings for a specific guild from a collection"""
-        return await self.mongo_db[collection].find_one({"guild_id": guild_id}) or {}
+        settings = await self.mongo_db[collection].find_one({"guild_id": guild_id})
+        if not settings:
+            settings = {}
+        return settings
     
     async def update_guild_settings(self, guild_id: int, collection: str, settings: Dict[str, Any]) -> bool:
         """Update settings for a specific guild in a collection"""

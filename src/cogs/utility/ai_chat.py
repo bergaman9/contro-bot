@@ -15,13 +15,15 @@ from dotenv import load_dotenv
 from src.utils.core.formatting import create_embed
 from src.utils.database.connection import initialize_mongodb, is_db_available
 from src.utils.views.perplexity_settings import PerplexitySettingsView
+from ...core.config import get_config
 
 # Configure logger
 logger = logging.getLogger('perplexity_chat')
 
 # Load environment variables
 load_dotenv()
-PERPLEXITY_API_KEY = os.getenv('PERPLEXITY_API_KEY')
+config = get_config()
+PERPLEXITY_API_KEY = config.external_services.perplexity_api_key
 
 class PerplexityChat(commands.Cog):
     """🤖 AI Chat with Perplexity API

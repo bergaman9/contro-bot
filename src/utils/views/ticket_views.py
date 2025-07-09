@@ -1,6 +1,6 @@
 """
 Ticket system views for Discord bot.
-This module has been relocated from utils/turkoyto_views/ticket_views.py.
+This module has been relocated from utils/generic_views/ticket_views.py.
 """
 import discord
 import logging
@@ -123,14 +123,15 @@ class DepartmentSelectView(discord.ui.View):
             self.add_item(DepartmentSelect(options))
 
 class TicketCreateModal(discord.ui.Modal, title="Create a New Ticket"):
-    """Modal for creating a new ticket."""
+    """Modal for creating a new ticket with dynamic form fields."""
     issue_title = discord.ui.TextInput(label="Title", placeholder="e.g., Issue with login")
     issue_description = discord.ui.TextInput(label="Description", style=discord.TextStyle.paragraph, placeholder="Please describe your issue in detail.")
 
     def __init__(self, department: TicketDepartment):
         super().__init__()
         self.department = department
-        
+        self.dynamic_fields = []
+
         # Add priority field if required
         if department.require_priority:
             self.priority = discord.ui.TextInput(
@@ -140,16 +141,36 @@ class TicketCreateModal(discord.ui.Modal, title="Create a New Ticket"):
                 min_length=3,
                 max_length=6
             )
+            self.add_item(self.priority)
+
+        # Add dynamic form fields from department.form_fields
+        form_fields = getattr(department, 'form_fields', []) or []
+        for field in form_fields:
+            # Only support text/paragraph for now
+            field_type = field.get('type', 'paragraph')
+            label = field.get('label', 'Field')[:45]
+            placeholder = field.get('placeholder', '')[:100]
+            required = field.get('required', True)
+            max_length = field.get('max_length', 1000)
+            style = discord.TextStyle.paragraph if field_type == 'paragraph' else discord.TextStyle.short
+            text_input = discord.ui.TextInput(
+                label=label,
+                placeholder=placeholder,
+                required=required,
+                max_length=max_length,
+                style=style
+            )
+            self.add_item(text_input)
+            self.dynamic_fields.append((field, text_input))
 
     async def on_submit(self, interaction: discord.Interaction):
         # Check ticket limits
         mongo_db = get_async_db()
-        existing_tickets = await mongo_db.active_tickets.count_documents({
+        existing_tickets = mongo_db.active_tickets.count_documents({
             "guild_id": interaction.guild.id,
             "user_id": interaction.user.id,
             "status": {"$in": [TicketStatus.OPEN, TicketStatus.ASSIGNED, TicketStatus.PENDING]}
         })
-        
         if existing_tickets >= self.department.max_tickets_per_user:
             await interaction.response.send_message(
                 embed=error_embed(
@@ -159,7 +180,6 @@ class TicketCreateModal(discord.ui.Modal, title="Create a New Ticket"):
                 ephemeral=True
             )
             return
-        
         # Validate priority if required
         priority = TicketPriority.NORMAL
         if self.department.require_priority and hasattr(self, 'priority'):
@@ -174,37 +194,46 @@ class TicketCreateModal(discord.ui.Modal, title="Create a New Ticket"):
                 )
                 return
             priority = priority_input
-        
         # Create the ticket channel
         guild = interaction.guild
         staff_roles = [guild.get_role(role_id) for role_id in self.department.staff_roles if guild.get_role(role_id)]
-        
         overwrites = {
             guild.default_role: discord.PermissionOverwrite(read_messages=False),
             interaction.user: discord.PermissionOverwrite(read_messages=True, send_messages=True),
         }
         for role in staff_roles:
             overwrites[role] = discord.PermissionOverwrite(read_messages=True, send_messages=True)
-
         try:
             # Use department category or create default
             category = None
             if self.department.category_id:
                 category = guild.get_channel(self.department.category_id)
-            
-            if not category:
-                category = discord.utils.get(guild.categories, name="Tickets")
                 if not category:
-                    category = await guild.create_category("Tickets")
-
+                    # Category ID exists but channel not found - log warning but continue without category
+                    print(f"Warning: Department category ID {self.department.category_id} not found in guild {guild.id}")
+                    category = None
+            
+            # If no department category, check global settings
+            if not category:
+                # Get global ticket settings
+                mongo_db = get_async_db()
+                settings = mongo_db.tickets.find_one({"guild_id": guild.id})
+                if settings and settings.get("category_id"):
+                    category = guild.get_channel(settings.get("category_id"))
+                    if not category:
+                        print(f"Warning: Global category ID {settings.get('category_id')} not found in guild {guild.id}")
+                        category = None
+            
+            # If still no category, ticket will be created without category (in main server directory)
+            # This is the desired behavior - no new category creation
+            
             # Create unique channel name with priority indicator
             priority_emoji = TicketPriority.EMOJIS.get(priority, "🔵")
             ticket_number = await self._get_next_ticket_number(guild.id)
             channel_name = f"{priority_emoji}ticket-{ticket_number}-{interaction.user.display_name}"
-            
             channel = await guild.create_text_channel(
                 name=channel_name[:100],  # Discord channel name limit
-                category=category,
+                category=category,  # This can be None - ticket will be created without category
                 overwrites=overwrites,
                 topic=f"Ticket #{ticket_number} | {self.department.name} | {interaction.user} | Priority: {priority}"
             )
@@ -217,7 +246,10 @@ class TicketCreateModal(discord.ui.Modal, title="Create a New Ticket"):
                 ephemeral=True
             )
             return
-
+        # Collect dynamic field values
+        dynamic_field_values = {}
+        for field, text_input in self.dynamic_fields:
+            dynamic_field_values[field.get('id') or field.get('label')] = text_input.value
         # Create ticket database entry
         ticket_data = {
             "ticket_number": ticket_number,
@@ -233,10 +265,10 @@ class TicketCreateModal(discord.ui.Modal, title="Create a New Ticket"):
             "created_at": datetime.utcnow(),
             "assigned_staff": None,
             "messages_count": 0,
-            "last_activity": datetime.utcnow()
+            "last_activity": datetime.utcnow(),
+            "form_responses": dynamic_field_values if dynamic_field_values else None
         }
-        
-        result = await mongo_db.active_tickets.insert_one(ticket_data)
+        result = mongo_db.active_tickets.insert_one(ticket_data)
         
         # Send initial message to the new channel
         embed = create_embed(
@@ -248,6 +280,9 @@ class TicketCreateModal(discord.ui.Modal, title="Create a New Ticket"):
         embed.add_field(name="Priority", value=f"{TicketPriority.EMOJIS.get(priority)} {priority.title()}", inline=True)
         embed.add_field(name="Created by", value=interaction.user.mention, inline=True)
         embed.add_field(name="Issue Description", value=self.issue_description.value, inline=False)
+        if dynamic_field_values:
+            for k, v in dynamic_field_values.items():
+                embed.add_field(name=f"Form: {k}", value=v, inline=False)
         embed.set_footer(text=f"Ticket ID: {result.inserted_id}")
         
         # Add the advanced management view
@@ -272,32 +307,27 @@ class TicketCreateModal(discord.ui.Modal, title="Create a New Ticket"):
     async def _get_next_ticket_number(self, guild_id: int) -> int:
         """Get the next ticket number for this guild."""
         mongo_db = get_async_db()
-        
         # Get the highest ticket number
-        last_ticket = await mongo_db.active_tickets.find_one(
+        last_ticket = mongo_db.active_tickets.find_one(
             {"guild_id": guild_id},
             sort=[("ticket_number", -1)]
         )
-        
         if last_ticket and "ticket_number" in last_ticket:
             return last_ticket["ticket_number"] + 1
-        
         # Check closed tickets too
-        last_closed = await mongo_db.closed_tickets.find_one(
+        last_closed = mongo_db.closed_tickets.find_one(
             {"guild_id": guild_id},
             sort=[("ticket_number", -1)]
         )
-        
         if last_closed and "ticket_number" in last_closed:
             return last_closed["ticket_number"] + 1
-            
         return 1
     
     async def _assign_staff(self, channel: discord.TextChannel, staff_member: discord.Member, ticket_id):
         """Assign a staff member to the ticket."""
         mongo_db = get_async_db()
         
-        await mongo_db.active_tickets.update_one(
+        mongo_db.active_tickets.update_one(
             {"_id": ticket_id},
             {"$set": {"assigned_staff": staff_member.id, "status": TicketStatus.ASSIGNED}}
         )
@@ -510,7 +540,7 @@ class ConfirmCloseView(discord.ui.View):
         mongo_db = get_async_db()
         
         # Mark ticket as closed in database
-        await mongo_db.active_tickets.update_one(
+        mongo_db.active_tickets.update_one(
             {"channel_id": interaction.channel.id},
             {"$set": {"status": "closed", "closed_at": discord.utils.utcnow().isoformat()}}
         )
@@ -984,7 +1014,7 @@ class PrioritySelect(discord.ui.Select):
         mongo_db = get_async_db()
         
         # Update ticket priority
-        result = await mongo_db.active_tickets.update_one(
+        mongo_db.active_tickets.update_one(
             {"channel_id": interaction.channel.id},
             {"$set": {"priority": new_priority}}
         )
@@ -1212,7 +1242,7 @@ class TicketRatingView(discord.ui.View):
             title="Rating Submitted"
         )
         
-        await interaction.response.edit_message(embed=embed, view=None) 
+        await interaction.response.edit_message(embed=embed, view=None)
 
 class TicketStatistics:
     """Class for ticket statistics and analytics."""

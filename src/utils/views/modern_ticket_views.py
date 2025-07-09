@@ -11,27 +11,36 @@ from ..core.formatting import create_embed
 from ..database.db_manager import db_manager
 from ..common import error_embed, success_embed, info_embed, warning_embed
 from ...bot.constants import Colors
+from ...utils.community.generic.card_renderer import create_level_card, get_level_scheme
+from ...utils.community.generic.xp_manager import XPManager
 
 class ModernTicketFormModal(discord.ui.Modal, title="Create Support Ticket"):
     """Dynamic modal for ticket creation with custom form questions."""
     
-    def __init__(self, bot, guild_id: int, questions: List[Dict[str, Any]]):
+    def __init__(self, bot, guild_id: int, questions: List[Dict[str, Any]], department: Dict[str, Any] = None):
         super().__init__()
         self.bot = bot
         self.guild_id = guild_id
         self.questions = questions
+        self.department = department
         self.db = db_manager.get_database()
+        
+        # Update modal title if department is provided
+        if department:
+            self.title = f"{department.get('emoji', '🎫')} {department.get('name', 'Support')} Ticket"
         
         # Add form questions to modal (Discord allows max 5 components)
         for i, question in enumerate(questions[:5]):
-            style = discord.TextStyle.paragraph if question.get('type') == 'paragraph' else discord.TextStyle.short
+            # Field type mapping
+            qtype = question.get('type', 'short')
+            style = discord.TextStyle.paragraph if qtype in ['paragraph', 'textarea'] else discord.TextStyle.short
             
             text_input = discord.ui.TextInput(
-                label=question.get('question', f'Question {i+1}'),
+                label=question.get('label') or question.get('question', f'Question {i+1}'),
                 placeholder=question.get('placeholder', ''),
                 style=style,
                 required=question.get('required', True),
-                max_length=1000 if style == discord.TextStyle.paragraph else 200
+                max_length=question.get('max_length', 1000 if style == discord.TextStyle.paragraph else 200)
             )
             
             self.add_item(text_input)
@@ -50,22 +59,29 @@ class ModernTicketFormModal(discord.ui.Modal, title="Create Support Ticket"):
             )
             return
         
-        # Get category
-        category_id = settings.get('category_id')
-        if not category_id:
-            await interaction.followup.send(
-                embed=error_embed("Ticket category not configured.", title="❌ Not Configured"),
-                ephemeral=True
-            )
-            return
+        # Get category - check department open_category_id first, then category_id, then global
+        category_id = None
+        category = None
         
-        category = interaction.guild.get_channel(int(category_id))
-        if not category:
-            await interaction.followup.send(
-                embed=error_embed("Ticket category not found.", title="❌ Category Missing"),
-                ephemeral=True
-            )
-            return
+        if self.department:
+            if self.department.get('open_category_id'):
+                category_id = self.department.get('open_category_id')
+            elif self.department.get('category_id'):
+                category_id = self.department.get('category_id')
+        
+        if not category_id:
+            category_id = settings.get('category_id')
+        
+        # If category_id exists, try to get the category
+        if category_id:
+            category = interaction.guild.get_channel(int(category_id))
+            if not category:
+                # Category ID exists but channel not found - log warning but continue without category
+                print(f"Warning: Category ID {category_id} not found in guild {interaction.guild.id}")
+                category = None
+        
+        # If no category found, ticket will be created without category (in main server directory)
+        # This is the desired behavior - no new category creation
         
         try:
             # Get next ticket number
@@ -85,8 +101,13 @@ class ModernTicketFormModal(discord.ui.Modal, title="Create Support Ticket"):
                 )
             }
             
-            # Add support roles
-            support_roles = settings.get('support_roles', [])
+            # Add support roles - check department specific first, then global
+            support_roles = []
+            if self.department and self.department.get('staff_roles'):
+                support_roles = self.department.get('staff_roles', [])
+            else:
+                support_roles = settings.get('support_roles', [])
+            
             for role_id in support_roles:
                 role = interaction.guild.get_role(role_id)
                 if role:
@@ -98,10 +119,10 @@ class ModernTicketFormModal(discord.ui.Modal, title="Create Support Ticket"):
                         manage_messages=True
                     )
             
-            # Create channel
+            # Create channel - category can be None (no category)
             ticket_channel = await interaction.guild.create_text_channel(
                 name=channel_name[:100],  # Discord limit
-                category=category,
+                category=category,  # This can be None - ticket will be created without category
                 overwrites=overwrites,
                 topic=f"Support ticket #{ticket_number} for {interaction.user}"
             )
@@ -114,7 +135,9 @@ class ModernTicketFormModal(discord.ui.Modal, title="Create Support Ticket"):
                 "ticket_number": ticket_number,
                 "created_at": datetime.utcnow(),
                 "status": "open",
-                "form_answers": {}
+                "form_answers": {},
+                "department_id": self.department.get('id') if self.department else None,
+                "department_name": self.department.get('name') if self.department else 'General Support'
             }
             
             # Store form answers
@@ -123,10 +146,10 @@ class ModernTicketFormModal(discord.ui.Modal, title="Create Support Ticket"):
                     question = self.questions[i]
                     ticket_data["form_answers"][question.get('question', f'Question {i+1}')] = child.value
             
-            result = await self.db.active_tickets.insert_one(ticket_data)
+            await self.db.active_tickets.insert_one(ticket_data)
             
             # Create the main ticket embed (like in the image)
-            await self._send_ticket_embed(ticket_channel, interaction, ticket_number, ticket_data)
+            await self._send_ticket_embed(ticket_channel, interaction, ticket_number, ticket_data, settings)
             
             # Confirm to user
             await interaction.followup.send(
@@ -167,28 +190,79 @@ class ModernTicketFormModal(discord.ui.Modal, title="Create Support Ticket"):
         
         return max(active_num, closed_num) + 1
     
-    async def _send_ticket_embed(self, channel, interaction, ticket_number, ticket_data):
+    async def _send_ticket_embed(self, channel, interaction, ticket_number, ticket_data, settings):
         """Send the main ticket embed like in the image."""
-        # Check ticket settings for level card option and colors
-        settings = await self.db.ticket_settings.find_one({"guild_id": self.guild_id}) or {}
-        show_level_card = settings.get('show_level_card', True)  # Default enabled
+        # Level kartı gösterme kontrolü
+        show_level_card = True
+        if self.department and isinstance(self.department, dict):
+            show_level_card = self.department.get('show_level_card', True)
         
-        # Get user's level data for color scheme
         user_level = 0
         level_card_file = None
         userdata = None
         
+        # 1. Embed kaynağını belirle
+        embed_json = None
+        if self.department and self.department.get('ticket_embed'):
+            embed_json = self.department['ticket_embed']
+        elif settings.get('default_ticket_embed'):
+            embed_json = settings['default_ticket_embed']
+        
+        # 2. Embed'i oluştur
+        if embed_json:
+            embed = json_to_discord_embed(embed_json)
+        else:
+            # Fallback: eski koddaki gibi embed oluştur
+            embed_color = settings.get('embed_color') or Colors.INFO
+            welcome_message = self.department.get('welcome_message') if self.department and self.department.get('welcome_message') else "Your support request has been created. Our team will contact you as soon as possible."
+            embed = discord.Embed(
+                description=welcome_message,
+                color=embed_color,
+                timestamp=datetime.utcnow()
+            )
+            embed.set_author(
+                name=f"{interaction.user.display_name} - Ticket #{ticket_number}",
+                icon_url=interaction.user.display_avatar.url
+            )
+        
+        # 3. Ticket info ve form cevaplarını embed'e ekle
+        embed.add_field(
+            name="👤 User",
+            value=f"{interaction.user.mention}",
+            inline=True
+        )
+        embed.add_field(
+            name="🎫 Ticket",
+            value=f"#{ticket_number}",
+            inline=True
+        )
+        if self.department:
+            embed.add_field(
+                name="🏢 Department",
+                value=f"{self.department.get('emoji', '🎫')} {self.department.get('name', 'General Support')}",
+                inline=True
+            )
+        else:
+            embed.add_field(
+                name="🏢 Department",
+                value="🎫 General Support",
+                inline=True
+            )
+        form_answers = ticket_data.get("form_answers", {})
+        if form_answers:
+            for question, answer in form_answers.items():
+                display_answer = f"```\n{answer[:200]}{'...' if len(answer) > 200 else ''}\n```"
+                embed.add_field(
+                    name=f"📝 {question}",
+                    value=display_answer,
+                    inline=True
+                )
+        
+        # Add level card image if available
         if show_level_card:
             try:
-                # Import here to avoid circular imports
-                from ...utils.community.turkoyto.card_renderer import create_level_card, get_level_scheme
-                from ...utils.community.turkoyto.xp_manager import XPManager
-                
-                # Get database connection and initialize XP manager
                 mongo_db = db_manager.get_database()
                 xp_manager = XPManager(mongo_db)
-                
-                # Get user's level data using prepare_level_card_data
                 userdata = await xp_manager.prepare_level_card_data(interaction.user, interaction.guild)
                 
                 if userdata:
@@ -204,86 +278,31 @@ class ModernTicketFormModal(discord.ui.Modal, title="Create Support Ticket"):
                     
                     if card_path:
                         level_card_file = discord.File(card_path, filename="level_card.png")
-                        
             except Exception as e:
                 # If level card creation fails, just continue without it
                 print(f"Level card creation failed: {e}")
-        
-        # Get embed color - use custom color or level-based color
-        embed_color = settings.get('embed_color')
-        if not embed_color and user_level > 0:
-            try:
-                from ...utils.community.turkoyto.card_renderer import get_level_scheme, scheme_to_discord_color
-                scheme = get_level_scheme(user_level)
-                embed_color = scheme_to_discord_color(scheme)
-            except:
-                embed_color = Colors.INFO
-        else:
-            embed_color = embed_color or Colors.INFO
-        
-        # Main ticket embed
-        embed = discord.Embed(
-            description="Your support request has been created. Our team will contact you as soon as possible.",
-            color=embed_color,
-            timestamp=datetime.utcnow()
-        )
-        
-        # Set author with user's name and ticket number
-        embed.set_author(
-            name=f"{interaction.user.display_name} - Ticket #{ticket_number}",
-            icon_url=interaction.user.display_avatar.url
-        )
-        
-        # Add user info with inline=True
-        embed.add_field(
-            name="Talepte bulunan kişi",
-            value=f"{interaction.user.mention}",
-            inline=True
-        )
-        
-        embed.add_field(
-            name="ID",
-            value=str(interaction.user.id),
-            inline=True
-        )
-        
-        embed.add_field(
-            name="Ticket sayısı",
-            value=str(ticket_number),
-            inline=True
-        )
-        
-        # Add form answers with inline=True
-        form_answers = ticket_data.get("form_answers", {})
-        
-        if form_answers:
-            for question, answer in form_answers.items():
-                # Limit answer length to fit in inline fields
-                display_answer = f"```\n{answer[:200]}{'...' if len(answer) > 200 else ''}\n```"
-                
-                embed.add_field(
-                    name=f"📝 {question}",
-                    value=display_answer,
-                    inline=True
-                )
-        
-        # Add level card image if available
-        if level_card_file:
-            embed.set_image(url="attachment://level_card.png")
         
         # Create ticket control view (persistent)
         control_view = TicketControlView(ticket_number, interaction.user.id, channel.id)
         
         # Send main embed with level card if available
-        if level_card_file:
-            await channel.send(embed=embed, file=level_card_file, view=control_view)
-        else:
-            await channel.send(embed=embed, view=control_view)
+        try:
+            if level_card_file:
+                await channel.send(embed=embed, file=level_card_file, view=control_view)
+            else:
+                await channel.send(embed=embed, view=control_view)
+        except Exception as send_err:
+            print(f"[ERROR] Ticket embed gönderilemedi: {send_err}")
+            # Fallback: dosyasız sadece embed gönder
+            try:
+                await channel.send(embed=embed, view=control_view)
+            except Exception as fallback_err:
+                print(f"[ERROR] Fallback embed gönderimi de başarısız: {fallback_err}")
     
     async def _get_user_level_info(self, user_id: int) -> Dict[str, Any]:
         """Get user's level information."""
         try:
-            member_data = await self.db.members.find_one({
+            member_data = self.db.members.find_one({
                 "guild_id": self.guild_id,
                 "user_id": user_id
             })
@@ -313,31 +332,31 @@ class ModernTicketFormModal(discord.ui.Modal, title="Create Support Ticket"):
         default_questions = [
             {
                 "guild_id": self.guild_id,
-                "question": "Konunuz nedir?",
+                "question": "What is your issue about?",
                 "type": "short",
-                "placeholder": "Ticket konunuzu kısaca açıklayın",
+                "placeholder": "Briefly describe your ticket subject",
                 "required": True,
                 "order": 1
             },
             {
                 "guild_id": self.guild_id,
-                "question": "İletişim bilgileriniz",
+                "question": "Your contact information",
                 "type": "short", 
-                "placeholder": "Discord kullanıcı adınız veya email",
+                "placeholder": "Your Discord username or email",
                 "required": True,
                 "order": 2
             },
             {
                 "guild_id": self.guild_id,
-                "question": "Detaylı açıklama",
+                "question": "Detailed description",
                 "type": "paragraph",
-                "placeholder": "Sorununuzu detaylı olarak açıklayın...",
+                "placeholder": "Please describe your issue in detail...",
                 "required": True,
                 "order": 3
             }
         ]
         
-        await self.db.ticket_form_questions.insert_many(default_questions)
+        self.db.ticket_form_questions.insert_many(default_questions)
 
 class TicketControlView(discord.ui.View):
     """Control view for ticket management - PERSISTENT."""
@@ -347,14 +366,18 @@ class TicketControlView(discord.ui.View):
         self.ticket_number = ticket_number
         self.creator_id = creator_id
         self.channel_id = channel_id
+        
+        # Create close button with unique custom_id
+        close_button = discord.ui.Button(
+            label="Close Ticket",
+            style=discord.ButtonStyle.danger,
+            emoji="🔒",
+            custom_id=f"ticket_close_{ticket_number}"
+        )
+        close_button.callback = self.close_ticket_callback
+        self.add_item(close_button)
     
-    @discord.ui.button(
-        label="Talebi Kapat",
-        style=discord.ButtonStyle.danger,
-        emoji="🔒",
-        custom_id="ticket_close"
-    )
-    async def close_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def close_ticket_callback(self, interaction: discord.Interaction):
         """Close the ticket."""
         db = db_manager.get_database()
         
@@ -378,8 +401,8 @@ class TicketControlView(discord.ui.View):
         # Show close confirmation
         close_view = TicketCloseConfirmView(ticket["_id"])
         embed = warning_embed(
-            "Bu ticket'ı kapatmak istediğinizden emin misiniz?",
-            title="🔒 Ticket Kapatma"
+            "Are you sure you want to close this ticket?",
+            title="🔒 Close Ticket"
         )
         
         await interaction.response.send_message(embed=embed, view=close_view, ephemeral=True)
@@ -392,7 +415,7 @@ class TicketCloseConfirmView(discord.ui.View):
         self.ticket_id = ticket_id
     
     @discord.ui.button(
-        label="Evet, Kapat", 
+        label="Yes, Close", 
         style=discord.ButtonStyle.danger, 
         emoji="✅"
     )
@@ -426,8 +449,8 @@ class TicketCloseConfirmView(discord.ui.View):
         
         # Send closing message
         embed = success_embed(
-            f"Ticket {interaction.user.mention} tarafından kapatıldı.\nKanal 5 saniye içinde silinecek.",
-            title="🔒 Ticket Kapatıldı"
+            f"Ticket closed by {interaction.user.mention}.\nThe channel will be deleted in 5 seconds.",
+            title="🔒 Ticket Closed"
         )
         
         await interaction.response.edit_message(embed=embed, view=None)
@@ -439,13 +462,39 @@ class TicketCloseConfirmView(discord.ui.View):
             await interaction.channel.delete(reason=f"Ticket closed by {interaction.user}")
         except:
             pass
+        
+        # Move channel to closed category if set
+        department = None
+        # Try to get department from DB using channel info
+        ticket_data = await db.active_tickets.find_one({"channel_id": interaction.channel.id})
+        if ticket_data and ticket_data.get("department_id"):
+            department = await db.ticket_departments.find_one({"id": ticket_data["department_id"]})
+        if department and department.get("closed_category_id"):
+            closed_cat = interaction.guild.get_channel(int(department["closed_category_id"]))
+            if closed_cat and interaction.channel.category_id != closed_cat.id:
+                await interaction.channel.edit(category=closed_cat)
     
     @discord.ui.button(
-        label="İptal", 
+        label="Cancel", 
         style=discord.ButtonStyle.secondary, 
         emoji="❌"
     )
     async def cancel_close(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Cancel ticket closure."""
-        embed = info_embed("Ticket kapatma işlemi iptal edildi.", title="İptal")
-        await interaction.response.edit_message(embed=embed, view=None) 
+        embed = info_embed("Ticket closure has been cancelled.", title="Cancelled")
+        await interaction.response.edit_message(embed=embed, view=None)
+
+# JSON embed objesini discord.Embed nesnesine çeviren yardımcı fonksiyon
+def json_to_discord_embed(embed_json: dict) -> discord.Embed:
+    embed = discord.Embed(
+        title=embed_json.get('title', ''),
+        description=embed_json.get('description', ''),
+        color=int(embed_json.get('color', '#5865F2').replace('#', ''), 16) if embed_json.get('color') else Colors.INFO
+    )
+    for field in embed_json.get('fields', []):
+        embed.add_field(
+            name=field.get('name', ''),
+            value=field.get('value', ''),
+            inline=field.get('inline', False)
+        )
+    return embed 

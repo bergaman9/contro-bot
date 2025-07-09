@@ -3,6 +3,7 @@ import logging
 import os
 import re
 from typing import Dict, Optional, List, Union, Any
+from ...core.config import get_config
 
 logger = logging.getLogger('steam')
 
@@ -12,7 +13,8 @@ class SteamAPI:
     """
     
     def __init__(self):
-        self.api_key = os.getenv("STEAM_API_KEY")
+        config = get_config()
+        self.api_key = config.external_services.steam_api_key
         self.base_url = "https://api.steampowered.com"
         
         # Person states in Steam

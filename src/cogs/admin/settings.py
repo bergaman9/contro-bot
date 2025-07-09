@@ -28,20 +28,22 @@ from src.utils.views.settings_views import (
     ChannelSelectView,
     AdvancedSettingsView
 )
+from src.utils.views.ticket_department_views import DepartmentSettingsView
 from src.utils.views.logging_views import LoggingSettingsView
 from src.utils.views.register_views import RegisterSettingsView
 from src.utils.database.connection import get_async_db, initialize_mongodb
 from src.utils.database.db_manager import db_manager
 from src.utils.version.version_manager import get_version_info, check_for_updates
+from ..base import BaseCog
 
 # Set up logging
 logger = logging.getLogger('admin.settings')
-class Settings(commands.Cog):
+class Settings(BaseCog):
     """Server settings management commands"""
     def __init__(self, bot):
-        self.bot = bot
-        self.db = None
-        self.bot.loop.create_task(self.initialize_db())
+        super().__init__(bot)
+        self.settings_cache = {}
+        self.update_queue = asyncio.Queue()
 
     async def initialize_db(self):
         """Initialize the database connection"""
@@ -235,6 +237,8 @@ class Settings(commands.Cog):
         )
         
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+
+
 
     @commands.hybrid_command(name="status", description="Show bot status and system information")
     async def status(self, ctx: commands.Context):

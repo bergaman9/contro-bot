@@ -21,7 +21,7 @@ class RegistrationPanelView(discord.ui.View):
     async def register_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Handle registration button click."""
         # Import here to avoid circular imports
-        from ..community.turkoyto.registration_view import GamerRegistrationModal
+        from ..community.generic.registration_view import GamerRegistrationModal
         
         # Check if user is already registered
         from ..database.db_manager import db_manager

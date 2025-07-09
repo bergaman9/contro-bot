@@ -1,98 +1,39 @@
-# Discord Bot Core
-discord.py>=2.3.2
-py-cord>=2.4.1
+# Core dependencies
+discord.py>=2.3.0
+flask>=2.3.0
+flask-cors>=4.0.0
+python-dotenv>=1.0.0
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
+PyJWT>=2.8.0
 
 # Database
-motor>=3.3.2
-pymongo>=4.6.0
-dnspython>=2.4.2
+motor>=3.3.0
+pymongo>=4.5.0
 
-# Web Framework
-flask>=3.0.0
-flask-cors>=4.0.0
-gunicorn>=21.2.0
-uvicorn>=0.24.0
-fastapi>=0.104.0
+# Cache
+redis>=5.0.0
 
-# HTTP Requests
-aiohttp>=3.9.1
+# HTTP and networking
+aiohttp>=3.8.0
 requests>=2.31.0
 
-# Image Processing
-Pillow>=10.1.0
-opencv-python>=4.8.1.78
+# Image processing
+Pillow>=10.0.0
 
-# Async Support
-asyncio-mqtt>=0.16.1
-
-# Environment
-python-dotenv>=1.0.0
-
-# Logging
-colorlog>=6.8.0
-
-# Date/Time
-python-dateutil>=2.8.2
+# AI and external services
+openai>=1.0.0
+anthropic>=0.7.0
 
 # Utilities
-pyyaml>=6.0.1
-toml>=0.10.2
+python-dateutil>=2.8.0
+pytz>=2023.3
 
-# Security
-cryptography>=41.0.8
+# Development and testing
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+black>=23.0.0
+flake8>=6.0.0
 
-# AI Providers
-openai>=1.3.0
-anthropic>=0.8.0
-
-# Performance & Monitoring
-psutil>=5.9.6
-prometheus-client>=0.19.0
-grafana-api>=1.0.3
-speedtest-cli>=2.1.3
-
-# Deployment
-docker>=6.1.3
-kubernetes>=28.1.0
-
-# Rate Limiting
-aioredis>=2.0.1
-redis>=5.0.1
-
-# Configuration Management
-pydantic>=2.5.0
-python-multipart>=0.0.6
-
-# Development
-pytest>=7.4.3
-pytest-asyncio>=0.21.1
-black>=23.11.0
-flake8>=6.1.0
-mypy>=1.7.1
-
-# Documentation
-sphinx>=7.2.6
-sphinx-rtd-theme>=1.3.0
-
-# Testing
-faker>=20.1.0
-factory-boy>=3.3.0
-
-# External APIs
-tmdbsimple>=2.9.1
-spotipy>=2.23.0
-asyncpraw>=7.7.1
-rawg>=2.0.1
-translate>=3.6.1
-html-text>=0.5.2
-
-# Scheduling
-apscheduler>=3.10.4
-
-# Utilities for Raspberry Pi
-RPi.GPIO>=0.7.1; sys_platform == "linux"
-gpiozero>=1.6.2; sys_platform == "linux"
-
-# System monitoring
-py-cpuinfo>=9.0.0
-distro>=1.8.0
+# Production
+gunicorn>=21.0.0 

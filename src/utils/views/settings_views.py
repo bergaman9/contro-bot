@@ -1091,9 +1091,26 @@ class TicketSystemView(BaseSettingsView):
         
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
     
-    @discord.ui.button(label="🎨 Send Ticket Panel", style=discord.ButtonStyle.success, row=0)
-    async def send_ticket_panel(self, interaction: discord.Interaction, button: discord.ui.Button):
-        """Send the ticket creation panel."""
+    @discord.ui.button(label="🏢 Departments", style=discord.ButtonStyle.primary, row=0)
+    async def manage_departments(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Manage ticket departments."""
+        from .ticket_department_views import DepartmentSettingsView
+        
+        view = DepartmentSettingsView(self.bot, self.guild_id)
+        await view.initialize()
+        
+        embed = create_embed(
+            title="🏢 Ticket Departments",
+            description="Manage departments for your ticket system.\n"
+                       "Each department can have its own category, staff, and forms.",
+            color=Colors.INFO
+        )
+        
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+    
+    @discord.ui.button(label="🏢 Send Department Panel", style=discord.ButtonStyle.success, row=1)
+    async def send_department_panel(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Send the department-based ticket panel."""
         if not self.settings.get('enabled', True):  # Default to enabled if not set
             await interaction.response.send_message(
                 embed=error_embed("Please enable the ticket system first.", title="❌ System Disabled"),
@@ -1101,12 +1118,22 @@ class TicketSystemView(BaseSettingsView):
             )
             return
         
-        # Note: No need to check form_questions anymore - default questions are auto-created
+        # Check if departments are configured
+        departments = self.settings.get('departments', [])
+        if not departments:
+            await interaction.response.send_message(
+                embed=error_embed(
+                    "No departments configured! Please create departments first using the 🏢 Departments button.",
+                    title="❌ No Departments"
+                ),
+                ephemeral=True
+            )
+            return
         
-        modal = TicketPanelSendModal(self.bot, self.guild_id, self.settings)
+        modal = DepartmentPanelSendModal(self.bot, self.guild_id, self.settings)
         await interaction.response.send_modal(modal)
     
-    @discord.ui.button(label="📊 Statistics", style=discord.ButtonStyle.secondary, row=1)
+    @discord.ui.button(label="📊 Statistics", style=discord.ButtonStyle.secondary, row=2)
     async def statistics(self, interaction: discord.Interaction, button: discord.ui.Button):
         """View ticket statistics."""
         view = TicketStatsView(self.guild_id)
@@ -1117,7 +1144,7 @@ class TicketSystemView(BaseSettingsView):
         )
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
     
-    @discord.ui.button(label="⚙️ Advanced Settings", style=discord.ButtonStyle.secondary, row=1)
+    @discord.ui.button(label="⚙️ Advanced Settings", style=discord.ButtonStyle.secondary, row=2)
     async def advanced_settings(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Configure advanced ticket settings."""
         modal = TicketAdvancedSettingsModal(self.bot, self.guild_id, self.settings)
@@ -1945,9 +1972,15 @@ class RegistrationSystemView(BaseSettingsView):
     
     async def load_settings(self):
         """Load registration settings from database."""
-        self.registration_settings = await self.db.registration_settings.find_one({"guild_id": self.guild_id}) or {}
-        self.register_settings = await self.db.register.find_one({"guild_id": self.guild_id}) or {}
-        self.role_settings = await self.db.role_settings.find_one({"guild_id": self.guild_id}) or {}
+        self.registration_settings = await self.db.registration_settings.find_one({"guild_id": self.guild_id})
+        if not self.registration_settings:
+            self.registration_settings = {}
+        self.register_settings = await self.db.register.find_one({"guild_id": self.guild_id})
+        if not self.register_settings:
+            self.register_settings = {}
+        self.role_settings = await self.db.role_settings.find_one({"guild_id": self.guild_id})
+        if not self.role_settings:
+            self.role_settings = {}
     
     def get_settings_summary(self) -> str:
         """Get registration settings summary."""
@@ -2112,8 +2145,12 @@ class RegistrationBasicView(BaseSettingsView):
     
     async def load_settings(self):
         """Load basic registration settings."""
-        self.settings = await self.db.registration_settings.find_one({"guild_id": self.guild_id}) or {}
-        self.register_settings = await self.db.register.find_one({"guild_id": self.guild_id}) or {}
+        self.settings = await self.db.registration_settings.find_one({"guild_id": self.guild_id})
+        if not self.settings:
+            self.settings = {}
+        self.register_settings = await self.db.register.find_one({"guild_id": self.guild_id})
+        if not self.register_settings:
+            self.register_settings = {}
     
     def get_basic_summary(self) -> str:
         """Get basic settings summary."""
@@ -2196,8 +2233,12 @@ class RegistrationRoleView(BaseSettingsView):
     
     async def load_settings(self):
         """Load role settings."""
-        self.register_settings = await self.db.register.find_one({"guild_id": self.guild_id}) or {}
-        self.role_settings = await self.db.role_settings.find_one({"guild_id": self.guild_id}) or {}
+        self.register_settings = await self.db.register.find_one({"guild_id": self.guild_id})
+        if not self.register_settings:
+            self.register_settings = {}
+        self.role_settings = await self.db.role_settings.find_one({"guild_id": self.guild_id})
+        if not self.role_settings:
+            self.role_settings = {}
     
     def get_role_summary(self) -> str:
         """Get role configuration summary."""
@@ -2288,7 +2329,9 @@ class RegistrationFormView(BaseSettingsView):
     
     async def load_settings(self):
         """Load form settings."""
-        self.form_settings = await self.db.registration_forms.find_one({"guild_id": self.guild_id}) or {}
+        self.form_settings = await self.db.registration_forms.find_one({"guild_id": self.guild_id})
+        if not self.form_settings:
+            self.form_settings = {}
         self.custom_fields = await self.db.registration_fields.find({"guild_id": self.guild_id}).to_list(None)
     
     def get_form_summary(self) -> str:
@@ -2345,7 +2388,9 @@ class RegistrationVerificationView(BaseSettingsView):
     
     async def load_settings(self):
         """Load verification settings."""
-        self.verification_settings = await self.db.registration_verification.find_one({"guild_id": self.guild_id}) or {}
+        self.verification_settings = await self.db.registration_verification.find_one({"guild_id": self.guild_id})
+        if not self.verification_settings:
+            self.verification_settings = {}
     
     def get_verification_summary(self) -> str:
         """Get verification settings summary."""
@@ -2469,7 +2514,9 @@ class RegistrationCustomizationView(BaseSettingsView):
     
     async def load_settings(self):
         """Load customization settings."""
-        self.customization_settings = await self.db.registration_customization.find_one({"guild_id": self.guild_id}) or {}
+        self.customization_settings = await self.db.registration_customization.find_one({"guild_id": self.guild_id})
+        if not self.customization_settings:
+            self.customization_settings = {}
     
     def get_customization_summary(self) -> str:
         """Get customization summary."""
@@ -2513,7 +2560,9 @@ class RegistrationAdvancedView(BaseSettingsView):
     
     async def load_settings(self):
         """Load advanced settings."""
-        self.advanced_settings = await self.db.registration_advanced.find_one({"guild_id": self.guild_id}) or {}
+        self.advanced_settings = await self.db.registration_advanced.find_one({"guild_id": self.guild_id})
+        if not self.advanced_settings:
+            self.advanced_settings = {}
     
     def get_advanced_summary(self) -> str:
         """Get advanced settings summary."""
@@ -3099,7 +3148,7 @@ class RegistrationPanelModal(discord.ui.Modal, title="Send Registration Panel"):
     async def send_registration_panel(self, channel, interaction):
         """Send the actual registration panel."""
         # Import create_register_card
-        from src.utils.community.turkoyto.card_renderer import create_register_card
+        from src.utils.community.generic.card_renderer import create_register_card
         
         # Get current registration stats
         today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
@@ -4808,7 +4857,7 @@ class TicketQuestionModal(discord.ui.Modal, title="Add Form Question"):
     
     question = discord.ui.TextInput(
         label="Question",
-        placeholder="What is the reason for your ticket?",
+        placeholder="Konunuz Nedir?",
         max_length=200,
         required=True
     )
@@ -5010,18 +5059,20 @@ class TicketPanelSendModal(discord.ui.Modal, title="Send Ticket Panel"):
     
     async def on_submit(self, interaction: discord.Interaction):
         """Send the ticket panel."""
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        
         # Determine target channel
         if self.channel_id.value:
             try:
                 channel = interaction.guild.get_channel(int(self.channel_id.value))
                 if not channel:
-                    await interaction.response.send_message(
+                    await interaction.followup.send(
                         embed=error_embed("Channel not found.", title="❌ Invalid Channel"),
                         ephemeral=True
                     )
                     return
             except ValueError:
-                await interaction.response.send_message(
+                await interaction.followup.send(
                     embed=error_embed("Invalid channel ID.", title="❌ Invalid ID"),
                     ephemeral=True
                 )
@@ -5045,11 +5096,32 @@ class TicketPanelSendModal(discord.ui.Modal, title="Send Ticket Panel"):
         )
         embed.set_footer(text="Our support team will respond as soon as possible!")
         
-        # Create view with ticket button
+        # Try to create ticket card and add to embed
+        ticket_card_file = None
+        try:
+            # Import create_ticket_card function
+            from ...utils.community.generic.card_renderer import create_ticket_card
+            
+            # Create ticket card with member avatars
+            card_path = await create_ticket_card(interaction.guild, self.bot)
+            
+            if card_path:
+                ticket_card_file = discord.File(card_path, filename="ticket_card.png")
+                embed.set_image(url="attachment://ticket_card.png")
+                
+        except Exception as e:
+            # If ticket card creation fails, just continue without it
+            print(f"Ticket card creation failed: {e}")
+        
+        # Create view with department buttons
         view = ModernTicketPanelView(self.bot, self.guild_id)
+        await view.setup_departments()
         
         try:
-            await channel.send(embed=embed, view=view)
+            if ticket_card_file:
+                await channel.send(embed=embed, file=ticket_card_file, view=view)
+            else:
+                await channel.send(embed=embed, view=view)
             
             # Mark panel as sent in database
             db = db_manager.get_database()
@@ -5059,7 +5131,7 @@ class TicketPanelSendModal(discord.ui.Modal, title="Send Ticket Panel"):
                 upsert=True
             )
             
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 embed=success_embed(
                     f"Ticket panel sent to {channel.mention}!",
                     title="✅ Panel Sent"
@@ -5067,28 +5139,261 @@ class TicketPanelSendModal(discord.ui.Modal, title="Send Ticket Panel"):
                 ephemeral=True
             )
         except discord.Forbidden:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 embed=error_embed("I don't have permission to send messages in that channel.", title="❌ Permission Error"),
+                ephemeral=True
+            )
+        except Exception as e:
+            await interaction.followup.send(
+                embed=error_embed(f"An unexpected error occurred: {e}"),
                 ephemeral=True
             )
 
 class ModernTicketPanelView(discord.ui.View):
-    """Modern ticket panel with form-based ticket creation."""
+    """Modern ticket panel with department-based ticket creation."""
     
     def __init__(self, bot, guild_id: int):
         super().__init__(timeout=None)
         self.bot = bot
         self.guild_id = guild_id
+        self.departments = []
+        self.panels = []  # Panel verisi eklendi
+
+    async def setup_departments(self):
+        """Setup department buttons from database."""
+        db = db_manager.get_database()
+        ticket_settings = await db.ticket_settings.find_one({'guild_id': self.guild_id})
+        if ticket_settings and 'departments' in ticket_settings:
+            self.departments = ticket_settings['departments']
+        else:
+            # Default departments
+            self.departments = [
+                {
+                    'id': 'general_support',
+                    'name': 'General Support',
+                    'description': 'General questions and assistance',
+                    'emoji': '🎫',
+                    'button_style': 'primary'
+                },
+                {
+                    'id': 'technical_issues',
+                    'name': 'Technical Issues',
+                    'description': 'Technical problems and bug reports',
+                    'emoji': '🔧',
+                    'button_style': 'danger'
+                }
+            ]
+        # Panel verisini de çek
+        self.panels = await db.ticket_panels.find({'guild_id': self.guild_id}).to_list(None)
+        # ... mevcut kod ...
+
+    async def create_panel_ticket(self, interaction: discord.Interaction, panel_id: str, button_id: str):
+        """Panel ticket açılırken panel ve buton bilgisine göre form_fields fallback uygula."""
+        db = db_manager.get_database()
+        # Departmanları her zaman güncel çek
+        self.departments = list(db.ticket_departments.find({'guild_id': self.guild_id}))
+        # ... mevcut kod ...
+
+
+# Department Panel System
+
+class DepartmentPanelSendModal(discord.ui.Modal, title="Send Department Panel"):
+    """Modal for sending department-based ticket panel."""
     
-    @discord.ui.button(
-        label="Create Ticket",
-        style=discord.ButtonStyle.primary,
-        emoji="🎫",
-        custom_id="modern_ticket_create"
+    channel_id = discord.ui.TextInput(
+        label="Channel ID (leave empty for current channel)",
+        placeholder="Channel ID where to send the panel",
+        max_length=20,
+        required=False
     )
-    async def create_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
-        """Create a ticket with form questions."""
-        # Get form questions
+    
+    panel_title = discord.ui.TextInput(
+        label="Panel Title",
+        placeholder="Support Departments",
+        default="🏢 Support Departments",
+        max_length=100,
+        required=False
+    )
+    
+    panel_description = discord.ui.TextInput(
+        label="Panel Description",
+        placeholder="Choose the appropriate department for your inquiry...",
+        style=discord.TextStyle.paragraph,
+        max_length=1000,
+        required=False
+    )
+    
+    def __init__(self, bot, guild_id: int, settings: dict, active_departments: list):
+        super().__init__()
+        self.bot = bot
+        self.guild_id = guild_id
+        self.settings = settings
+        self.active_departments = active_departments
+    
+    async def on_submit(self, interaction: discord.Interaction):
+        """Send the department panel."""
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        
+        # Determine target channel
+        if self.channel_id.value:
+            try:
+                channel = interaction.guild.get_channel(int(self.channel_id.value))
+                if not channel:
+                    await interaction.followup.send(
+                        embed=error_embed("Channel not found.", title="❌ Invalid Channel"),
+                        ephemeral=True
+                    )
+                    return
+            except ValueError:
+                await interaction.followup.send(
+                    embed=error_embed("Invalid channel ID.", title="❌ Invalid ID"),
+                    ephemeral=True
+                )
+                return
+        else:
+            channel = interaction.channel
+        
+        # Create panel embed
+        title = self.panel_title.value or "🏢 Support Departments"
+        description = self.panel_description.value or "Choose the appropriate department for your inquiry. Each department has specialized staff to help you."
+        
+        embed = create_embed(
+            title=title,
+            description=description,
+            color=Colors.INFO
+        )
+        
+        # Add department info to embed
+        departments = self.settings.get('departments', [])
+        if departments:
+            dept_info = []
+            for dept in departments[:5]:  # Show first 5 departments
+                emoji = dept.get('emoji', '🎫')
+                name = dept.get('name', 'Unknown Department')
+                desc = dept.get('description', 'No description')
+                dept_info.append(f"{emoji} **{name}**\n{desc}")
+            
+            embed.add_field(
+                name="📋 Available Departments:",
+                value="\n\n".join(dept_info),
+                inline=False
+            )
+        
+        embed.add_field(
+            name="📝 How to create a ticket:",
+            value="1️⃣ Click the department button below\n2️⃣ Fill out the department form\n3️⃣ Wait for specialized staff assistance",
+            inline=False
+        )
+        embed.set_footer(text="Each department has its own specialized support team!")
+        
+        # Create view with department buttons
+        view = DepartmentPanelView(self.bot, self.guild_id)
+        await view.setup_departments()
+        
+        try:
+            await channel.send(embed=embed, view=view)
+            
+            # Mark panel as sent in database
+            db = db_manager.get_database()
+            await db.ticket_settings.update_one(
+                {"guild_id": self.guild_id},
+                {"$set": {"department_panel_sent": True}},
+                upsert=True
+            )
+            
+            await interaction.followup.send(
+                embed=success_embed(
+                    f"Department panel sent to {channel.mention}!",
+                    title="✅ Panel Sent"
+                ),
+                ephemeral=True
+            )
+        except discord.Forbidden:
+            await interaction.followup.send(
+                embed=error_embed("I don't have permission to send messages in that channel.", title="❌ Permission Error"),
+                ephemeral=True
+            )
+        except Exception as e:
+            await interaction.followup.send(
+                embed=error_embed(f"An unexpected error occurred: {e}"),
+                ephemeral=True
+            )
+
+
+class DepartmentPanelView(discord.ui.View):
+    """Department-based ticket panel with specialized department buttons."""
+    
+    def __init__(self, bot, guild_id: int):
+        super().__init__(timeout=None)
+        self.bot = bot
+        self.guild_id = guild_id
+        self.departments = []
+    
+    async def setup_departments(self):
+        """Setup department buttons from database."""
+        db = db_manager.get_database()
+        ticket_settings = await db.ticket_settings.find_one({'guild_id': self.guild_id})
+        
+        if ticket_settings and 'departments' in ticket_settings:
+            self.departments = ticket_settings['departments']
+        else:
+            # Default departments if none configured
+            self.departments = [
+                {
+                    'id': 'general_support',
+                    'name': 'General Support',
+                    'description': 'General questions and assistance',
+                    'emoji': '🎫',
+                    'button_style': 'primary',
+                    'welcome_message': 'Welcome to General Support! Please describe your issue.',
+                    'form_fields': []
+                },
+                {
+                    'id': 'technical_support',
+                    'name': 'Technical Support',
+                    'description': 'Technical problems and bug reports',
+                    'emoji': '🔧',
+                    'button_style': 'danger',
+                    'welcome_message': 'Welcome to Technical Support! Please provide detailed information about the technical issue.',
+                    'form_fields': []
+                }
+            ]
+        
+        # Clear existing items and add department buttons (up to 25 departments)
+        self.clear_items()
+        
+        # Discord allows max 25 components in a view, distributed across 5 rows (5 components per row)
+        for i, dept in enumerate(self.departments[:25]):
+            # Get button style
+            style_mapping = {
+                'primary': discord.ButtonStyle.primary,
+                'secondary': discord.ButtonStyle.secondary,
+                'success': discord.ButtonStyle.success,
+                'danger': discord.ButtonStyle.danger
+            }
+            button_style = style_mapping.get(dept.get('button_style', 'primary'), discord.ButtonStyle.primary)
+            
+            # Create button with proper row distribution
+            button = discord.ui.Button(
+                label=dept['name'][:80],  # Discord button label limit
+                style=button_style,
+                emoji=dept.get('emoji', '🎫'),
+                custom_id=f"dept_ticket_{dept['id']}_{i}",
+                row=i // 5  # Distribute across 5 rows (5 buttons per row)
+            )
+            
+            # Create closure to preserve department data
+            def make_dept_callback(department):
+                async def dept_callback(interaction: discord.Interaction):
+                    await self.create_department_ticket(interaction, department)
+                return dept_callback
+            
+            button.callback = make_dept_callback(dept)
+            self.add_item(button)
+    
+    async def create_department_ticket(self, interaction: discord.Interaction, department: dict):
+        """Create a ticket for specific department with custom form questions."""
+        # Get database connection
         db = db_manager.get_database()
         
         # Check if ticket system is enabled
@@ -5100,21 +5405,11 @@ class ModernTicketPanelView(discord.ui.View):
             )
             return
         
-        questions = await db.ticket_form_questions.find(
-            {"guild_id": self.guild_id}
-        ).sort("order", 1).to_list(None)
-        
-        # If no questions exist, create default ones
-        if not questions:
-            await self._create_default_questions(db)
-            questions = await db.ticket_form_questions.find(
-                {"guild_id": self.guild_id}
-            ).sort("order", 1).to_list(None)
-        
         # Check for existing ticket
         existing_ticket = await db.active_tickets.find_one({
             "guild_id": self.guild_id,
-            "user_id": interaction.user.id
+            "user_id": interaction.user.id,
+            "status": {"$ne": "closed"}
         })
         
         if existing_ticket:
@@ -5132,40 +5427,309 @@ class ModernTicketPanelView(discord.ui.View):
                 # Clean up orphaned ticket
                 await db.active_tickets.delete_one({"_id": existing_ticket["_id"]})
         
-        # Create and show form modal
-        modal = ModernTicketFormModal(self.bot, self.guild_id, questions)
-        await interaction.response.send_modal(modal)
-    
-    async def _create_default_questions(self, db):
-        """Create default form questions if none exist."""
-        default_questions = [
-            {
-                "guild_id": self.guild_id,
-                "question": "Konunuz nedir?",
-                "type": "short",
-                "placeholder": "Ticket konunuzu kısaca açıklayın",
-                "required": True,
-                "order": 1
-            },
-            {
-                "guild_id": self.guild_id,
-                "question": "İletişim bilgileriniz",
-                "type": "short", 
-                "placeholder": "Discord kullanıcı adınız veya email",
-                "required": True,
-                "order": 2
-            },
-            {
-                "guild_id": self.guild_id,
-                "question": "Detaylı açıklama",
-                "type": "paragraph",
-                "placeholder": "Sorununuzu detaylı olarak açıklayın...",
-                "required": True,
-                "order": 3
-            }
-        ]
+        # Get form questions for this department
+        dept_form_fields = department.get('form_fields', [])
         
-        await db.ticket_form_questions.insert_many(default_questions)
+        if dept_form_fields:
+            # Use department-specific questions
+            questions = []
+            for field in dept_form_fields:
+                questions.append({
+                    'question': field.get('label', 'Question'),
+                    'type': field.get('type', 'short'),
+                    'placeholder': field.get('placeholder', ''),
+                    'required': field.get('required', True)
+                })
+        else:
+            # Use global form questions
+            questions = await db.ticket_form_questions.find(
+                {"guild_id": self.guild_id}
+            ).sort("order", 1).to_list(None)
+            
+            # If no questions exist, create default ones for this department
+            if not questions:
+                questions = [
+                    {
+                        "question": f"What can we help you with in {department['name']}?",
+                        "type": "short",
+                        "placeholder": "Briefly describe your request",
+                        "required": True
+                    },
+                    {
+                        "question": "Detailed Description",
+                        "type": "paragraph",
+                        "placeholder": "Please provide more details about your issue or request...",
+                        "required": True
+                    },
+                    {
+                        "question": "Priority Level",
+                        "type": "short",
+                        "placeholder": "Low, Medium, High, or Urgent",
+                        "required": False
+                    }
+                ]
+        
+        # Create and show department-specific form modal
+        modal = ModernTicketFormModal(self.bot, self.guild_id, questions, department)
+        await interaction.response.send_modal(modal)
+
+
+class ModernTicketFormModal(discord.ui.Modal):
+    """Department-specific ticket form modal with customizable questions."""
+    
+    def __init__(self, bot, guild_id: int, questions: list, department: dict):
+        # Set modal title based on department
+        dept_name = department.get('name', 'Support')
+        super().__init__(title=f"{dept_name} - Create Ticket")
+        
+        self.bot = bot
+        self.guild_id = guild_id
+        self.questions = questions[:5]  # Discord modal limit: 5 inputs
+        self.department = department
+        
+        # Add questions as text inputs
+        for i, q in enumerate(self.questions):
+            question_text = q.get('question', f'Question {i+1}')
+            placeholder = q.get('placeholder', 'Enter your response...')
+            required = q.get('required', True)
+            q_type = q.get('type', 'short')
+            
+            # Create text input
+            text_input = discord.ui.TextInput(
+                label=question_text[:45],  # Discord limit: 45 chars
+                placeholder=placeholder[:100],  # Discord limit: 100 chars
+                style=discord.TextStyle.paragraph if q_type == 'paragraph' else discord.TextStyle.short,
+                required=required,
+                max_length=4000 if q_type == 'paragraph' else 200
+            )
+            
+            self.add_item(text_input)
+    
+    async def on_submit(self, interaction: discord.Interaction):
+        """Handle ticket creation with department-specific data."""
+        await interaction.response.defer(ephemeral=True)
+        
+        try:
+            # Get form responses
+            responses = []
+            for i, item in enumerate(self.children):
+                if hasattr(item, 'value') and item.value:
+                    question = self.questions[i].get('question', f'Question {i+1}')
+                    responses.append(f"**{question}:**\n{item.value}")
+            
+            # Create ticket
+            ticket_id = await self._create_ticket_channel(interaction, responses)
+            
+            if ticket_id:
+                await interaction.followup.send(
+                    embed=success_embed(
+                        f"Ticket created successfully in {self.department['name']}!\n"
+                        f"Ticket ID: `{ticket_id}`",
+                        title="✅ Ticket Created"
+                    ),
+                    ephemeral=True
+                )
+            else:
+                await interaction.followup.send(
+                    embed=error_embed("Failed to create ticket channel.", title="❌ Creation Failed"),
+                    ephemeral=True
+                )
+        
+        except Exception as e:
+            await interaction.followup.send(
+                embed=error_embed(f"An error occurred: {str(e)}", title="❌ Error"),
+                ephemeral=True
+            )
+    
+    async def _create_ticket_channel(self, interaction: discord.Interaction, responses: list):
+        """Create ticket channel for the department."""
+        import uuid
+        from datetime import datetime
+        
+        db = db_manager.get_database()
+        guild = interaction.guild
+        user = interaction.user
+        
+        # Get department settings
+        category_id = self.department.get('category_id')
+        staff_roles = self.department.get('staff_roles', [])
+        welcome_message = self.department.get('welcome_message', f"Welcome to {self.department['name']}!")
+        
+        # Kategori fallback mantığı - modern ve kapsamlı
+        category = None
+        
+        # 1. Önce departmanın kendi category_id'sini kontrol et
+        if category_id:
+            category = guild.get_channel(category_id)
+            if not category:
+                print(f"Warning: Department category ID {category_id} not found in guild {guild.id}")
+                category = None
+        
+        # 2. Departmanda kategori yoksa, global ticket settings'den al
+        if not category:
+            ticket_settings = db.ticket_settings.find_one({"guild_id": self.guild_id})
+            if ticket_settings and ticket_settings.get('category_id'):
+                global_category_id = ticket_settings.get('category_id')
+                category = guild.get_channel(global_category_id)
+                if not category:
+                    print(f"Warning: Global category ID {global_category_id} not found in guild {guild.id}")
+                    category = None
+        
+        # 3. Hiç kategori bulunamazsa, ticket kategorisiz açılacak (sunucu ana dizininde)
+        # Bu istenen davranış - yeni kategori oluşturma yok
+        
+        # Generate unique ticket number
+        ticket_number = str(uuid.uuid4())[:8]
+        channel_name = f"ticket-{self.department['id']}-{user.name}-{ticket_number}"
+        
+        # Set up permissions
+        overwrites = {
+            guild.default_role: discord.PermissionOverwrite(read_messages=False),
+            user: discord.PermissionOverwrite(read_messages=True, send_messages=True),
+            guild.me: discord.PermissionOverwrite(read_messages=True, send_messages=True, manage_messages=True)
+        }
+        
+        # Add staff roles permissions
+        for role_id in staff_roles:
+            role = guild.get_role(role_id)
+            if role:
+                overwrites[role] = discord.PermissionOverwrite(read_messages=True, send_messages=True, manage_messages=True)
+        
+        try:
+            # Create channel
+            channel = await guild.create_text_channel(
+                name=channel_name,
+                category=category,
+                overwrites=overwrites,
+                reason=f"Ticket created by {user} in {self.department['name']}"
+            )
+            
+            # Create ticket embed
+            embed = create_embed(
+                title=f"🎫 {self.department['name']} Ticket",
+                description=welcome_message,
+                color=Colors.INFO
+            )
+            
+            embed.add_field(
+                name="👤 Created by:",
+                value=f"{user.mention} ({user})",
+                inline=True
+            )
+            
+            embed.add_field(
+                name="🏢 Department:",
+                value=f"{self.department.get('emoji', '🎫')} {self.department['name']}",
+                inline=True
+            )
+            
+            embed.add_field(
+                name="🆔 Ticket ID:",
+                value=f"`{ticket_number}`",
+                inline=True
+            )
+            
+            # Add form responses
+            if responses:
+                embed.add_field(
+                    name="📝 Form Responses:",
+                    value="\n\n".join(responses),
+                    inline=False
+                )
+            
+            embed.set_footer(text=f"Created on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+            
+            # Create close button view
+            close_view = TicketControlView(self.bot, self.guild_id, ticket_number, self.department)
+            
+            # Send initial message
+            await channel.send(embed=embed, view=close_view)
+            
+            # Mention staff roles if configured
+            if staff_roles:
+                staff_mentions = []
+                for role_id in staff_roles:
+                    role = guild.get_role(role_id)
+                    if role:
+                        staff_mentions.append(role.mention)
+                
+                if staff_mentions:
+                    await channel.send(f"Staff notification: {' '.join(staff_mentions)}")
+            
+            # Save to database
+            ticket_data = {
+                "guild_id": self.guild_id,
+                "channel_id": channel.id,
+                "user_id": user.id,
+                "ticket_id": ticket_number,
+                "department_id": self.department['id'],
+                "department_name": self.department['name'],
+                "status": "open",
+                "created_at": datetime.utcnow(),
+                "staff_roles": staff_roles,
+                "form_responses": responses
+            }
+            
+            await db.active_tickets.insert_one(ticket_data)
+            
+            return ticket_number
+            
+        except discord.Forbidden:
+            raise Exception("Bot doesn't have permission to create channels")
+        except Exception as e:
+            raise Exception(f"Failed to create ticket channel: {str(e)}")
+
+
+class TicketControlView(discord.ui.View):
+    """Control view for department tickets."""
+    
+    def __init__(self, bot, guild_id: int, ticket_id: str, department: dict):
+        super().__init__(timeout=None)
+        self.bot = bot
+        self.guild_id = guild_id
+        self.ticket_id = ticket_id
+        self.department = department
+    
+    @discord.ui.button(label="🔒 Close Ticket", style=discord.ButtonStyle.danger, custom_id="close_ticket")
+    async def close_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Close the ticket."""
+        # Import the existing ticket closing functionality
+        from ..views.ticket_view import TicketCloseView
+        
+        view = TicketCloseView(self.bot, self.guild_id, self.ticket_id)
+        embed = create_embed(
+            title="🔒 Close Ticket",
+            description="Are you sure you want to close this ticket?",
+            color=Colors.WARNING
+        )
+        
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+    
+    @discord.ui.button(label="🎫 Ticket Info", style=discord.ButtonStyle.secondary, custom_id="ticket_info")
+    async def ticket_info(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Show ticket information."""
+        db = db_manager.get_database()
+        ticket = await db.active_tickets.find_one({"ticket_id": self.ticket_id})
+        
+        if not ticket:
+            await interaction.response.send_message(
+                embed=error_embed("Ticket not found.", title="❌ Not Found"),
+                ephemeral=True
+            )
+            return
+        
+        embed = create_embed(
+            title="🎫 Ticket Information",
+            color=Colors.INFO
+        )
+        
+        embed.add_field(name="🆔 Ticket ID", value=f"`{self.ticket_id}`", inline=True)
+        embed.add_field(name="🏢 Department", value=self.department['name'], inline=True)
+        embed.add_field(name="📅 Created", value=f"<t:{int(ticket['created_at'].timestamp())}:R>", inline=True)
+        embed.add_field(name="👤 User", value=f"<@{ticket['user_id']}>", inline=True)
+        embed.add_field(name="📊 Status", value=ticket['status'].title(), inline=True)
+        
+        await interaction.response.send_message(embed=embed, ephemeral=True)
 
 
 

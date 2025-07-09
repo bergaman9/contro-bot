@@ -548,7 +548,7 @@ class ServerSetup(commands.Cog):
         
         file_path = os.path.join(
             os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
-            "utils", "community", "turkoyto", "xp_manager.py"
+            "utils", "community", "generic", "xp_manager.py"
         )
         
         try:

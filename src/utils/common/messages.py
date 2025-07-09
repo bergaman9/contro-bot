@@ -39,8 +39,8 @@ class MessageEmbed:
     
     @staticmethod
     def success(
-        title: str = "✅ Başarılı",
-        description: str = "İşlem başarıyla tamamlandı.",
+        title: str = "✅ Success",
+        description: str = "Operation completed successfully.",
         fields: Optional[list] = None,
         footer: Optional[str] = None,
         thumbnail: Optional[str] = None
@@ -70,7 +70,7 @@ class MessageEmbed:
     
     @staticmethod
     def info(
-        title: str = "ℹ️ Bilgi",
+        title: str = "ℹ️ Information",
         description: str = "",
         fields: Optional[list] = None,
         footer: Optional[str] = None,
@@ -199,7 +199,7 @@ def error_embed(description: str, title: str = "❌ Hata") -> Embed:
     return MessageEmbed.error(title=title, description=description)
 
 
-def success_embed(description: str, title: str = "✅ Başarılı") -> Embed:
+def success_embed(description: str, title: str = "✅ Success") -> Embed:
     """Quick success embed creation"""
     return MessageEmbed.success(title=title, description=description)
 

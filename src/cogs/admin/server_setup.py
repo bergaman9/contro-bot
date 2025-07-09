@@ -12,25 +12,27 @@ from src.utils.views.settings_views import MainSettingsView
 from src.utils.views.views import MainSetupView
 from src.utils.database.db_manager import db_manager
 from src.bot.constants import Colors
+from ..base import BaseCog
 
 # Set up logging
 logger = logging.getLogger('admin.server_setup')
 
-class ServerSetup(commands.Cog):
+class ServerSetup(BaseCog):
     """Server setup and configuration commands"""
     
     def __init__(self, bot):
-        self.bot = bot
-        self.db = None
+        super().__init__(bot)
+        self.setup_cache = {}
+        self.active_setups = {}
         self.bot.loop.create_task(self.initialize_db())
 
     async def initialize_db(self):
         """Initialize the database connection"""
         try:
             if db_manager and hasattr(db_manager, 'get_database'):
-                self.db = db_manager.get_database()
+                self._db = db_manager.get_database()
             else:
-                self.db = getattr(self.bot, 'async_db', None)
+                self._db = getattr(self.bot, 'async_db', None)
             logger.info("Database connection initialized for ServerSetup cog")
         except Exception as e:
             logger.error(f"Error initializing database connection: {e}")
@@ -400,7 +402,7 @@ class ServerSetup(commands.Cog):
         """Configure basic bot settings"""
         results = []
         
-        if not self.db:
+        if not self._db:
             results.append({"item": "Database Settings", "success": False, "reason": "Database not available"})
             return results
         
@@ -410,7 +412,7 @@ class ServerSetup(commands.Cog):
             for setting, value in settings_config.items():
                 feature_updates[setting] = value
             
-            await self.db.feature_toggles.update_one(
+            await self._db.feature_toggles.update_one(
                 {"guild_id": guild_id},
                 {"$set": feature_updates},
                 upsert=True
@@ -420,7 +422,7 @@ class ServerSetup(commands.Cog):
             
             # Set default welcome message if enabled
             if settings_config.get('welcome_enabled'):
-                await self.db.welcomer.update_one(
+                await self._db.welcomer.update_one(
                     {"guild_id": guild_id},
                     {"$set": {
                         "welcome_message": "Welcome to our server, {user}! 🎉",
@@ -432,7 +434,7 @@ class ServerSetup(commands.Cog):
             
             # Configure leveling if enabled
             if settings_config.get('leveling_enabled'):
-                await self.db.leveling_settings.update_one(
+                await self._db.leveling_settings.update_one(
                     {"guild_id": guild_id},
                     {"$set": {
                         "enabled": True,

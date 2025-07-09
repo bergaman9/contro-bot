@@ -1,15 +1,13 @@
 """
-Community features module for Discord bot.
+Community utilities for Discord bot
 
-This module contains community-specific features including:
-- TurkOyto community features
-- Ticket system
-- Level system
-- Game matching
+This module provides community-specific features and utilities:
+- Generic community features
+- User management and registration
+- Leveling and XP systems
 - Event management
+- Game matching and sessions
+- Ticket system integration
 """
 
-# TurkOyto community features will be imported from the turkoyto submodule
-# when needed to avoid circular imports
-
-__all__ = [] 
+# Generic community features will be imported from the generic submodule 

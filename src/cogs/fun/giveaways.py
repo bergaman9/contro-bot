@@ -6,6 +6,7 @@ import logging
 import random
 from datetime import datetime
 from typing import Optional, Dict, Any, List
+from dateutil import parser
 
 from src.utils.core.formatting import create_embed
 from src.utils.database.connection import initialize_mongodb
@@ -23,33 +24,33 @@ class GiveawayView(discord.ui.View):
         self.cog = cog
         self.giveaway_data = giveaway_data
     
-    @discord.ui.button(label="Katıl", style=discord.ButtonStyle.primary, custom_id="participate_button")
+    @discord.ui.button(label="Join", style=discord.ButtonStyle.primary, custom_id="participate_button")
     async def participate_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         if self.cog:
             await self.cog.handle_participate_button(interaction)
         else:
             await interaction.response.send_message(
-                embed=create_embed("Bu butonu şu anda işleyemiyorum. Lütfen daha sonra tekrar deneyin.", discord.Color.red()),
+                embed=create_embed("I cannot process this button right now. Please try again later.", discord.Color.red()),
                 ephemeral=True
             )
     
-    @discord.ui.button(label="Katılımcılar", style=discord.ButtonStyle.secondary, custom_id="participants_button")
+    @discord.ui.button(label="Participants", style=discord.ButtonStyle.secondary, custom_id="participants_button")
     async def participants_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         if self.cog:
             await self.cog.handle_participants_button(interaction)
         else:
             await interaction.response.send_message(
-                embed=create_embed("Bu butonu şu anda işleyemiyorum. Lütfen daha sonra tekrar deneyin.", discord.Color.red()),
+                embed=create_embed("I cannot process this button right now. Please try again later.", discord.Color.red()),
                 ephemeral=True
             )
     
-    @discord.ui.button(label="Çekilişi Bitir", style=discord.ButtonStyle.danger, custom_id="reroll_button")
+    @discord.ui.button(label="End Giveaway", style=discord.ButtonStyle.danger, custom_id="reroll_button")
     async def reroll_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         if self.cog:
             await self.cog.handle_reroll_button(interaction)
         else:
             await interaction.response.send_message(
-                embed=create_embed("Bu butonu şu anda işleyemiyorum. Lütfen daha sonra tekrar deneyin.", discord.Color.red()),
+                embed=create_embed("I cannot process this button right now. Please try again later.", discord.Color.red()),
                 ephemeral=True
             )
 
@@ -59,33 +60,33 @@ class GiveawayEditView(discord.ui.View):
         super().__init__(timeout=None)
         self.cog = cog
     
-    @discord.ui.button(label="Katılımcılar", style=discord.ButtonStyle.secondary, custom_id="participants_button")
+    @discord.ui.button(label="Participants", style=discord.ButtonStyle.secondary, custom_id="participants_button")
     async def participants_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         if self.cog:
             await self.cog.handle_participants_button(interaction)
         else:
             await interaction.response.send_message(
-                embed=create_embed("Bu butonu şu anda işleyemiyorum. Lütfen daha sonra tekrar deneyin.", discord.Color.red()),
+                embed=create_embed("I cannot process this button right now. Please try again later.", discord.Color.red()),
                 ephemeral=True
             )
     
-    @discord.ui.button(label="Aktif Çekilişler", style=discord.ButtonStyle.secondary, custom_id="active_giveaways_button")
+    @discord.ui.button(label="Active Giveaways", style=discord.ButtonStyle.secondary, custom_id="active_giveaways_button")
     async def active_giveaways_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         if self.cog:
             await self.cog.active_giveaways_handler(interaction)
         else:
             await interaction.response.send_message(
-                embed=create_embed("Bu butonu şu anda işleyemiyorum. Lütfen daha sonra tekrar deneyin.", discord.Color.red()),
+                embed=create_embed("I cannot process this button right now. Please try again later.", discord.Color.red()),
                 ephemeral=True
             )
     
-    @discord.ui.button(label="Çekilişi Tekrarla", style=discord.ButtonStyle.danger, custom_id="reroll_button")
+    @discord.ui.button(label="Reroll Giveaway", style=discord.ButtonStyle.danger, custom_id="reroll_button")
     async def reroll_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         if self.cog:
             await self.cog.handle_reroll_button(interaction)
         else:
             await interaction.response.send_message(
-                embed=create_embed("Bu butonu şu anda işleyemiyorum. Lütfen daha sonra tekrar deneyin.", discord.Color.red()),
+                embed=create_embed("I cannot process this button right now. Please try again later.", discord.Color.red()),
                 ephemeral=True
             )
 
@@ -101,6 +102,7 @@ class Giveaways(commands.Cog):
         self.cache_ttl = 300  # 5 minutes cache TTL
         self.last_cache_update = {}
         self.cleanup_task.start()
+        self.check_new_giveaways.start()
         
         # Add persistent views
         self.bot.add_view(GiveawayView(self))
@@ -139,6 +141,50 @@ class Giveaways(commands.Cog):
         except Exception as e:
             logger.error(f"Error in cleanup task: {e}")
 
+    @tasks.loop(seconds=10)
+    async def check_new_giveaways(self):
+        # Find giveaways with no message_id
+        giveaways = list(self.mongo_db['giveaways'].find({"message_id": None}))
+        for giveaway in giveaways:
+            try:
+                # Skip if message_id is already set (extra safety)
+                if giveaway.get('message_id'):
+                    continue
+                # Parse end_time to int (ms)
+                end_time = giveaway.get('end_time')
+                if isinstance(end_time, str):
+                    end_time = int(parser.isoparse(end_time).timestamp() * 1000)
+                elif isinstance(end_time, float):
+                    end_time = int(end_time)
+                channel_id = int(giveaway['channel_id'])
+                channel = self.bot.get_channel(channel_id)
+                if not channel:
+                    self.bot.logger.warning(f"Channel {channel_id} not found for giveaway {giveaway['_id']}")
+                    continue
+                embed = discord.Embed(
+                    title=f"🎉 {giveaway['title']}",
+                    description=giveaway.get('description', ''),
+                    color=int(giveaway.get('embed_color', '#FF6B9D').replace('#', ''), 16)
+                )
+                embed.add_field(name="🏆 Prize", value=giveaway['prize'], inline=False)
+                embed.add_field(name="👥 Winners", value=str(giveaway.get('winner_count', 1)), inline=True)
+                # end_time is ms, convert to seconds for Discord timestamp
+                if end_time > 1e12:  # ms
+                    end_time = end_time // 1000
+                embed.add_field(name="⏰ Ends", value=f"<t:{end_time}:R>", inline=True)
+                embed.add_field(name="🎯 Participants", value="0", inline=True)
+                embed.set_footer(text=f"Giveaway ID: {giveaway['_id']}")
+                view = GiveawayView(self)
+                message = await channel.send(embed=embed, view=view)
+                # Mesaj gönderildikten sonra message_id'yi güncelle
+                self.mongo_db['giveaways'].update_one(
+                    {'_id': giveaway['_id']},
+                    {'$set': {'message_id': str(message.id)}}
+                )
+                logger.info(f"Created Discord message for giveaway {giveaway['_id']}: {message.id}")
+            except Exception as e:
+                logger.error(f"Failed to send Discord message for giveaway {giveaway['_id']}: {e}")
+
     async def get_giveaway_data(self, message_id: int) -> Optional[Dict[str, Any]]:
         """Get giveaway data with caching"""
         cache_key = f"giveaway_{message_id}"
@@ -148,14 +194,19 @@ class Giveaways(commands.Cog):
         if cache_key in self.giveaway_cache and now - self.last_cache_update.get(cache_key, 0) < self.cache_ttl:
             return self.giveaway_cache[cache_key]
             
-        # Fetch from database
-        giveaway_data = self.mongo_db['giveaways'].find_one({"message_id": message_id})
+        # Fetch from database (try both int and string message_id)
+        giveaway_data = self.mongo_db['giveaways'].find_one({
+            "$or": [
+                {"message_id": message_id},
+                {"message_id": str(message_id)}
+            ]
+        })
         
         # Update cache
         if giveaway_data:
             self.giveaway_cache[cache_key] = giveaway_data
             self.last_cache_update[cache_key] = now
-            
+        
         return giveaway_data
 
     async def invalidate_cache(self, message_id: int) -> None:
@@ -178,7 +229,7 @@ class Giveaways(commands.Cog):
             # Validate inputs
             if limit <= 0:
                 await ctx.send(
-                    embed=create_embed("Katılımcı limiti pozitif bir sayı olmalıdır.", discord.Color.red())
+                    embed=create_embed("Participant limit must be a positive number.", discord.Color.red())
                 )
                 return
                 
@@ -207,18 +258,18 @@ class Giveaways(commands.Cog):
             # Create the giveaway embed
             embed = discord.Embed(
                 title=prize,
-                description=f"Katılmak için katıl butonuna tıkla! \nToplamda **{limit}** kişi katıldığında çekiliş tamamlanacak.", 
+                description=f"Click the join button to participate! \nThe giveaway will end when **{limit}** people join.", 
                 colour=0xff0076
             )
-            embed.add_field(name="Başlatan", value=ctx.author.mention, inline=True)
+            embed.add_field(name="Host", value=ctx.author.mention, inline=True)
             
             # Handle role restrictions
             if role_mentions:
-                embed.add_field(name="Katılabilir Roller", value=' '.join(role_mentions), inline=True)
+                embed.add_field(name="Eligible Roles", value=' '.join(role_mentions), inline=True)
             else:
-                embed.add_field(name="Katılabilir Roller", value="@everyone", inline=True)
+                embed.add_field(name="Eligible Roles", value="@everyone", inline=True)
                 
-            embed.add_field(name="Kazanan Sayısı", value="1", inline=True)
+            embed.add_field(name="Winners", value="1", inline=True)
             embed.set_image(url="https://i.ibb.co/8Kn0L6t/giveaway-banner.png")
             
             # Create the persistent view
@@ -228,7 +279,7 @@ class Giveaways(commands.Cog):
             message = await ctx.send(embed=embed, view=view)
             
             # Update embed with footer
-            embed.set_footer(text=f"Çekiliş ID: {message.id}")
+            embed.set_footer(text=f"Giveaway ID: {message.id}")
             await message.edit(embed=embed)
             
             # Store giveaway information in database
@@ -256,7 +307,7 @@ class Giveaways(commands.Cog):
             
         except Exception as e:
             logger.error(f"Error creating giveaway: {e}")
-            await ctx.send(embed=create_embed("Çekiliş oluşturulurken bir hata oluştu.", discord.Color.red()))
+            await ctx.send(embed=create_embed("An error occurred while creating the giveaway.", discord.Color.red()))
 
     @giveaway_group.command(
         name="shuffle", 
@@ -270,20 +321,20 @@ class Giveaways(commands.Cog):
             try:
                 message_id_int = int(message_id)
             except ValueError:
-                await ctx.send(embed=create_embed("Geçersiz mesaj ID'si.", discord.Color.red()))
+                await ctx.send(embed=create_embed("Invalid message ID.", discord.Color.red()))
                 return
 
             # Get giveaway data from cache or database
             giveaway_data = await self.get_giveaway_data(message_id_int)
 
             if not giveaway_data:
-                await ctx.send(embed=create_embed("Geçersiz çekiliş ID.", discord.Color.red()))
+                await ctx.send(embed=create_embed("Invalid giveaway ID.", discord.Color.red()))
                 return
                 
             participants_list = giveaway_data.get("participants", [])
 
             if not participants_list:
-                await ctx.send(embed=create_embed("Çekilişte hiç katılımcı yok.", discord.Color.red()))
+                await ctx.send(embed=create_embed("No participants in this giveaway.", discord.Color.red()))
                 return
                 
             # Select a new winner randomly
@@ -301,7 +352,7 @@ class Giveaways(commands.Cog):
             
             # Create success embed
             embed = discord.Embed(
-                description=f"🎉 {selected_user.mention} çekilişin yeni talihlisidir!",
+                description=f"🎉 {selected_user.mention} is the new winner of the giveaway!",
                 color=0xff0076
             )
             
@@ -310,7 +361,7 @@ class Giveaways(commands.Cog):
             
         except Exception as e:
             logger.error(f"Error in giveaway_shuffle: {e}")
-            await ctx.send(embed=create_embed("Çekiliş tekrarlanırken bir hata oluştu.", discord.Color.red()))
+            await ctx.send(embed=create_embed("An error occurred while reshuffling the giveaway.", discord.Color.red()))
 
     @giveaway_group.command(
         name="show", 
@@ -333,7 +384,7 @@ class Giveaways(commands.Cog):
             giveaway_data = await self.get_giveaway_data(message_id_int)
             
             if not giveaway_data:
-                await ctx.send(embed=create_embed("Çekiliş bulunamadı.", discord.Color.red()))
+                await ctx.send(embed=create_embed("Giveaway not found.", discord.Color.red()))
                 return
                 
             # Delete from database
@@ -342,14 +393,14 @@ class Giveaways(commands.Cog):
             # Invalidate cache
             await self.invalidate_cache(message_id_int)
             
-            await ctx.send(embed=create_embed("Çekiliş silindi.", discord.Color.green()))
+            await ctx.send(embed=create_embed("Giveaway deleted.", discord.Color.green()))
             logger.info(f"Giveaway {message_id} removed by {ctx.author} (ID: {ctx.author.id})")
             
         except ValueError:
-            await ctx.send(embed=create_embed("Geçersiz mesaj ID'si.", discord.Color.red()))
+            await ctx.send(embed=create_embed("Invalid message ID.", discord.Color.red()))
         except Exception as e:
             logger.error(f"Error removing giveaway: {e}")
-            await ctx.send(embed=create_embed("Çekiliş silinirken bir hata oluştu.", discord.Color.red()))
+            await ctx.send(embed=create_embed("An error occurred while deleting the giveaway.", discord.Color.red()))
 
     async def active_giveaways_handler(self, ctx_or_interaction):
         """Handles displaying active giveaways"""
@@ -369,20 +420,20 @@ class Giveaways(commands.Cog):
             
             # Format the active giveaways list
             active_giveaways_list = [
-                f"[{giveaway['prize'].title()} Çekilişi]"
+                f"[{giveaway['prize'].title()} Giveaway]"
                 f"(https://discord.com/channels/{guild.id}/{giveaway['channel_id']}/{giveaway['message_id']})"
                 for giveaway in active_giveaways
             ]
 
             if not active_giveaways_list:
                 embed = discord.Embed(
-                    title="Aktif Çekilişler", 
-                    description="Aktif çekiliş yok.",
+                    title="Active Giveaways", 
+                    description="No active giveaways.",
                     color=discord.Color.blue()
                 )
             else:
                 embed = discord.Embed(
-                    title="Aktif Çekilişler", 
+                    title="Active Giveaways", 
                     description='\n'.join(active_giveaways_list),
                     color=discord.Color.green()
                 )
@@ -393,7 +444,7 @@ class Giveaways(commands.Cog):
             logger.error(f"Error in active_giveaways_handler: {e}")
             try:
                 await ctx_or_interaction.send(
-                    embed=create_embed("Aktif çekilişler listelenirken bir hata oluştu.", discord.Color.red())
+                    embed=create_embed("An error occurred while listing active giveaways.", discord.Color.red())
                 )
             except:
                 pass
@@ -432,7 +483,7 @@ class Giveaways(commands.Cog):
         giveaway_data = await self.get_giveaway_data(interaction.message.id)
         if not giveaway_data:
             await interaction.response.send_message(
-                embed=create_embed("Bu çekiliş artık mevcut değil.", discord.Color.red()),
+                embed=create_embed("This giveaway is no longer available.", discord.Color.red()),
                 ephemeral=True
             )
             return
@@ -446,7 +497,7 @@ class Giveaways(commands.Cog):
         
         if not can_participate:
             await interaction.response.send_message(
-                embed=create_embed("Bu çekilişe katılamazsınız.", discord.Color.red()),
+                embed=create_embed("You cannot participate in this giveaway.", discord.Color.red()),
                 ephemeral=True
             )
             return
@@ -460,7 +511,7 @@ class Giveaways(commands.Cog):
         # Check if already participating
         if member.id in participants_list:
             await interaction.response.send_message(
-                embed=create_embed("Bu çekilişe zaten katıldınız.", discord.Color.red()),
+                embed=create_embed("You have already joined this giveaway.", discord.Color.red()),
                 ephemeral=True
             )
             return
@@ -468,7 +519,7 @@ class Giveaways(commands.Cog):
         # Check if giveaway is still active
         if not status:
             await interaction.response.send_message(
-                embed=create_embed("Bu çekiliş aktif değil!", discord.Color.red()),
+                embed=create_embed("This giveaway is not active!", discord.Color.red()),
                 ephemeral=True
             )
             return
@@ -487,7 +538,7 @@ class Giveaways(commands.Cog):
         
         # Send confirmation
         await interaction.response.send_message(
-            embed=create_embed("Çekilişe katıldınız.", discord.Color.green()),
+            embed=create_embed("You joined the giveaway.", discord.Color.green()),
             ephemeral=True
         )
         
@@ -505,14 +556,14 @@ class Giveaways(commands.Cog):
                 
                 # Announce winner
                 await channel.send(embed=create_embed(
-                    f"🎉 {selected_user.mention} tebrikler! **{prize}** kazandınız!",
+                    f"🎉 Congratulations {selected_user.mention}! You won **{prize}**!",
                     0xff0076
                 ))
                 
                 # Try to DM the winner
                 try:
                     await selected_user.send(embed=create_embed(
-                        f"🎉 {selected_user.mention} tebrikler! **{prize}** kazandınız!",
+                        f"🎉 Congratulations {selected_user.mention}! You won **{prize}**!",
                         0xff0076
                     ))
                 except:
@@ -522,14 +573,14 @@ class Giveaways(commands.Cog):
                 message = await channel.fetch_message(interaction.message.id)
                 embed = discord.Embed(
                     title=prize, 
-                    description="Çekiliş tamamlandı, katılan herkese teşekkürler!", 
+                    description="Giveaway completed, thanks to everyone who participated!", 
                     colour=0xff0076
                 )
                 
                 # Copy fields from original embed
-                embed.add_field(name="Başlatan", value=message.embeds[0].fields[0].value, inline=True)
-                embed.add_field(name="Katılabilir Roller", value=message.embeds[0].fields[1].value, inline=True)
-                embed.add_field(name="Kazanan", value=selected_user.mention, inline=True)
+                embed.add_field(name="Host", value=message.embeds[0].fields[0].value, inline=True)
+                embed.add_field(name="Eligible Roles", value=message.embeds[0].fields[1].value, inline=True)
+                embed.add_field(name="Winner", value=selected_user.mention, inline=True)
                 embed.set_image(url="https://i.ibb.co/8Kn0L6t/giveaway-banner.png")
                 
                 await message.edit(embed=embed, view=GiveawayEditView(self))
@@ -539,7 +590,7 @@ class Giveaways(commands.Cog):
         giveaway_data = await self.get_giveaway_data(interaction.message.id)
         if not giveaway_data:
             await interaction.response.send_message(
-                embed=create_embed("Çekiliş bulunamadı.", discord.Color.red()),
+                embed=create_embed("Giveaway not found.", discord.Color.red()),
                 ephemeral=True
             )
             return
@@ -554,11 +605,11 @@ class Giveaways(commands.Cog):
                 participants.append(f"{user.mention}")
         
         if not participants:
-            participants = ["Çekilişe henüz katılan yok."]
+            participants = ["No one has joined the giveaway yet."]
             
         # Send participants list
         embed = discord.Embed(
-            title="Çekiliş Katılımcıları", 
+            title="Giveaway Participants", 
             description="\n".join(participants), 
             color=discord.Color.green()
         )
@@ -573,7 +624,7 @@ class Giveaways(commands.Cog):
         # Check permissions
         if not member.guild_permissions.ban_members:
             await interaction.response.send_message(
-                embed=create_embed("Bu çekilişi tekrarlamak için yetkiniz yok.", discord.Color.red()),
+                embed=create_embed("You don't have permission to reroll this giveaway.", discord.Color.red()),
                 ephemeral=True
             )
             return
@@ -581,7 +632,7 @@ class Giveaways(commands.Cog):
         giveaway_data = await self.get_giveaway_data(interaction.message.id)
         if not giveaway_data:
             await interaction.response.send_message(
-                embed=create_embed("Çekiliş bulunamadı.", discord.Color.red()),
+                embed=create_embed("Giveaway not found.", discord.Color.red()),
                 ephemeral=True
             )
             return
@@ -598,14 +649,14 @@ class Giveaways(commands.Cog):
         
         if result == "no_participants":
             await interaction.response.send_message(
-                embed=create_embed("Çekilişte hiç katılımcı yok.", discord.Color.red()),
+                embed=create_embed("No participants in this giveaway.", discord.Color.red()),
                 ephemeral=True
             )
             return
             
         if result == "error":
             await interaction.response.send_message(
-                embed=create_embed("Çekiliş tekrarlanırken bir hata oluştu.", discord.Color.red()),
+                embed=create_embed("An error occurred while rerolling the giveaway.", discord.Color.red()),
                 ephemeral=True
             )
             return
@@ -613,14 +664,14 @@ class Giveaways(commands.Cog):
         # Announce new winner
         channel = self.bot.get_channel(interaction.channel_id)
         await channel.send(embed=create_embed(
-            f"🎉 {selected_user.mention} çekilişin yeni talihlisidir!",
+            f"🎉 {selected_user.mention} is the new winner of the giveaway!",
             0xff0076
         ))
         
         # Try to DM the winner
         try:
             await selected_user.send(embed=create_embed(
-                f"🎉 {selected_user.mention} tebrikler! **{giveaway_data['prize']}** kazandınız!",
+                f"🎉 Congratulations {selected_user.mention}! You won **{giveaway_data['prize']}**!",
                 0xff0076
             ))
         except:
@@ -630,20 +681,20 @@ class Giveaways(commands.Cog):
         message = await channel.fetch_message(interaction.message.id)
         embed = discord.Embed(
             title=giveaway_data['prize'], 
-            description="Çekiliş tamamlandı, katılan herkese teşekkürler!", 
+            description="Giveaway completed, thanks to everyone who participated!", 
             colour=0xff0076
         )
         
         # Copy fields from original embed
-        embed.add_field(name="Başlatan", value=message.embeds[0].fields[0].value, inline=True)
-        embed.add_field(name="Katılabilir Roller", value=message.embeds[0].fields[1].value, inline=True)
-        embed.add_field(name="Kazanan", value=selected_user.mention, inline=True)
+        embed.add_field(name="Host", value=message.embeds[0].fields[0].value, inline=True)
+        embed.add_field(name="Eligible Roles", value=message.embeds[0].fields[1].value, inline=True)
+        embed.add_field(name="Winner", value=selected_user.mention, inline=True)
         embed.set_image(url="https://i.ibb.co/8Kn0L6t/giveaway-banner.png")
         
         await message.edit(embed=embed, view=GiveawayEditView(self))
         
         await interaction.response.send_message(
-            embed=create_embed("Çekiliş tekrarlandı.", discord.Color.green()),
+            embed=create_embed("Giveaway rerolled.", discord.Color.green()),
             ephemeral=True
         )
 
@@ -656,11 +707,11 @@ class Giveaways(commands.Cog):
             if not giveaway_data:
                 if hasattr(ctx_or_interaction, 'response'):
                     await ctx_or_interaction.response.send_message(
-                        embed=create_embed("Çekiliş bulunamadı.", discord.Color.red()),
+                        embed=create_embed("Giveaway not found.", discord.Color.red()),
                         ephemeral=True
                     )
                 else:
-                    await ctx_or_interaction.send(embed=create_embed("Çekiliş bulunamadı.", discord.Color.red()))
+                    await ctx_or_interaction.send(embed=create_embed("Giveaway not found.", discord.Color.red()))
                 return
                 
             participants_list = giveaway_data.get("participants", [])
@@ -668,11 +719,11 @@ class Giveaways(commands.Cog):
             if not participants_list:
                 if hasattr(ctx_or_interaction, 'response'):
                     await ctx_or_interaction.response.send_message(
-                        embed=create_embed("Çekilişte hiç katılımcı yok.", discord.Color.red()),
+                        embed=create_embed("No participants in this giveaway.", discord.Color.red()),
                         ephemeral=True
                     )
                 else:
-                    await ctx_or_interaction.send(embed=create_embed("Çekilişte hiç katılımcı yok.", discord.Color.red()))
+                    await ctx_or_interaction.send(embed=create_embed("No participants in this giveaway.", discord.Color.red()))
                 return
                 
             # Select winner and end giveaway
@@ -686,29 +737,29 @@ class Giveaways(commands.Cog):
             if result == "success":
                 if hasattr(ctx_or_interaction, 'response'):
                     await ctx_or_interaction.response.send_message(
-                        embed=create_embed(f"Çekiliş bitirildi! Kazanan: {selected_user.mention}", discord.Color.green()),
+                        embed=create_embed(f"Giveaway ended! Winner: {selected_user.mention}", discord.Color.green()),
                         ephemeral=True
                     )
                 else:
-                    await ctx_or_interaction.send(embed=create_embed(f"Çekiliş bitirildi! Kazanan: {selected_user.mention}", discord.Color.green()))
+                    await ctx_or_interaction.send(embed=create_embed(f"Giveaway ended! Winner: {selected_user.mention}", discord.Color.green()))
             else:
                 if hasattr(ctx_or_interaction, 'response'):
                     await ctx_or_interaction.response.send_message(
-                        embed=create_embed("Çekiliş bitirilirken bir hata oluştu.", discord.Color.red()),
+                        embed=create_embed("An error occurred while ending the giveaway.", discord.Color.red()),
                         ephemeral=True
                     )
                 else:
-                    await ctx_or_interaction.send(embed=create_embed("Çekiliş bitirilirken bir hata oluştu.", discord.Color.red()))
+                    await ctx_or_interaction.send(embed=create_embed("An error occurred while ending the giveaway.", discord.Color.red()))
                     
         except ValueError:
-            error_msg = embed=create_embed("Geçersiz mesaj ID'si.", discord.Color.red())
+            error_msg = embed=create_embed("Invalid message ID.", discord.Color.red())
             if hasattr(ctx_or_interaction, 'response'):
                 await ctx_or_interaction.response.send_message(error_msg, ephemeral=True)
             else:
                 await ctx_or_interaction.send(error_msg)
         except Exception as e:
             logger.error(f"Error ending giveaway: {e}")
-            error_msg = embed=create_embed("Çekiliş bitirilirken bir hata oluştu.", discord.Color.red())
+            error_msg = embed=create_embed("An error occurred while ending the giveaway.", discord.Color.red())
             if hasattr(ctx_or_interaction, 'response'):
                 await ctx_or_interaction.response.send_message(error_msg, ephemeral=True)
             else:

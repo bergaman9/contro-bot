@@ -3,16 +3,23 @@ import requests
 import asyncio
 import os
 import dotenv
+import discord
+import logging
+from datetime import datetime, timedelta
+from ...core.config import get_config
 
 dotenv.load_dotenv()
 
-USER_TOKEN = os.getenv("USER_TOKEN")
-USER_ID = os.getenv("USER_ID")
-TURKOYTO_CID = os.getenv("TURKOYTO_CID")
-TEKNOMINATOR_CID = os.getenv("TEKNOMINATOR_CID")
-TURKOYTO_GID = os.getenv("TURKOYTO_GID")
-TEKNOMINATOR_GID = os.getenv("TEKNOMINATOR_GID")
-SESSION_ID = os.getenv("SESSION_ID")
+logger = logging.getLogger(__name__)
+
+config = get_config()
+USER_TOKEN = config.admin.user_token
+USER_ID = config.admin.user_id
+COMMUNITY_CID = config.server.community_cid
+TEKNOMINATOR_CID = config.server.teknominator_cid
+COMMUNITY_GID = config.server.community_gid
+TEKNOMINATOR_GID = config.server.teknominator_gid
+SESSION_ID = config.server.session_id
 # Bu iki değer her zaman güncel tutulmalı! Discord istemcisinin networkünden alınır.
 BUMP_COMMAND_ID = "947088344167366698"
 BUMP_COMMAND_VERSION = "1051151064008769576"
@@ -26,6 +33,10 @@ HEADERS = {
     "Origin": "https://discord.com",
     "Referer": "https://discord.com/channels/@me",
 }
+
+# Environment variables for community server
+COMMUNITY_CID = os.getenv("COMMUNITY_CID")
+COMMUNITY_GID = os.getenv("COMMUNITY_GID")
 
 def build_bump_payload(guild_id, channel_id, session_id):
     return {
@@ -67,11 +78,11 @@ class Bump(commands.Cog):
 
     async def process_server_bumps(self):
         """Tüm yapılandırılmış sunucular için bump işlemlerini yürütür"""
-        # İlk sunucu: Türk Oyuncu Topluluğu
+        # İlk sunucu: Community Server
         await self._bump_server(
-            guild_id=TURKOYTO_GID,
-            channel_id=TURKOYTO_CID,
-            server_name="Türk Oyuncu Topluluğu"
+            guild_id=COMMUNITY_GID,
+            channel_id=COMMUNITY_CID,
+            server_name="Community Server"
         )
 
         # Sunucular arası bekleme süresi

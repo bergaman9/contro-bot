@@ -12,7 +12,7 @@ import colorsys
 import numpy as np
 
 from src.utils.database import initialize_mongodb
-from src.utils.community.turkoyto.xp_manager import XPManager
+from src.utils.community.generic.xp_manager import XPManager
 
 def add_glow(img, amount=3, color=(255, 0, 255)):
     """Add neon glow effect to an image"""
@@ -63,7 +63,7 @@ class Spin(commands.Cog):
         self.bot = bot
         self.mongodb = initialize_mongodb()
         self.xp_manager = XPManager(self.mongodb)
-        self.spin_button_custom_id = "turkoyto_synthwave_spinwheel"
+        self.spin_button_custom_id = "community_synthwave_spinwheel"
         self.ADD_EXP_CHANNEL_ID = 1288154600226160680
         self.WINNERS_CHANNEL_ID = 1288155323583955057
         self.prizes = [

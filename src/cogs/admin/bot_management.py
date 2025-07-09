@@ -9,6 +9,7 @@ import datetime
 
 from src.utils.core.formatting import create_embed
 from src.utils.database.connection import initialize_mongodb, is_db_available
+from ..base import BaseCog
 
 # Set up logging
 logger = logging.getLogger('bot_settings')
@@ -195,19 +196,18 @@ class ChangelogChannelSelect(discord.ui.ChannelSelect):
         )
 
 
-class BotSettings(commands.Cog):
+class BotSettings(BaseCog):
     """🤖 Bot Settings System
     
-    Comprehensive system for configuring bot behavior and settings:
-    • 🔧 Prefix settings
-    • 🎭 Bot appearance
-    • 📊 Performance options
-    • 👑 Developer options
-    • 📝 Version info and updates
+    Bu modül bot ayarlarını yönetir:
+    - Prefix ayarları
+    - Bot görünümü
+    - Performans ayarları
+    - Geliştirici seçenekleri
     """
     
     def __init__(self, bot):
-        self.bot = bot
+        super().__init__(bot)
         self.mongo_db = initialize_mongodb()
         self.versions_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'versions.json')
     

@@ -28,8 +28,7 @@ class GameStats(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.mongodb = None
-        self.game_stats_cache = {}  # Cache for game stats to reduce DB queries
-        self.game_logs_cache = {}   # Cache for game logs
+        self.games_cache = {}  # Unified cache for games collection
         self.last_activity_check = {}  # Track when we last checked a user's activity
         self.init_task = asyncio.create_task(self.initialize())
         
@@ -45,8 +44,7 @@ class GameStats(commands.Cog):
             self.mongodb = initialize_mongodb()
             if self.mongodb is not None:  # Proper way to check MongoDB connection
                 # Start background tasks after database is initialized
-                self.update_game_activities.start()
-                self.update_game_logs.start()
+                self.update_games.start()
                 self.clean_up_database_for_guild.start()
                 logger.info("GameStats cog initialized successfully")
             else:
@@ -86,6 +84,18 @@ class GameStats(commands.Cog):
         for key in expired_keys:
             cache_dict.pop(key)
 
+    async def get_guild_games_data(self, guild_id):
+        """Get unified games data for a guild"""
+        games_key = f"guild_games_{guild_id}"
+        
+        async def fetch_guild_games():
+            if not self.mongodb:
+                return None
+            games = self.mongodb["games"]
+            return await games.find_one({"guild_id": guild_id})
+        
+        return await self.get_cached_data(self.games_cache, games_key, fetch_guild_games)
+
     @commands.Cog.listener()
     async def on_member_remove(self, member):
         """Handler for when a member leaves the server"""
@@ -93,308 +103,306 @@ class GameStats(commands.Cog):
             return  # Skip if not initialized
             
         try:
-            await self.remove_game_logs_in_db(member.guild, member)
+            await self.remove_player_from_games(member.guild, member)
         except Exception as e:
             logger.error(f"Error in on_member_remove for {member}: {e}")
 
-    @tasks.loop(seconds=300, reconnect=True)  # Increased to 5 minutes
-    async def update_game_activities(self):
-        """Update game activity statistics periodically"""
+    @tasks.loop(seconds=300, reconnect=True)  # 5 minutes
+    async def update_games(self):
+        """Update games data for all guilds"""
         if self.mongodb is None:
-            return  # Skip if not initialized
-            
+            return
+        
         try:
-            current_time = discord.utils.utcnow().timestamp()
-            bulk_operations = []
-            
             for guild in self.bot.guilds:
-                # Process only a subset of members each run to distribute load
+                # Check if bot has permission to view member activities
+                # view_activity permission was removed in newer Discord.py versions
+                # Instead, we'll check if we can access member activities
+                try:
+                    # Try to access a member's activity to test permissions
+                    test_member = next((m for m in guild.members if not m.bot), None)
+                    if test_member and not hasattr(test_member, 'activity'):
+                        continue
+                except Exception:
+                    # If we can't access member activities, skip this guild
+                    continue
+                
+                guild_games_key = f"guild_games_{guild.id}"
+                current_data = await self.get_guild_games_data(guild.id)
+                
+                # Get current active games from Discord
+                current_games = {}
                 for member in guild.members:
-                    # Only check users if enough time has passed since last check
-                    last_check = self.last_activity_check.get(member.id, 0)
-                    if current_time - last_check < self.update_interval/2:
+                    if member.bot:
                         continue
                         
-                    self.last_activity_check[member.id] = current_time
-                    
-                    # Only process members actually playing games
-                    if (not member.bot and member.activity and 
-                            member.activity.type == discord.ActivityType.playing):
+                    if member.activity and member.activity.type == discord.ActivityType.playing:
                         game_name = member.activity.name
-                        if game_name:
-                            # Queue the update for batch processing
-                            bulk_operations.append((guild.id, game_name, member.id))
-            
-            # Process all updates in a single batch if there are any
-            if bulk_operations:
-                await self.batch_update_games_in_db(bulk_operations)
+                        if not game_name:
+                            continue
+                            
+                        game_name_lower = game_name.lower()
+                        
+                        if game_name_lower not in current_games:
+                            current_games[game_name_lower] = {
+                                "name": game_name,
+                                "name_lower": game_name_lower,
+                                "active_players": [],
+                                "total_time_played": 0,
+                                "player_count": 0,
+                                "first_added": datetime.utcnow(),
+                                "last_played": datetime.utcnow()
+                            }
+                        
+                        # Add/update active player
+                        player_data = {
+                            "member_id": member.id,
+                            "member_name": member.name,
+                            "member_discriminator": str(member.discriminator),
+                            "time_played": 0,  # Will be calculated
+                            "last_seen": datetime.utcnow()
+                        }
+                        
+                        # Update or add player
+                        existing_player = next(
+                            (p for p in current_games[game_name_lower]["active_players"] 
+                             if p["member_id"] == member.id), None
+                        )
+                        if existing_player:
+                            existing_player.update(player_data)
+                        else:
+                            current_games[game_name_lower]["active_players"].append(player_data)
+                            current_games[game_name_lower]["player_count"] += 1
+                
+                # Update database
+                await self.update_games_in_db(guild, current_games)
+                
+                # Clear cache
+                self.games_cache.pop(guild_games_key, None)
                 
         except Exception as e:
-            logger.error(f"Error in update_game_activities: {e}")
+            logger.error(f"Error in update_games: {e}")
 
-    @tasks.loop(seconds=300, reconnect=True)  # Increased to 5 minutes
-    async def update_game_logs(self):
-        """Update current game playing logs"""
-        if self.mongodb is None:
-            return  # Skip if not initialized
+    async def update_games_in_db(self, guild, current_games):
+        """Update games data in database"""
+        if not self.mongodb:
+            return
             
         try:
-            # Process in batches to avoid rate limits
-            for guild in self.bot.guilds:
-                players_to_add = []
-                players_to_remove = []
-                
-                # Get current member IDs in guild - do this once to avoid repeated calls
-                current_member_ids = {member.id for member in guild.members if not member.bot}
-                
-                # Check the cached guild log first
-                guild_log_key = f"guild_log_{guild.id}"
-                
-                async def fetch_guild_log():
-                    if not self.mongodb:
-                        return None
-                    game_logs = self.mongodb["game_logs"]
-                    return await game_logs.find_one({"guild_id": guild.id})
-                
-                guild_log = await self.get_cached_data(self.game_logs_cache, guild_log_key, fetch_guild_log)
-                
-                # Track existing active players from DB to identify who needs to be removed
-                existing_active_members = set()
-                if guild_log:
-                    for game in guild_log.get("game_names", []):
-                        for player in game.get("active_players", []):
-                            existing_active_members.add(player.get("member_id"))
-                
-                # Find members who are playing games
-                active_players = {}  # Keep track of currently active players
-                for member in guild.members:
-                    if (not member.bot and member.activity and 
-                            member.activity.type == discord.ActivityType.playing):
-                        game_name = member.activity.name
-                        if game_name:
-                            players_to_add.append({
-                                "guild_id": guild.id,
-                                "game_name": game_name,
-                                "member_id": member.id,
-                                "member_name": member.name,
-                                "member_discriminator": str(member.discriminator)
-                            })
-                            active_players[member.id] = True
-                
-                # Find members who need to be removed (not playing anymore)
-                members_to_remove = existing_active_members - set(active_players.keys())
-                for member_id in members_to_remove:
-                    if member_id in current_member_ids:  # Make sure they're still in the guild
-                        member = guild.get_member(member_id)
-                        if member:
-                            players_to_remove.append((guild, member))
-                
-                # Process additions in one batch (only if there are any)
-                if players_to_add:
-                    await self.batch_update_game_logs_in_db(players_to_add)
-                
-                # Process removals in another batch (only if there are any)
-                if players_to_remove:
-                    await self.batch_remove_game_logs_in_db(players_to_remove)
+            games = self.mongodb["games"]
+            guild_data = await games.find_one({"guild_id": guild.id})
+            
+            if not guild_data:
+                # Create new guild games document
+                guild_data = {
+                    "guild_id": guild.id,
+                    "games": [],
+                    "enabled": True,
+                    "last_updated": datetime.utcnow()
+                }
+            
+            # Update existing games and add new ones
+            updated_games = []
+            existing_games = {g["name_lower"]: g for g in guild_data.get("games", [])}
+            
+            for game_name_lower, current_game in current_games.items():
+                if game_name_lower in existing_games:
+                    # Update existing game
+                    existing_game = existing_games[game_name_lower]
                     
-                # Invalidate cache after updates
-                self.game_logs_cache.pop(guild_log_key, None)
+                    # Calculate time played for existing players
+                    for active_player in current_game["active_players"]:
+                        # Find historical data for this player
+                        historical_player = next(
+                            (p for p in existing_game.get("historical_players", [])
+                             if p["member_id"] == active_player["member_id"]), None
+                        )
+                        
+                        if historical_player:
+                            active_player["time_played"] = historical_player.get("time_played", 0) + 5  # Add 5 minutes
+                        else:
+                            active_player["time_played"] = 5  # New player, start with 5 minutes
                     
-                # Brief pause to avoid hitting rate limits
-                await asyncio.sleep(1)
-                
+                    # Update total time played
+                    total_time = sum(p["time_played"] for p in current_game["active_players"])
+                    
+                    existing_game.update({
+                        "active_players": current_game["active_players"],
+                        "player_count": len(current_game["active_players"]),
+                        "last_played": current_game["last_played"],
+                        "total_time_played": total_time,
+                        "historical_players": self._merge_historical_players(
+                            existing_game.get("historical_players", []),
+                            current_game["active_players"]
+                        )
+                    })
+                    updated_games.append(existing_game)
+                else:
+                    # Add new game
+                    current_game["historical_players"] = current_game["active_players"].copy()
+                    current_game["total_time_played"] = len(current_game["active_players"]) * 5  # Initial 5 minutes per player
+                    updated_games.append(current_game)
+            
+            # Add inactive games (not currently being played)
+            for game_name_lower, existing_game in existing_games.items():
+                if game_name_lower not in current_games:
+                    existing_game["active_players"] = []
+                    existing_game["player_count"] = 0
+                    updated_games.append(existing_game)
+            
+            # Update database
+            await games.update_one(
+                {"guild_id": guild.id},
+                {
+                    "$set": {
+                        "games": updated_games,
+                        "last_updated": datetime.utcnow()
+                    }
+                },
+                upsert=True
+            )
+            
         except Exception as e:
-            logger.error(f"Error in update_game_logs: {e}")
+            logger.error(f"Error updating games in DB for {guild}: {e}")
 
-    @tasks.loop(minutes=60, reconnect=True)  # Increased to 1 hour
+    def _merge_historical_players(self, historical, active):
+        """Merge historical player data with active players"""
+        merged = {p["member_id"]: p for p in historical}
+        
+        for player in active:
+            if player["member_id"] in merged:
+                # Update existing historical data
+                merged[player["member_id"]].update({
+                    "member_name": player["member_name"],
+                    "member_discriminator": player["member_discriminator"],
+                    "time_played": player["time_played"],
+                    "last_seen": player["last_seen"]
+                })
+            else:
+                # Add new player to historical
+                merged[player["member_id"]] = player.copy()
+        
+        return list(merged.values())
+
+    @tasks.loop(minutes=60, reconnect=True)  # 1 hour
     async def clean_up_database_for_guild(self):
         """Periodically clean up the database to remove stale data"""
-        if self.mongodb is None:
-            return  # Skip if not initialized
-            
-        try:
-            for guild in self.bot.guilds:
-                game_logs = self.mongodb["game_logs"]
-                guild_log = await game_logs.find_one({"guild_id": guild.id})
-
-                if not guild_log:
-                    continue
-
-                # Get current member IDs from guild - only do this once
-                current_member_ids = {member.id for member in guild.members}
-                updated_game_names = []
-                
-                for game in guild_log.get("game_names", []):
-                    # Filter out players who are no longer in the guild
-                    active_players = [player for player in game.get("active_players", []) 
-                                      if player["member_id"] in current_member_ids]
-                    
-                    # Only keep games that still have active players
-                    if active_players:
-                        game["active_players"] = active_players
-                        updated_game_names.append(game)
-
-                # Only update if there are changes
-                if len(updated_game_names) != len(guild_log.get("game_names", [])):
-                    await game_logs.update_one(
-                        {"guild_id": guild.id}, 
-                        {"$set": {"game_names": updated_game_names}}
-                    )
-                    
-                    # Invalidate cache
-                    self.game_logs_cache.pop(f"guild_log_{guild.id}", None)
-                    
-        except Exception as e:
-            logger.error(f"Error in clean_up_database_for_guild: {e}")
-
-    async def remove_game_logs_in_db(self, guild, member):
-        """Remove a member from all game logs"""
-        if self.mongodb is None:
-            return  # Skip if not initialized
-            
-        try:
-            # Check cache first
-            guild_log_key = f"guild_log_{guild.id}"
-            
-            async def fetch_guild_log():
-                game_logs = self.mongodb["game_logs"]
-                return await game_logs.find_one({"guild_id": guild.id})
-                
-            guild_log = await self.get_cached_data(self.game_logs_cache, guild_log_key, fetch_guild_log)
-            
-            if guild_log:
-                updated_game_names = []
-                modified = False
-                
-                for game in guild_log.get("game_names", []):
-                    # Filter out the member from active_players
-                    active_players = [player for player in game.get("active_players", [])
-                                     if player.get("member_id") != member.id]
-                    
-                    # Only keep games that still have active players
-                    if active_players:
-                        if len(active_players) != len(game.get("active_players", [])):
-                            modified = True
-                        game["active_players"] = active_players
-                        updated_game_names.append(game)
-                    else:
-                        modified = True
-                
-                # Only update if there were changes
-                if modified:
-                    # Update the database with the filtered game list
-                    game_logs = self.mongodb["game_logs"]
-                    await game_logs.update_one(
-                        {"guild_id": guild.id}, 
-                        {"$set": {"game_names": updated_game_names}}
-                    )
-                    
-                    # Invalidate cache
-                    self.game_logs_cache.pop(guild_log_key, None)
-                
-        except Exception as e:
-            logger.error(f"Error in remove_game_logs_in_db for {member}: {e}")
-            
-    async def batch_update_games_in_db(self, operations):
-        """Update game statistics in batches"""
         if self.mongodb is None:
             return
             
         try:
-            game_stats = self.mongodb["game_stats"]
-            updates_by_guild = {}
+            games_collection = self.mongodb["games"]
             
-            # Group operations by guild
-            for guild_id, game_name, member_id in operations:
-                if guild_id not in updates_by_guild:
-                    updates_by_guild[guild_id] = {}
-                    
-                if game_name not in updates_by_guild[guild_id]:
-                    updates_by_guild[guild_id][game_name] = set()
-                    
-                updates_by_guild[guild_id][game_name].add(member_id)
-            
-            # Process each guild's updates
-            for guild_id, games in updates_by_guild.items():
-                # Check cache first
-                guild_stats_key = f"guild_stats_{guild_id}"
-                
-                async def fetch_guild_stats():
-                    guild_data = await game_stats.find_one({"guild_id": guild_id})
-                    if not guild_data:
-                        await game_stats.insert_one({
-                            "guild_id": guild_id, 
-                            "played_games": []
-                        })
-                        return await game_stats.find_one({"guild_id": guild_id})
-                    return guild_data
-                
-                guild_data = await self.get_cached_data(self.game_stats_cache, guild_stats_key, fetch_guild_stats)
-                
-                played_games = guild_data.get("played_games", [])
+            for guild in self.bot.guilds:
+                guild_data = await games_collection.find_one({"guild_id": guild.id})
+                if not guild_data:
+                    continue
+
+                # Get current member IDs from guild
+                current_member_ids = {member.id for member in guild.members}
+                updated_games = []
                 modified = False
                 
-                # Update each game
-                for game_name, member_ids in games.items():
-                    game_found = False
+                for game in guild_data.get("games", []):
+                    # Filter out players who are no longer in the guild
+                    active_players = [
+                        player for player in game.get("active_players", []) 
+                        if player["member_id"] in current_member_ids
+                    ]
                     
-                    # Look for existing game entry
-                    for game in played_games:
-                        if game["game_name"] == game_name:
-                            game_found = True
-                            game["total_time_played"] += 1
-                            
-                            # Update each member's play time
-                            for member_id in member_ids:
-                                player_found = False
-                                for player in game["players"]:
-                                    if player["member_id"] == member_id:
-                                        player["time_played"] += 1
-                                        player_found = True
-                                        break
-                                        
-                                if not player_found:
-                                    game["players"].append({
-                                        "member_id": member_id, 
-                                        "time_played": 1
-                                    })
-                                    
-                            modified = True
-                            break
+                    historical_players = [
+                        player for player in game.get("historical_players", [])
+                        if player["member_id"] in current_member_ids
+                    ]
                     
-                    # Create new game entry if not found
-                    if not game_found:
-                        played_games.append({
-                            "game_name": game_name,
-                            "total_time_played": 1,
-                            "players": [
-                                {"member_id": member_id, "time_played": 1} 
-                                for member_id in member_ids
-                            ]
-                        })
+                    # Check if we removed any players
+                    if (len(active_players) != len(game.get("active_players", [])) or
+                        len(historical_players) != len(game.get("historical_players", []))):
                         modified = True
-                
-                # Update database if changes were made
+                    
+                    # Update game data
+                    game["active_players"] = active_players
+                    game["historical_players"] = historical_players
+                    game["player_count"] = len(active_players)
+                    
+                    # Only keep games that have historical data
+                    if historical_players:
+                        updated_games.append(game)
+                    else:
+                        modified = True
+
+                # Only update if there are changes
                 if modified:
-                    await game_stats.update_one(
-                        {"guild_id": guild_id}, 
-                        {"$set": {"played_games": played_games}}
+                    await games_collection.update_one(
+                        {"guild_id": guild.id}, 
+                        {"$set": {"games": updated_games, "last_updated": datetime.utcnow()}}
                     )
                     
                     # Invalidate cache
-                    self.game_stats_cache.pop(guild_stats_key, None)
+                    self.games_cache.pop(f"guild_games_{guild.id}", None)
                     
         except Exception as e:
-            logger.error(f"Error in batch_update_games_in_db: {e}")
+            logger.error(f"Error in clean_up_database_for_guild: {e}")
+
+    async def remove_player_from_games(self, guild, member):
+        """Remove a member from all games when they leave"""
+        if self.mongodb is None:
+            return
+            
+        try:
+            games_collection = self.mongodb["games"]
+            guild_data = await games_collection.find_one({"guild_id": guild.id})
+            
+            if not guild_data:
+                return
+                
+            modified = False
+            updated_games = []
+            
+            for game in guild_data.get("games", []):
+                # Remove from active players
+                active_players = [
+                    p for p in game.get("active_players", [])
+                    if p["member_id"] != member.id
+                ]
+                
+                # Remove from historical players
+                historical_players = [
+                    p for p in game.get("historical_players", [])
+                    if p["member_id"] != member.id
+                ]
+                
+                if (len(active_players) != len(game.get("active_players", [])) or
+                    len(historical_players) != len(game.get("historical_players", []))):
+                    modified = True
+                
+                game["active_players"] = active_players
+                game["historical_players"] = historical_players
+                game["player_count"] = len(active_players)
+                
+                # Keep game if it still has historical data
+                if historical_players:
+                    updated_games.append(game)
+                else:
+                    modified = True
+            
+            if modified:
+                await games_collection.update_one(
+                    {"guild_id": guild.id},
+                    {"$set": {"games": updated_games, "last_updated": datetime.utcnow()}}
+                )
+                
+                # Invalidate cache
+                self.games_cache.pop(f"guild_games_{guild.id}", None)
+                
+        except Exception as e:
+            logger.error(f"Error in remove_player_from_games for {member}: {e}")
 
     def cog_unload(self):
         """Cleanup when cog is unloaded"""
         # Stop background tasks
-        if self.update_game_activities.is_running():
-            self.update_game_activities.cancel()
-            
-        if self.update_game_logs.is_running():
-            self.update_game_logs.cancel()
+        if self.update_games.is_running():
+            self.update_games.cancel()
             
         if self.clean_up_database_for_guild.is_running():
             self.clean_up_database_for_guild.cancel()
@@ -404,8 +412,7 @@ class GameStats(commands.Cog):
             self.init_task.cancel()
             
         # Clear caches
-        self.game_stats_cache.clear()
-        self.game_logs_cache.clear()
+        self.games_cache.clear()
         self.last_activity_check.clear()
             
         logger.info("GameStats cog unloaded")

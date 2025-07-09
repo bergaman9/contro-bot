@@ -8,8 +8,9 @@ from typing import Optional
 
 from src.utils.core.formatting import create_embed
 from src.utils.database.connection import initialize_mongodb, initialize_async_mongodb
-from src.utils.community.turkoyto.xp_manager import XPManager, XP_VOICE_PER_MINUTE
-from src.utils.community.turkoyto.card_renderer import create_level_card, get_level_scheme, scheme_to_discord_color
+from src.utils.community.generic.xp_manager import XPManager, XP_VOICE_PER_MINUTE
+from src.utils.community.generic.card_renderer import create_level_card, get_level_scheme, scheme_to_discord_color
+from src.cogs.base import BaseCog
 
 logger = logging.getLogger('levelling')
 
@@ -118,7 +119,7 @@ class Levelling(commands.Cog):
             if self.mongo_db is None:
                 return {}
                 
-            settings = await self.mongo_db.levelling_settings.find_one({"guild_id": int(guild_id)})
+            settings = await self.mongo_db.get_collection('levelling_settings').find_one({"guild_id": int(guild_id)})
             if settings is None:
                 # Return default settings
                 return {

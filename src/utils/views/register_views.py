@@ -12,15 +12,16 @@ from src.utils.views.channel_selector import ChannelSelectView
 from src.utils.database.connection import get_collection
 from src.utils.database.db_manager import db_manager
 from src.utils.core.formatting import create_embed, hex_to_int
+from src.utils.community.generic.registration_view import RegistrationButtonView
 
 # Set up logging
 logger = logging.getLogger('register_settings')
 
 # Default values for settings
-DEFAULT_WELCOME_MESSAGE = "Hoş geldin {mention}! Sunucumuza kayıt olduğun için teşekkürler."
-DEFAULT_BUTTON_TITLE = "📝 Sunucu Kayıt Sistemi"
-DEFAULT_BUTTON_DESCRIPTION = "Sunucumuza hoş geldiniz! Aşağıdaki butona tıklayarak kayıt olabilirsiniz."
-DEFAULT_BUTTON_INSTRUCTIONS = "Kaydınızı tamamlamak için isminizi ve yaşınızı doğru bir şekilde girmeniz gerekmektedir."
+DEFAULT_WELCOME_MESSAGE = "Welcome {mention}! Thank you for registering to our server."
+DEFAULT_BUTTON_TITLE = "📝 Server Registration System"
+DEFAULT_BUTTON_DESCRIPTION = "Welcome to our server! You can register by clicking the button below."
+DEFAULT_BUTTON_INSTRUCTIONS = "To complete your registration, you need to enter your name and age correctly."
 
 class RegisterSettingsView(discord.ui.View):
     """Main view for register settings"""
@@ -48,7 +49,9 @@ class RegisterSettingsView(discord.ui.View):
         if db is None:
             return
             
-        settings = await db.register.find_one({"guild_id": self.guild_id}) or {}
+        settings = await db.register.find_one({"guild_id": self.guild_id})
+        if not settings:
+            settings = {}
         
         # Update each button's style based on whether it's configured
         for item in self.children:
@@ -82,7 +85,9 @@ class RegisterSettingsView(discord.ui.View):
     async def entry_roles_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Configure roles to give after registration"""
         db = db_manager.get_database()
-        settings = await db.register.find_one({"guild_id": self.guild_id}) or {}
+        settings = await db.register.find_one({"guild_id": self.guild_id})
+        if not settings:
+            settings = {}
         roles_to_add = settings.get("roles_to_add", [])
         
         # Check if configured
@@ -102,7 +107,9 @@ class RegisterSettingsView(discord.ui.View):
     async def remove_roles_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Configure roles to remove after registration"""
         db = db_manager.get_database()
-        settings = await db.register.find_one({"guild_id": self.guild_id}) or {}
+        settings = await db.register.find_one({"guild_id": self.guild_id})
+        if not settings:
+            settings = {}
         roles_to_remove = settings.get("roles_to_remove", [])
         
         # Check if configured
@@ -122,7 +129,9 @@ class RegisterSettingsView(discord.ui.View):
     async def age_roles_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Configure age-based roles"""
         db = db_manager.get_database()
-        settings = await db.register.find_one({"guild_id": self.guild_id}) or {}
+        settings = await db.register.find_one({"guild_id": self.guild_id})
+        if not settings:
+            settings = {}
         age_roles_enabled = settings.get("age_roles_enabled", False)
         
         # Button color based on status
@@ -144,7 +153,9 @@ class RegisterSettingsView(discord.ui.View):
     async def log_channel_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Configure the log channel"""
         db = db_manager.get_database()
-        settings = await db.register.find_one({"guild_id": self.guild_id}) or {}
+        settings = await db.register.find_one({"guild_id": self.guild_id})
+        if not settings:
+            settings = {}
         log_channel_id = settings.get("log_channel_id")
         
         button_style = discord.ButtonStyle.success if log_channel_id else discord.ButtonStyle.danger
@@ -159,7 +170,9 @@ class RegisterSettingsView(discord.ui.View):
     async def nickname_update_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Configure nickname update after registration"""
         db = db_manager.get_database()
-        settings = await db.register.find_one({"guild_id": self.guild_id}) or {}
+        settings = await db.register.find_one({"guild_id": self.guild_id})
+        if not settings:
+            settings = {}
         nickname_enabled = settings.get("nickname_update_enabled", False)
         
         button_style = discord.ButtonStyle.success if nickname_enabled else discord.ButtonStyle.danger
@@ -614,7 +627,6 @@ class ButtonCustomizationView(discord.ui.View):
         """Create registration button with default settings"""
         try:
             # Create the registration button view
-            from src.utils.community.turkoyto.registration_view import RegistrationButtonView
             register_view = RegistrationButtonView()
             
             # Create the embed
@@ -700,23 +712,23 @@ class RegisterMessageSendView(discord.ui.View):
                     button_label = "Register"
                 else:  # Turkish
                     embed = discord.Embed(
-                        title="📝 Sunucu Kayıt",
-                        description="Sunucumuza hoş geldiniz! Tüm kanallara erişim sağlamak için aşağıdaki butona tıklayarak kayıt olun.",
+                        title="📝 Server Registration",
+                        description="Welcome to our server! Please click the button below to register and gain access to all channels.",
                         color=discord.Color.blue()
                     )
                     embed.add_field(
-                        name="📋 Talimatlar",
-                        value="• Aşağıdaki **Kayıt Ol** butonuna tıklayın\n"
-                              "• Gerekli bilgileri doldurun\n"
-                              "• Kaydı tamamlamak için formu gönderin",
+                        name="📋 Instructions",
+                        value="• Click the **Register** button below\n"
+                              "• Fill in the required information\n"
+                              "• Submit the form to complete registration",
                         inline=False
                     )
                     embed.add_field(
-                        name="❓ Yardıma mı İhtiyacınız Var?",
-                        value="Herhangi bir sorun yaşarsanız, lütfen yetkili ekibimizle iletişime geçin.",
+                        name="❓ Need Help?",
+                        value="If you have any issues, please contact our staff members.",
                         inline=False
                     )
-                    button_label = "Kayıt Ol"
+                    button_label = "Register"
                 
                 embed.set_footer(text=f"Registration System • {interaction.guild.name}")
                 embed.timestamp = datetime.datetime.now()

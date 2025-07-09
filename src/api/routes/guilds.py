@@ -2,12 +2,11 @@ from flask import Blueprint, jsonify, request
 import os
 import sys
 from dotenv import load_dotenv
-
-import  discord
+import discord
+from ...core.database import get_database_manager
 
 # Add the parent directory to sys.path to import from the project root
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from src.utils.database import initialize_mongodb
 
 # Load environment variables
 load_dotenv()
@@ -15,12 +14,14 @@ GUILDS_API_KEY = os.getenv("GUILDS_API_KEY", "default_key_please_change")  # Get
 
 guilds_api = Blueprint('guilds_api', __name__)
 bot_instance = None
-mongo_db = initialize_mongodb()
+mongo_db = None
 
-def initialize_guilds_api(bot):
+async def initialize_guilds_api(bot):
     """Initialize the guilds API with a bot instance"""
-    global bot_instance
+    global bot_instance, mongo_db
     bot_instance = bot
+    db_manager = await get_database_manager()
+    mongo_db = db_manager.database
 
 def check_auth(request):
     """Check if the request has valid authorization"""

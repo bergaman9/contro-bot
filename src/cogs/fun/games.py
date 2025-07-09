@@ -22,16 +22,35 @@ from translate import Translator
 
 from src.utils.database.connection import initialize_mongodb
 from src.utils.core.formatting import create_embed
+from src.core.config import get_config
 
-tmdb.API_KEY = os.getenv("TMDB_API_KEY")
-openai.api_key = os.getenv("OPENAI_API_KEY")
+config = get_config()
+tmdb.API_KEY = config.external_services.tmdb_api_key
+openai.api_key = config.external_services.openai_api_key
 
-sp = spotipy.Spotify(auth_manager=SpotifyClientCredentials(client_id=os.getenv("SP_CLIENT_ID"),
-                                                           client_secret=os.getenv("SP_CLIENT_SECRET")))
+# Initialize Spotify client only if credentials are available
+try:
+    sp = spotipy.Spotify(auth_manager=SpotifyClientCredentials(client_id=config.external_services.spotify_client_id,
+                                                               client_secret=config.external_services.spotify_client_secret))
+except Exception:
+    sp = None  # Will be checked before use
 
-reddit = asyncpraw.Reddit(client_id=os.getenv("REDDIT_CLIENT_ID"), client_secret=os.getenv("REDDIT_CLIENT_SECRET"),
-                          username=os.getenv("REDDIT_USERNAME"), password=os.getenv("REDDIT_PASSWORD"),
-                          user_agent=os.getenv("REDDIT_USER_AGENT"))
+# Initialize Reddit client only if credentials are available
+try:
+    if config.external_services.reddit_client_id and config.external_services.reddit_client_secret and config.external_services.reddit_username and config.external_services.reddit_password and config.external_services.reddit_user_agent:
+        reddit = asyncpraw.Reddit(
+            client_id=config.external_services.reddit_client_id, 
+            client_secret=config.external_services.reddit_client_secret,
+            username=config.external_services.reddit_username, 
+            password=config.external_services.reddit_password,
+            user_agent=config.external_services.reddit_user_agent
+        )
+    else:
+        reddit = None
+        print("Reddit credentials not configured, reddit commands will be disabled")
+except Exception as e:
+    reddit = None
+    print(f"Failed to initialize Reddit client: {e}")
 
 
 class Fun(commands.Cog):
@@ -368,6 +387,14 @@ class Fun(commands.Cog):
     @app_commands.describe(sub="The sub to fetch the meme of.")
     async def reddit(self, ctx, sub):
         await ctx.defer()
+        
+        # Check if Reddit client is available
+        if reddit is None:
+            await ctx.send(
+                embed=create_embed(description="Reddit API is not configured. Please check your Reddit credentials in the environment variables.", color=discord.Color.red())
+            )
+            return
+            
         try:
             subreddit = await reddit.subreddit(sub, fetch=True)
         except:
@@ -406,16 +433,24 @@ class Fun(commands.Cog):
     @app_commands.describe(query="The query to search for.")
     async def spotify(self, ctx, query):
         await ctx.defer()
-        spotifyList = []
-        results = sp.search(q=query, limit=5)
-        for idx, track in enumerate(results['tracks']['items']):
-            spotifyList.append(f"🎵 **{track['name']}** {track['external_urls']['spotify']}")
-
-        try:
-            await ctx.send("\n".join(spotifyList))
-        except:
+        
+        # Check if Spotify client is available
+        if sp is None:
             await ctx.send(
-                embed=create_embed(description=f"Could not find the song **{query}**.", color=discord.Color.red()))
+                embed=create_embed(description="Spotify API is not configured. Please set SP_CLIENT_ID and SP_CLIENT_SECRET environment variables.", color=discord.Color.red())
+            )
+            return
+            
+        try:
+            spotifyList = []
+            results = sp.search(q=query, limit=5)
+            for idx, track in enumerate(results['tracks']['items']):
+                spotifyList.append(f"🎵 **{track['name']}** {track['external_urls']['spotify']}")
+
+            await ctx.send("\n".join(spotifyList))
+        except Exception as e:
+            await ctx.send(
+                embed=create_embed(description=f"Could not find the song **{query}** or an error occurred.", color=discord.Color.red()))
 
     async def game_name_autocomplete(self, interaction: discord.Interaction, current: str) -> List[
         app_commands.Choice[str]]:

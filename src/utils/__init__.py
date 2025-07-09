@@ -6,7 +6,7 @@ This package is organized into modular subpackages:
 - database: Database connection and management
 - setup: Server setup system
 - settings: Settings management system  
-- community: Community features (TurkOyto)
+- community: Community features (generic)
 - greeting: Welcome/goodbye system
 - registration: User registration system
 - moderation: Moderation utilities

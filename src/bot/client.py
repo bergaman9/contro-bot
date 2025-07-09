@@ -1,204 +1,202 @@
-"""Enhanced Discord bot client."""
+"""
+Discord bot client for Contro Discord Bot
+Main bot class with Discord.py integration and application manager integration
+"""
+
+import asyncio
 import discord
 from discord.ext import commands
-from typing import Optional, Dict, Any, List
-import logging
-import aiohttp
-from datetime import datetime
+from typing import Optional, Dict, Any
+import os
+import sys
 
-from .constants import *
-from ..database.connection import DatabaseConnection
-from ..services import GuildService, UserService, MemberService
-
-logger = logging.getLogger(__name__)
+from ..core.config import get_config
+from ..core.logger import get_logger, LoggerMixin
+from ..core.application import get_application_manager
 
 
-class ControBot(commands.Bot):
-    """Enhanced Discord bot with additional functionality."""
+class ControBot(commands.Bot, LoggerMixin):
+    """Main Discord bot class with application manager integration."""
     
-    def __init__(self, *args, db: Optional[DatabaseConnection] = None, **kwargs):
-        """Initialize the bot.
+    def __init__(self, config):
+        # Set up intents
+        intents = discord.Intents.default()
+        intents.message_content = True
+        intents.guilds = True
+        intents.members = True
+        intents.guild_messages = True
+        intents.guild_reactions = True
         
-        Args:
-            db: Database connection instance
-            *args: Positional arguments for commands.Bot
-            **kwargs: Keyword arguments for commands.Bot
-        """
-        # Set default command prefix if not provided
-        if 'command_prefix' not in kwargs:
-            kwargs['command_prefix'] = self.get_prefix
-            
-        super().__init__(*args, **kwargs)
+        # Handle config parameter (can be dict or config object)
+        if hasattr(config, 'get_prefix'):
+            # Config object
+            prefix = config.get_prefix()
+            self.config = config
+        else:
+            # Dict
+            prefix = config.get('get_prefix', None)
+            if callable(prefix):
+                prefix = prefix()
+            else:
+                prefix = config.get('discord_prefix', '!')
+            self.config = config
         
-        # Core attributes
-        self.db = db
-        self.session: Optional[aiohttp.ClientSession] = None
-        self.start_time = datetime.utcnow()
+        # Initialize bot
+        super().__init__(
+            command_prefix=prefix,
+            intents=intents,
+            help_command=None,
+            case_insensitive=True
+        )
         
-        # Services
-        self.guild_service: Optional[GuildService] = None
-        self.user_service: Optional[UserService] = None
-        self.member_service: Optional[MemberService] = None
-        
-        # Cache
-        self._prefix_cache: Dict[int, str] = {}
+        self.app_manager = None
+        self.sync_db = None
+        self.async_db = None
         
     async def setup_hook(self):
         """Called when the bot is starting up."""
-        logger.info("Running setup hook...")
+        self.logger.info("Setting up bot...")
         
-        # Create aiohttp session
-        self.session = aiohttp.ClientSession()
-        
-        # Initialize services if database is available
-        if self.db:
-            self.guild_service = GuildService(self.db)
-            self.user_service = UserService(self.db)
-            self.member_service = MemberService(self.db)
+        try:
+            # Get application manager
+            self.app_manager = await get_application_manager()
             
-            logger.info("Services initialized")
-        
-        # Sync commands if needed
-        if getattr(self, 'should_sync_commands', False):
-            logger.info("Syncing application commands...")
-            await self.sync_commands()
+            # Set db connections
+            self.async_db = self.app_manager.get_db_manager()
+            self.sync_db = self.app_manager.get_sync_db_manager()
             
+            # Load cogs
+            await self.load_cogs()
+            
+            self.logger.info("Bot setup completed successfully")
+            
+        except Exception as e:
+            self.logger.error(f"Failed to setup bot: {e}")
+            raise
+    
+    async def load_cogs(self):
+        """Load all bot cogs."""
+        cogs_dir = os.path.join(os.path.dirname(__file__), '..', 'cogs')
+        
+        # Files to exclude from loading (these are not cogs)
+        exclude_files = {'base.py', '__init__.py'}
+        
+        for filename in os.listdir(cogs_dir):
+            if filename.endswith('.py') and filename not in exclude_files:
+                cog_name = filename[:-3]
+                try:
+                    await self.load_extension(f'src.cogs.{cog_name}')
+                    self.logger.info(f"Loaded cog: {cog_name}")
+                except Exception as e:
+                    self.logger.error(f"Failed to load cog {cog_name}: {e}")
+        
+        # Also load subdirectory cogs
+        await self._load_cogs_from_subdirs(cogs_dir)
+    
+    async def _load_cogs_from_subdirs(self, cogs_dir):
+        """Load cogs from subdirectories."""
+        for item in os.listdir(cogs_dir):
+            item_path = os.path.join(cogs_dir, item)
+            if os.path.isdir(item_path) and not item.startswith('__'):
+                # Check if directory has __init__.py with setup function
+                init_file = os.path.join(item_path, '__init__.py')
+                if os.path.exists(init_file):
+                    try:
+                        await self.load_extension(f'src.cogs.{item}')
+                        self.logger.info(f"Loaded cog module: {item}")
+                    except Exception as e:
+                        self.logger.error(f"Failed to load cog module {item}: {e}")
+    
     async def on_ready(self):
         """Called when the bot is ready."""
-        logger.info(f"Bot ready! Logged in as {self.user} ({self.user.id})")
-        logger.info(f"Connected to {len(self.guilds)} guilds")
+        self.logger.info(f"Bot is ready! Logged in as {self.user}")
+        self.logger.info(f"Bot is in {len(self.guilds)} guilds")
         
-        # Set status
-        activity = discord.Activity(
-            type=discord.ActivityType.watching,
-            name=f"{len(self.guilds)} servers | /help"
-        )
-        await self.change_presence(activity=activity)
-        
-    async def on_connect(self):
-        """Called when the bot connects to Discord."""
-        logger.info("Connected to Discord")
-        
-    async def on_disconnect(self):
-        """Called when the bot disconnects from Discord."""
-        logger.warning("Disconnected from Discord")
-        
-    async def on_resumed(self):
-        """Called when the bot resumes a session."""
-        logger.info("Resumed Discord session")
-        
-    async def on_guild_join(self, guild: discord.Guild):
-        """Called when the bot joins a guild."""
-        logger.info(f"Joined guild: {guild.name} ({guild.id})")
-        
-        # Ensure guild exists in database
-        if self.guild_service:
-            try:
-                await self.guild_service.ensure_guild_exists(guild)
-                await self.guild_service.update_guild_info(guild)
-            except Exception as e:
-                logger.error(f"Error setting up guild {guild.id}: {e}")
-                
-        # Update status
-        await self.update_status()
-        
-    async def on_guild_remove(self, guild: discord.Guild):
-        """Called when the bot leaves a guild."""
-        logger.info(f"Left guild: {guild.name} ({guild.id})")
-        
-        # Update status
-        await self.update_status()
-        
-    async def get_prefix(self, message: discord.Message) -> List[str]:
-        """Get the prefix for a guild."""
-        # DMs always use default prefix
-        if not message.guild:
-            return [DEFAULT_PREFIX]
-            
-        # Check cache first
-        if message.guild.id in self._prefix_cache:
-            prefix = self._prefix_cache[message.guild.id]
+        # Set bot status with correct prefix
+        if hasattr(self.config, 'environment') and self.config.environment == 'development':
+            prefix = '>>'
+        elif hasattr(self.config, 'discord_dev_prefix'):
+            prefix = self.config.discord_dev_prefix
+        elif hasattr(self.config, 'discord_prefix'):
+            prefix = self.config.discord_prefix
         else:
-            # Get from database
-            if self.guild_service:
-                try:
-                    prefix = await self.guild_service.get_prefix(message.guild.id)
-                    self._prefix_cache[message.guild.id] = prefix
-                except Exception as e:
-                    logger.error(f"Error getting prefix for guild {message.guild.id}: {e}")
-                    prefix = DEFAULT_PREFIX
-            else:
-                prefix = DEFAULT_PREFIX
-                
-        # Return list with prefix and mention
-        return commands.when_mentioned_or(prefix)(self, message)
-        
-    async def update_status(self):
-        """Update bot status."""
+            prefix = '>'
+            
         activity = discord.Activity(
             type=discord.ActivityType.watching,
-            name=f"{len(self.guilds)} servers | /help"
+            name=f"{len(self.guilds)} servers | {prefix}help"
         )
         await self.change_presence(activity=activity)
+    
+    async def on_command_error(self, ctx, error):
+        """Handle command errors."""
+        if isinstance(error, commands.CommandNotFound):
+            return
         
+        if isinstance(error, commands.MissingPermissions):
+            await ctx.send("❌ You don't have permission to use this command.")
+            return
+        
+        if isinstance(error, commands.BotMissingPermissions):
+            await ctx.send("❌ I don't have the required permissions to execute this command.")
+            return
+        
+        if isinstance(error, commands.CommandOnCooldown):
+            await ctx.send(f"⏰ This command is on cooldown. Try again in {error.retry_after:.2f} seconds.")
+            return
+        
+        # Log unexpected errors
+        self.logger.error(f"Command error in {ctx.command}: {error}")
+        await ctx.send("❌ An unexpected error occurred. Please try again later.")
+    
     async def close(self):
-        """Clean up bot resources."""
-        logger.info("Shutting down bot...")
-        
-        # Close aiohttp session
-        if self.session:
-            await self.session.close()
-            
-        # Clean up services
-        if self.guild_service:
-            await self.guild_service.cleanup()
-        if self.user_service:
-            await self.user_service.cleanup()
-        if self.member_service:
-            await self.member_service.cleanup()
-            
-        # Call parent close
+        """Called when the bot is shutting down."""
+        self.logger.info("Shutting down bot...")
         await super().close()
-        
-    def get_uptime(self) -> str:
-        """Get bot uptime as a formatted string."""
-        delta = datetime.utcnow() - self.start_time
-        days = delta.days
-        hours, remainder = divmod(delta.seconds, 3600)
-        minutes, seconds = divmod(remainder, 60)
-        
-        parts = []
-        if days:
-            parts.append(f"{days}d")
-        if hours:
-            parts.append(f"{hours}h")
-        if minutes:
-            parts.append(f"{minutes}m")
-        if seconds or not parts:
-            parts.append(f"{seconds}s")
-            
-        return " ".join(parts)
-        
-    async def is_owner(self, user: discord.User) -> bool:
-        """Check if a user is a bot owner."""
-        # Use built-in owner check
-        if await super().is_owner(user):
-            return True
-            
-        # Check additional owner IDs from constants
-        return user.id in OWNER_IDS
-        
-    async def sync_commands(self, guild_id: Optional[int] = None):
-        """Sync application commands.
-        
-        Args:
-            guild_id: Guild ID to sync to (None for global)
-        """
-        if guild_id:
-            guild = self.get_guild(guild_id)
-            if guild:
-                await self.tree.sync(guild=guild)
-                logger.info(f"Synced commands to guild {guild_id}")
+        self.logger.info("Bot shutdown completed")
+    
+    # Convenience methods for accessing application services
+    def get_database(self):
+        """Get database manager from application manager."""
+        if self.app_manager:
+            return self.app_manager.get_db_manager()
+        return None
+    
+    def get_cache(self):
+        """Get cache manager from application manager."""
+        if self.app_manager:
+            return self.app_manager.get_cache_manager()
+        return None
+    
+    def get_config(self):
+        """Get configuration from application manager."""
+        if self.app_manager:
+            return self.app_manager.get_config()
+        return None
+
+
+async def create_bot(config) -> ControBot:
+    """Create a new bot instance."""
+    return ControBot(config)
+
+
+async def run_bot(config):
+    """Create and run the bot."""
+    bot = await create_bot(config)
+    
+    try:
+        # Use get_discord_token() to get the correct token based on environment
+        if hasattr(config, 'get_discord_token'):
+            # Config object
+            token = config.get_discord_token()
         else:
-            await self.tree.sync()
-            logger.info("Synced commands globally") 
+            # Dict
+            token = config.get('discord_token', '')
+        await bot.start(token)
+    except KeyboardInterrupt:
+        bot.logger.info("Received shutdown signal")
+    except Exception as e:
+        bot.logger.error(f"Bot crashed: {e}")
+        raise
+    finally:
+        await bot.close() 

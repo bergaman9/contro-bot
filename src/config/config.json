@@ -20,7 +20,8 @@
         "utility.starboard",
         "utility.tickets",
         "utility.invites",
-        "utility.perplexity_chat"
+        "utility.perplexity_chat",
+        "utility.custom_status_manager"
     ],
     "client_settings": {
         "main": {
@@ -45,7 +46,9 @@
             "enabled_cogs": [
                 "admin.settings",
                 "admin.server_setup",
-                "utility.info"
+                "utility.info",
+                "utility.starboard",
+                "utility.custom_status_manager"
             ]
         },
         "premium": {
