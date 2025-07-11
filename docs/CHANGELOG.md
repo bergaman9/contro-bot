@@ -1,3 +1,7 @@
+## [1.1.9] - 2025-07-11
+
+fix: railway port uyumluluğu, EXPOSE 8080 ve compose port düzeltmesi
+
 ## [1.1.8] - 2025-07-11
 
 fix: add Dockerfile and compose for proper dependency install on Railway
