@@ -1,3 +1,7 @@
+## [1.1.7] - 2025-07-11
+
+Fix requirements.txt: separate gunicorn and python-dotenv, remove corrupt line
+
 ## [1.1.6] - 2025-07-11
 
 Add python-dotenv to requirements.txt
