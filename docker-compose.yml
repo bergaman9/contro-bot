@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  contro-bot:
+    build: .
+    container_name: contro-bot
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    ports:
+      - "5000:5000"  # API port
+    environment:
+      - PYTHONPATH=/app
+      - PYTHONUNBUFFERED=1 
