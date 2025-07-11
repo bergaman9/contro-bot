@@ -30,13 +30,20 @@ class DatabaseManager(LoggerMixin):
         try:
             self.logger.info(f"Connecting to MongoDB: {self._connection_string}")
             
-            # Create client with connection pool settings
+            # Create client with optimized settings for Raspberry Pi
             self.client = AsyncIOMotorClient(
                 self._connection_string,
-                maxPoolSize=self.config.max_pool_size,
-                minPoolSize=self.config.min_pool_size,
-                serverSelectionTimeoutMS=self.config.server_selection_timeout,
-                connectTimeoutMS=self.config.connect_timeout
+                maxPoolSize=3,  # Reduced for Raspberry Pi
+                minPoolSize=1,  # Reduced for Raspberry Pi
+                serverSelectionTimeoutMS=30000,  # Increased for Raspberry Pi
+                connectTimeoutMS=30000,  # Increased for Raspberry Pi
+                socketTimeoutMS=60000,  # Increased for Raspberry Pi
+                maxIdleTimeMS=45000,  # Reduced for Raspberry Pi
+                retryWrites=True,
+                retryReads=True,
+                waitQueueTimeoutMS=15000,  # Increased for Raspberry Pi
+                heartbeatFrequencyMS=10000,  # Added for Raspberry Pi
+                maxConnecting=2  # Added for Raspberry Pi
             )
             
             # Test connection
@@ -193,10 +200,17 @@ def get_sync_database_manager() -> Any:
     if _sync_client is None or _sync_db is None:
         _sync_client = MongoClient(
             config.url,
-            maxPoolSize=config.max_pool_size,
-            minPoolSize=config.min_pool_size,
-            serverSelectionTimeoutMS=config.server_selection_timeout,
-            connectTimeoutMS=config.connect_timeout
+            maxPoolSize=3,  # Reduced for Raspberry Pi
+            minPoolSize=1,  # Reduced for Raspberry Pi
+            serverSelectionTimeoutMS=30000,  # Increased for Raspberry Pi
+            connectTimeoutMS=30000,  # Increased for Raspberry Pi
+            socketTimeoutMS=60000,  # Increased for Raspberry Pi
+            maxIdleTimeMS=45000,  # Reduced for Raspberry Pi
+            retryWrites=True,
+            retryReads=True,
+            waitQueueTimeoutMS=15000,  # Increased for Raspberry Pi
+            heartbeatFrequencyMS=10000,  # Added for Raspberry Pi
+            maxConnecting=2  # Added for Raspberry Pi
         )
         _sync_db = _sync_client[config.database_name]
     return _sync_db

@@ -549,8 +549,16 @@ class CustomCommandsManager(commands.Cog, LoggerMixin):
         collection = self.mongo_db.custom_commands
         
         try:
-            # Use find() and to_list() instead of async for
-            guild_data_list = collection.find({'system_enabled': True}).to_list(length=None)
+            # Handle different cursor types
+            cursor = collection.find({'system_enabled': True})
+            
+            # Check if cursor has to_list method (async cursor)
+            if hasattr(cursor, 'to_list'):
+                guild_data_list = await cursor.to_list(length=None)
+            else:
+                # If it's already a list or sync cursor, use it directly
+                guild_data_list = list(cursor) if hasattr(cursor, '__iter__') else []
+            
             for guild_data in guild_data_list:
                 guild_id = guild_data['guild_id']
                 commands = guild_data.get('commands', [])

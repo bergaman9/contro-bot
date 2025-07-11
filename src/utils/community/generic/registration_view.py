@@ -112,7 +112,7 @@ class GamerRegistrationModal(Modal, title="Oyuncu Kaydı"):
             expectations = self.children[4].value.strip()
             
             # Get existing user data or create new entry
-            user_data = self.mongo_db.users.find_one({
+            user_data = self.mongo_db['users'].find_one({
                 "user_id": interaction.user.id,
                 "guild_id": interaction.guild.id
             })
@@ -142,7 +142,7 @@ class GamerRegistrationModal(Modal, title="Oyuncu Kaydı"):
             })
             
             # Save to database
-            self.mongo_db.users.update_one(
+            self.mongo_db['users'].update_one(
                 {"user_id": interaction.user.id, "guild_id": interaction.guild.id},
                 {"$set": user_data},
                 upsert=True
@@ -234,7 +234,7 @@ class GamerRegistrationModal(Modal, title="Oyuncu Kaydı"):
             )
             
             # Add recommendations based on games
-            similar_players = list(self.mongo_db.users.find({
+            similar_players = list(self.mongo_db['users'].find({
                 "guild_id": interaction.guild.id,
                 "games": {"$in": favorite_games},
                 "user_id": {"$ne": interaction.user.id}
@@ -293,20 +293,20 @@ class GamerRegistrationModal(Modal, title="Oyuncu Kaydı"):
             # Award 100 XP for registration
             registration_xp = 100
             
-            self.mongo_db.users.update_one(
+            self.mongo_db['users'].update_one(
                 {"user_id": user.id, "guild_id": guild_id},
                 {"$inc": {"xp": registration_xp}}
             )
             
             # Check if user leveled up
-            user_data = self.mongo_db.users.find_one({"user_id": user.id, "guild_id": guild_id})
+            user_data = self.mongo_db['users'].find_one({"user_id": user.id, "guild_id": guild_id})
             
             if user_data["xp"] >= user_data["next_level_xp"]:
                 # Update level and next_level_xp
                 new_level = user_data["level"] + 1
                 next_level_xp = 1000 * (new_level + 1) * 1.5
                 
-                self.mongo_db.users.update_one(
+                self.mongo_db['users'].update_one(
                     {"user_id": user.id, "guild_id": guild_id},
                     {"$set": {"level": new_level, "next_level_xp": next_level_xp}}
                 )
@@ -338,7 +338,7 @@ class GameBuddyView(View):
             return
         
         # Find players with similar game preferences
-        similar_players = list(self.mongo_db.users.find({
+        similar_players = list(self.mongo_db['users'].find({
             "guild_id": interaction.guild.id,
             "games": {"$in": self.games},
             "user_id": {"$ne": interaction.user.id}

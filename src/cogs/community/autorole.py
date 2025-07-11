@@ -23,10 +23,18 @@ class AutoRole(BaseCog):
         self.voice_times: Dict[str, Dict[str, int]] = {}  # guild_id -> user_id -> minutes
         self.active_timers: Dict[str, asyncio.Task] = {}
         self.cooldowns: Dict[str, datetime] = {}
+        self._autorole_db = None  # Will be initialized in cog_load
         
     async def cog_load(self):
         """Initialize database connection when cog loads"""
         try:
+            # Call parent cog_load first
+            await super().cog_load()
+            
+            # Initialize database connection
+            from src.utils.core.manager import get_async_database
+            self._autorole_db = await get_async_database()
+            
             logger.info("✅ AutoRole cog loaded successfully")
             # Start background tasks
             self.process_role_queue.start()
@@ -173,8 +181,12 @@ class AutoRole(BaseCog):
     async def execute_role_assignment(self, assignment: Dict[str, Any]):
         """Execute a role assignment from the queue"""
         try:
+            # Güvenli settings kontrolü
+            settings = assignment.get('settings')
+            if not settings:
+                logger.error("Assignment dict does not contain 'settings' or it is None!")
+                return
             member = assignment['member']
-            settings = assignment['settings']
             assignment_type = assignment['type']
             
             # Check cooldown
@@ -369,10 +381,13 @@ class AutoRole(BaseCog):
     async def get_auto_role_settings(self, guild_id: int) -> Optional[Dict[str, Any]]:
         """Get auto role settings for a guild"""
         try:
-            if not self.db:
+            if self._autorole_db is None:
                 logger.error("Database connection not available")
                 return None
-            settings = await self.db.autorole_settings.find_one({"guild_id": str(guild_id)})
+            
+            # Access the autorole_settings collection properly
+            settings_collection = self._autorole_db.get_collection('autorole_settings') if hasattr(self._autorole_db, 'get_collection') else self._autorole_db['autorole_settings']
+            settings = await settings_collection.find_one({"guild_id": str(guild_id)})
             return settings
         except Exception as e:
             logger.error(f"Error getting auto role settings for guild {guild_id}: {e}")
@@ -381,14 +396,21 @@ class AutoRole(BaseCog):
     async def get_auto_role_rules(self, guild_id: int, trigger_type: str = None) -> List[Dict[str, Any]]:
         """Get auto role rules for a guild"""
         try:
-            if not self.db:
+            if self._autorole_db is None:
                 logger.error("Database connection not available")
                 return []
+            
+            # Access the autorole_rules collection properly
+            rules_collection = self._autorole_db.get_collection('autorole_rules') if hasattr(self._autorole_db, 'get_collection') else self._autorole_db['autorole_rules']
+            
             query = {"guild_id": str(guild_id)}
             if trigger_type:
                 query["trigger"] = trigger_type
             
-            rules = await self.db.autorole_rules.find(query).to_list(None)
+            # Use async iteration instead of to_list
+            rules = []
+            async for rule in rules_collection.find(query):
+                rules.append(rule)
             return rules
         except Exception as e:
             logger.error(f"Error getting auto role rules for guild {guild_id}: {e}")
@@ -398,9 +420,13 @@ class AutoRole(BaseCog):
                                  success: bool, error: str = None):
         """Log role assignment attempt"""
         try:
-            if not self.db:
+            if self._autorole_db is None:
                 logger.error("Database connection not available")
                 return
+            
+            # Access the autorole_logs collection properly
+            logs_collection = self._autorole_db.get_collection('autorole_logs') if hasattr(self._autorole_db, 'get_collection') else self._autorole_db['autorole_logs']
+            
             log_entry = {
                 "guild_id": str(member.guild.id),
                 "user_id": str(member.id),
@@ -410,7 +436,7 @@ class AutoRole(BaseCog):
                 "error_message": error
             }
             
-            await self.db.autorole_logs.insert_one(log_entry)
+            await logs_collection.insert_one(log_entry)
             
         except Exception as e:
             logger.error(f"Error logging role assignment: {e}")
@@ -483,15 +509,21 @@ class AutoRole(BaseCog):
     async def autorole_stats(self, ctx: commands.Context):
         """View auto role assignment statistics"""
         try:
-            if not self.db:
+            if self._autorole_db is None:
                 await ctx.send("❌ Database connection not available")
                 return
             
-            # Get recent logs
-            recent_logs = await self.db.autorole_logs.find({
+            # Access the autorole_logs collection properly
+            logs_collection = self._autorole_db.get_collection('autorole_logs') if hasattr(self._autorole_db, 'get_collection') else self._autorole_db['autorole_logs']
+            
+            # Get recent logs using async iteration
+            recent_logs = []
+            cutoff_date = datetime.utcnow() - timedelta(days=7)
+            async for log in logs_collection.find({
                 "guild_id": str(ctx.guild.id),
-                "timestamp": {"$gte": datetime.utcnow() - timedelta(days=7)}
-            }).to_list(None)
+                "timestamp": {"$gte": cutoff_date}
+            }):
+                recent_logs.append(log)
             
             total_assignments = len(recent_logs)
             successful_assignments = len([log for log in recent_logs if log.get('success')])

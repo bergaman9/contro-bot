@@ -49,35 +49,44 @@ def initialize_sync_mongodb():
             logger.info("Connecting to MongoDB Atlas with SRV connection")
             sync_client = MongoClient(
                 MONGO_URI,
-                serverSelectionTimeoutMS=10000,
-                connectTimeoutMS=10000,
-                socketTimeoutMS=30000,
-                maxIdleTimeMS=60000,
+                serverSelectionTimeoutMS=30000,  # Increased for Raspberry Pi
+                connectTimeoutMS=30000,          # Increased for Raspberry Pi
+                socketTimeoutMS=60000,           # Increased for Raspberry Pi
+                maxIdleTimeMS=45000,             # Reduced for Raspberry Pi
                 retryWrites=True,
-                maxPoolSize=5,
-                waitQueueTimeoutMS=10000,
+                maxPoolSize=3,                   # Reduced for Raspberry Pi
+                minPoolSize=1,                   # Added for Raspberry Pi
+                waitQueueTimeoutMS=15000,        # Increased for Raspberry Pi
                 retryReads=True,
                 tls=True,
-                tlsAllowInvalidCertificates=True,
-                tlsCAFile=certifi.where()
+                tlsAllowInvalidCertificates=False,  # More secure
+                tlsCAFile=certifi.where(),
+                heartbeatFrequencyMS=10000,      # Added for Raspberry Pi
+                maxConnecting=2                  # Added for Raspberry Pi
             )
         else:
             logger.info("Connecting to local MongoDB")
             sync_client = MongoClient(
                 MONGO_URI,
-                serverSelectionTimeoutMS=10000,
-                connectTimeoutMS=10000,
-                socketTimeoutMS=30000,
-                maxIdleTimeMS=60000,
+                serverSelectionTimeoutMS=30000,  # Increased for Raspberry Pi
+                connectTimeoutMS=30000,          # Increased for Raspberry Pi
+                socketTimeoutMS=60000,           # Increased for Raspberry Pi
+                maxIdleTimeMS=45000,             # Reduced for Raspberry Pi
                 retryWrites=True,
-                maxPoolSize=5,
-                waitQueueTimeoutMS=10000,
+                maxPoolSize=3,                   # Reduced for Raspberry Pi
+                minPoolSize=1,                   # Added for Raspberry Pi
+                waitQueueTimeoutMS=15000,        # Increased for Raspberry Pi
                 retryReads=True
             )
         
         # Test connection
         sync_client.admin.command('ping')
         sync_db = sync_client[DB_NAME]
+        
+        # Add get_collection method for compatibility
+        if not hasattr(sync_db, 'get_collection'):
+            sync_db.get_collection = lambda collection_name: sync_db[collection_name]
+        
         logger.info(f"Sync MongoDB connected successfully to database: {DB_NAME}")
         return sync_db
         
@@ -94,35 +103,44 @@ async def initialize_async_mongodb():
             logger.info("Connecting to MongoDB Atlas with async SRV connection")
             async_client = MongoClient(
                 MONGO_URI,
-                serverSelectionTimeoutMS=10000,
-                connectTimeoutMS=10000,
-                socketTimeoutMS=30000,
-                maxIdleTimeMS=60000,
+                serverSelectionTimeoutMS=30000,  # Increased for Raspberry Pi
+                connectTimeoutMS=30000,          # Increased for Raspberry Pi
+                socketTimeoutMS=60000,           # Increased for Raspberry Pi
+                maxIdleTimeMS=45000,             # Reduced for Raspberry Pi
                 retryWrites=True,
-                maxPoolSize=5,
-                waitQueueTimeoutMS=10000,
+                maxPoolSize=3,                   # Reduced for Raspberry Pi
+                minPoolSize=1,                   # Added for Raspberry Pi
+                waitQueueTimeoutMS=15000,        # Increased for Raspberry Pi
                 retryReads=True,
                 tls=True,
-                tlsAllowInvalidCertificates=True,
-                tlsCAFile=certifi.where()
+                tlsAllowInvalidCertificates=False,  # More secure
+                tlsCAFile=certifi.where(),
+                heartbeatFrequencyMS=10000,      # Added for Raspberry Pi
+                maxConnecting=2                  # Added for Raspberry Pi
             )
         else:
             logger.info("Connecting to local MongoDB with async connection")
             async_client = MongoClient(
                 MONGO_URI,
-                serverSelectionTimeoutMS=10000,
-                connectTimeoutMS=10000,
-                socketTimeoutMS=30000,
-                maxIdleTimeMS=60000,
+                serverSelectionTimeoutMS=30000,  # Increased for Raspberry Pi
+                connectTimeoutMS=30000,          # Increased for Raspberry Pi
+                socketTimeoutMS=60000,           # Increased for Raspberry Pi
+                maxIdleTimeMS=45000,             # Reduced for Raspberry Pi
                 retryWrites=True,
-                maxPoolSize=5,
-                waitQueueTimeoutMS=10000,
+                maxPoolSize=3,                   # Reduced for Raspberry Pi
+                minPoolSize=1,                   # Added for Raspberry Pi
+                waitQueueTimeoutMS=15000,        # Increased for Raspberry Pi
                 retryReads=True
             )
         
         # Test connection - use sync ping for now since pymongo async is limited
         async_client.admin.command('ping')
         async_db = async_client[DB_NAME]
+        
+        # Add get_collection method for compatibility
+        if not hasattr(async_db, 'get_collection'):
+            async_db.get_collection = lambda collection_name: async_db[collection_name]
+        
         logger.info(f"Async MongoDB connected successfully to database: {DB_NAME}")
         return async_db
         
@@ -206,6 +224,12 @@ class DummyAsyncDatabase:
             return getattr(self, collection_name)
         return DummyAsyncCollection(collection_name)
     
+    def get_collection(self, collection_name: str):
+        """Get a collection by name"""
+        if hasattr(self, collection_name):
+            return getattr(self, collection_name)
+        return DummyAsyncCollection(collection_name)
+    
     async def list_collection_names(self) -> List[str]:
         return []
     
@@ -272,6 +296,10 @@ class DummySyncDatabase:
         logger.warning("Using DummySyncDatabase - MongoDB connection failed")
     
     def __getitem__(self, collection_name: str):
+        return DummySyncCollection(collection_name)
+    
+    def get_collection(self, collection_name: str):
+        """Get a collection by name"""
         return DummySyncCollection(collection_name)
     
     def list_collection_names(self) -> List[str]:

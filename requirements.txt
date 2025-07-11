@@ -25,6 +25,22 @@ Pillow>=10.0.0
 openai>=1.0.0
 anthropic>=0.7.0
 
+# Data processing and utilities
+numpy>=1.24.0
+psutil>=5.9.0
+ordinal>=0.0.1
+
+# Scheduling and external APIs
+apscheduler>=3.10.0
+asyncpraw>=7.7.0
+
+# External service APIs
+html-text>=0.5.0
+rawg>=0.1.0
+spotipy>=2.23.0
+tmdbsimple>=2.0.0
+translate>=3.6.0
+
 # Utilities
 python-dateutil>=2.8.0
 pytz>=2023.3

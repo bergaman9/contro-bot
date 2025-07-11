@@ -10,9 +10,9 @@ from typing import Optional, Dict, Any
 import os
 import sys
 
-from ..core.config import get_config
-from ..core.logger import get_logger, LoggerMixin
-from ..core.application import get_application_manager
+from src.core.config import get_config
+from src.core.logger import get_logger, LoggerMixin
+from src.core.application import get_application_manager
 
 
 class ControBot(commands.Bot, LoggerMixin):
@@ -112,20 +112,33 @@ class ControBot(commands.Bot, LoggerMixin):
         self.logger.info(f"Bot is ready! Logged in as {self.user}")
         self.logger.info(f"Bot is in {len(self.guilds)} guilds")
         
-        # Set bot status with correct prefix
-        if hasattr(self.config, 'environment') and self.config.environment == 'development':
-            prefix = '>>'
-        elif hasattr(self.config, 'discord_dev_prefix'):
-            prefix = self.config.discord_dev_prefix
-        elif hasattr(self.config, 'discord_prefix'):
-            prefix = self.config.discord_prefix
+        # Set bot status based on environment
+        if hasattr(self.config, 'environment'):
+            environment = self.config.environment
         else:
-            prefix = '>'
+            environment = 'development'
             
-        activity = discord.Activity(
-            type=discord.ActivityType.watching,
-            name=f"{len(self.guilds)} servers | {prefix}help"
-        )
+        if environment == 'production':
+            # Production status - show website and help
+            activity = discord.Activity(
+                type=discord.ActivityType.watching,
+                name="contro.space | /help"
+            )
+        elif environment == 'development':
+            # Development status - show dev mode and prefix
+            prefix = self.config.discord_dev_prefix if hasattr(self.config, 'discord_dev_prefix') else '>>'
+            activity = discord.Activity(
+                type=discord.ActivityType.watching,
+                name=f"🔧 Dev Mode | {prefix}help"
+            )
+        else:
+            # Default/testing status
+            prefix = self.config.discord_prefix if hasattr(self.config, 'discord_prefix') else '>'
+            activity = discord.Activity(
+                type=discord.ActivityType.watching,
+                name=f"{len(self.guilds)} servers | {prefix}help"
+            )
+            
         await self.change_presence(activity=activity)
     
     async def on_command_error(self, ctx, error):

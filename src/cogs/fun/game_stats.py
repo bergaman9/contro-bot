@@ -89,7 +89,7 @@ class GameStats(commands.Cog):
         games_key = f"guild_games_{guild_id}"
         
         async def fetch_guild_games():
-            if not self.mongodb:
+            if self.mongodb is None:
                 return None
             games = self.mongodb["games"]
             return await games.find_one({"guild_id": guild_id})
@@ -185,7 +185,7 @@ class GameStats(commands.Cog):
 
     async def update_games_in_db(self, guild, current_games):
         """Update games data in database"""
-        if not self.mongodb:
+        if self.mongodb is None:
             return
             
         try:

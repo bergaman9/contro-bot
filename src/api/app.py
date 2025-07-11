@@ -4,16 +4,17 @@ Provides REST API endpoints for dashboard and external integrations
 """
 
 import asyncio
+import time
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from werkzeug.exceptions import HTTPException
 import threading
 from typing import Optional
 
-from ..core.config import get_config
-from ..core.logger import setup_logging, get_logger
-from ..core.database import get_database_manager
-from ..core.cache import get_cache_manager
+from src.core.config import get_config
+from src.core.logger import setup_logging, get_logger
+from src.core.database import get_database_manager
+from src.core.cache import get_cache_manager
 from .middleware.auth import auth_middleware
 from .middleware.rate_limit import rate_limit_middleware
 from .routes.giveaway_api import giveaway_bp
@@ -50,11 +51,19 @@ def create_app() -> Flask:
     @app.route('/health')
     def health_check():
         """Health check endpoint."""
-        return jsonify({
-            'status': 'healthy',
-            'service': 'contro-api',
-            'version': '2.0.0'
-        })
+        try:
+            return jsonify({
+                'status': 'healthy',
+                'service': 'contro-api',
+                'version': '2.0.0',
+                'timestamp': time.time()
+            })
+        except Exception as e:
+            logger.error(f"Health check error: {e}")
+            return jsonify({
+                'status': 'error',
+                'error': str(e)
+            }), 500
     
     logger.info("Flask application created successfully")
     return app

@@ -24,7 +24,7 @@ class GameMatchingView(View):
     async def send_initial_message(self, ctx):
         """Send the initial game matching message"""
         # Get user's game preferences
-        user_data = self.mongo_db.users.find_one({
+        user_data = self.mongo_db['users'].find_one({
             "user_id": self.user_id,
             "guild_id": self.guild_id
         })
@@ -123,7 +123,7 @@ class GameMatchingView(View):
         await interaction.response.defer(ephemeral=True)
         
         # Find players who play this game
-        players = list(self.mongo_db.users.find({
+        players = list(self.mongo_db['users'].find({
             "guild_id": self.guild_id,
             "games": {"$in": [self.selected_game]}
         }))

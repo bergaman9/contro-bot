@@ -37,12 +37,12 @@ class LevelLeaderboardView(View):
         skip = self.current_page * self.items_per_page
         
         # Get users sorted by the selected field
-        users = list(self.mongo_db.users.find(
+        users = list(self.mongo_db['users'].find(
             {"guild_id": self.guild_id}
         ).sort("level", -1).limit(10))
         
         # Get total count for pagination
-        total_users = self.mongo_db.users.count_documents({"guild_id": self.guild_id})
+        total_users = self.mongo_db['users'].count_documents({"guild_id": self.guild_id})
         total_pages = (total_users + self.items_per_page - 1) // self.items_per_page
         
         # Create the embed
@@ -113,7 +113,7 @@ class LevelLeaderboardView(View):
         """Show the next page"""
         await interaction.response.defer()
         
-        total_users = self.mongo_db.users.count_documents({"guild_id": self.guild_id})
+        total_users = self.mongo_db['users'].count_documents({"guild_id": self.guild_id})
         total_pages = (total_users + self.items_per_page - 1) // self.items_per_page
         
         if self.current_page < total_pages - 1:

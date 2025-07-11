@@ -29,10 +29,14 @@ class XPManager:
     async def get_db(self):
         """Get database instance - async preferred"""
         if self.mongo_db is None:
-            # Try to get async database
-            from src.utils.database.connection import get_async_db
-            # get_async_db() returns a database object directly, don't await it
-            self.mongo_db = get_async_db()
+            # Try to get async database from connection module
+            try:
+                from src.utils.database.connection import ensure_async_db
+                self.mongo_db = await ensure_async_db()
+                logger.info("Got async database from connection module")
+            except Exception as e:
+                logger.error(f"Failed to get async database: {e}")
+                return None
         return self.mongo_db
     
     async def add_xp(self, member, xp_amount, activity_type="message", level_up_callback=None):
@@ -40,6 +44,7 @@ class XPManager:
         if member.bot:
             logger.debug(f"Skipping XP for bot user {member.name}")
             return
+        
           # Get async database
         mongo_db = await self.get_db()
         if mongo_db is None:
@@ -59,8 +64,11 @@ class XPManager:
             user_data = None
             
             try:
+                # Access the users collection properly
+                users_collection = mongo_db.get_collection('users') if hasattr(mongo_db, 'get_collection') else mongo_db['users']
+                
                 # Try the preferred ID format first (integer)
-                user_data = await mongo_db.users.find_one({
+                user_data = await users_collection.find_one({
                     "user_id": user_id_int, 
                     "guild_id": guild_id_int
                 })
@@ -68,7 +76,7 @@ class XPManager:
                 # If not found, try string format
                 if not user_data:
                     logger.debug(f"User not found with integer ID, trying string ID")
-                    user_data = await mongo_db.users.find_one({
+                    user_data = await users_collection.find_one({
                         "user_id": user_id_str, 
                         "guild_id": guild_id_str
                     })
@@ -93,7 +101,7 @@ class XPManager:
                 
                 # Insert new user document
                 try:
-                    await mongo_db.users.insert_one(user_data)
+                    await users_collection.insert_one(user_data)
                     logger.info(f"Created new user record for {member.name} ({user_id_int})")
                 except Exception as e:
                     logger.error(f"Failed to create new user document: {e}", exc_info=True)
@@ -125,7 +133,7 @@ class XPManager:
             
             # Save the updated user data to the users collection
             try:
-                update_result = await mongo_db.users.update_one(
+                update_result = await users_collection.update_one(
                     {"user_id": user_id_int, "guild_id": guild_id_int},
                     {"$set": user_data},
                     upsert=True
@@ -213,8 +221,11 @@ class XPManager:
             # Try the users collection with integer IDs first
             user_data = None
             try:
+                # Access the users collection properly
+                users_collection = mongo_db.get_collection('users') if hasattr(mongo_db, 'get_collection') else mongo_db['users']
+                
                 # Try async query first with integer IDs
-                user_data = await mongo_db.users.find_one({
+                user_data = await users_collection.find_one({
                     "user_id": user_id_int, 
                     "guild_id": guild_id_int
                 })
@@ -222,7 +233,7 @@ class XPManager:
                 
                 # If not found, try with string IDs
                 if not user_data:
-                    user_data = await mongo_db.users.find_one({
+                    user_data = await users_collection.find_one({
                         "user_id": user_id_str, 
                         "guild_id": guild_id_str
                     })
@@ -269,7 +280,7 @@ class XPManager:
             
             try:
                 # Try to create the new user
-                await mongo_db.users.insert_one(new_user_data)
+                await mongo_db['users'].insert_one(new_user_data)
                 logger.info(f"Created new user entry for {user_id_int} in guild {guild_id_int}")
             except Exception as e:
                 logger.error(f"Failed to create new user: {e}")
@@ -311,7 +322,7 @@ class XPManager:
             users = []
             try:
                 # Try async approach first
-                cursor = mongo_db.users.find({"guild_id": guild_id}).sort("xp", -1)
+                cursor = mongo_db['users'].find({"guild_id": guild_id}).sort("xp", -1)
                 users = await cursor.to_list(length=None)
             except Exception as e:
                 logger.error(f"Error getting users for ranking: {e}", exc_info=True)
@@ -339,7 +350,7 @@ class XPManager:
             if mongo_db is None:
                 return []
             
-            cursor = mongo_db.users.find({"guild_id": guild_id}).sort("xp", -1).limit(limit)
+            cursor = mongo_db['users'].find({"guild_id": guild_id}).sort("xp", -1).limit(limit)
             return await cursor.to_list(length=limit)
         except Exception as e:
             logger.error(f"Error getting top users: {e}")
@@ -394,13 +405,13 @@ class XPManager:
         try:
             # Update in new collection
             try:
-                await self.mongo_db.users.update_one(
+                await self.mongo_db['users'].update_one(
                     {"user_id": user_id, "guild_id": guild_id},
                     {"$set": user_data},
                     upsert=True
                 )
             except (TypeError, AttributeError):
-                self.mongo_db.users.update_one(
+                self.mongo_db['users'].update_one(
                     {"user_id": user_id, "guild_id": guild_id},
                     {"$set": user_data},
                     upsert=True
@@ -411,14 +422,14 @@ class XPManager:
                 # Check if user exists in legacy collection
                 legacy_user = None
                 try:
-                    legacy_user = await self.mongo_db.users.find_one({"user_id": user_id})
+                    legacy_user = await self.mongo_db['users'].find_one({"user_id": user_id})
                 except (TypeError, AttributeError):
-                    legacy_user = self.mongo_db.users.find_one({"user_id": user_id})
+                    legacy_user = self.mongo_db['users'].find_one({"user_id": user_id})
                 
                 if legacy_user:
                     # Update existing user
                     try:
-                        await self.mongo_db.users.update_one(
+                        await self.mongo_db['users'].update_one(
                             {"user_id": user_id},
                             {"$set": {f"guilds.{guild_id}": {
                                 "username": member.name,
@@ -432,7 +443,7 @@ class XPManager:
                             }}}
                         )
                     except (TypeError, AttributeError):
-                        self.mongo_db.users.update_one(
+                        self.mongo_db['users'].update_one(
                             {"user_id": user_id},
                             {"$set": {f"guilds.{guild_id}": {
                                 "username": member.name,
@@ -463,9 +474,9 @@ class XPManager:
                         }
                     }
                     try:
-                        await self.mongo_db.users.insert_one(legacy_data)
+                        await self.mongo_db['users'].insert_one(legacy_data)
                     except (TypeError, AttributeError):
-                        self.mongo_db.users.insert_one(legacy_data)
+                        self.mongo_db['users'].insert_one(legacy_data)
             except Exception as e:
                 logger.warning(f"Failed to update legacy format during registration: {e}")
             
@@ -509,7 +520,7 @@ class XPManager:
                 # Check if async MongoDB is available
                 is_async = False
                 try:
-                    is_async = hasattr(self.mongo_db.users.insert_one, '__await__')
+                    is_async = hasattr(self.mongo_db['users'].insert_one, '__await__')
                 except Exception:
                     is_async = False
                 
@@ -530,9 +541,9 @@ class XPManager:
                 # Insert the new document
                 try:
                     if is_async:
-                        await self.mongo_db.users.insert_one(new_user)
+                        await self.mongo_db['users'].insert_one(new_user)
                     else:
-                        self.mongo_db.users.insert_one(new_user)
+                        self.mongo_db['users'].insert_one(new_user)
                     
                     # Set the user data
                     user_data = {

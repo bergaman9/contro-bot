@@ -5,6 +5,7 @@ Manages all services (bot, API, database, cache) from a single point
 
 import asyncio
 import threading
+import os
 from typing import Optional, Dict, Any
 from contextlib import asynccontextmanager
 
@@ -91,7 +92,7 @@ class ApplicationManager(LoggerMixin):
     async def _setup_bot(self) -> None:
         """Setup Discord bot."""
         self.logger.info("Setting up Discord bot...")
-        from ..bot.client import create_bot
+        from src.bot.client import create_bot
         # Pass config object directly, not model_dump() to preserve methods
         self.bot = await create_bot(self.config)
         self.logger.info("Discord bot setup completed")
@@ -99,7 +100,7 @@ class ApplicationManager(LoggerMixin):
     async def _setup_api(self) -> None:
         """Setup Flask API."""
         self.logger.info("Setting up Flask API...")
-        from ..api.app import create_app
+        from src.api.app import create_app
         self.api_app = create_app()
         self.logger.info("Flask API setup completed")
     
@@ -120,13 +121,19 @@ class ApplicationManager(LoggerMixin):
     
     def _start_api_thread(self) -> None:
         """Start API server in a separate thread."""
+        # Force reload API port from environment BEFORE starting the thread
+        api_port = int(os.environ.get('API_PORT', self.config.api.port))
+        
+        # Update the port for this run
+        self.config.api.port = api_port
+        
         def run_api():
             try:
                 # Note: debug=False to avoid signal handling issues in threads
                 # Flask's debug mode tries to set signal handlers which only work in main thread
                 self.api_app.run(
                     host=self.config.api.host,
-                    port=self.config.api.port,
+                    port=api_port,  # Use the corrected port directly
                     debug=False,  # Always False to avoid signal issues in threads
                     threaded=True
                 )
@@ -136,7 +143,8 @@ class ApplicationManager(LoggerMixin):
         
         api_thread = threading.Thread(target=run_api, daemon=True)
         api_thread.start()
-        self.logger.info(f"API server started on {self.config.api.host}:{self.config.api.port}")
+        
+        self.logger.info(f"API server started on {self.config.api.host}:{api_port}")
     
     async def _start_bot(self) -> None:
         """Start Discord bot."""

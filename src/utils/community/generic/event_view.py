@@ -484,18 +484,18 @@ class EventCreationModal(Modal, title="Oyun Etkinliği Oluştur"):
         try:
             event_creation_xp = 200
             
-            self.mongo_db.users.update_one(
+            self.mongo_db['users'].update_one(
                 {"user_id": user.id, "guild_id": self.guild_id},
                 {"$inc": {"xp": event_creation_xp}}
             )
             
-            user_data = self.mongo_db.users.find_one({"user_id": user.id, "guild_id": self.guild_id})
+            user_data = self.mongo_db['users'].find_one({"user_id": user.id, "guild_id": self.guild_id})
             
             if user_data and user_data.get("xp", 0) >= user_data.get("next_level_xp", 1000):
                 new_level = user_data.get("level", 0) + 1
                 next_level_xp = 1000 * (new_level + 1) * 1.5
                 
-                self.mongo_db.users.update_one(
+                self.mongo_db['users'].update_one(
                     {"user_id": user.id, "guild_id": self.guild_id},
                     {"$set": {"level": new_level, "next_level_xp": next_level_xp}}
                 )

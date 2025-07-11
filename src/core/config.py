@@ -127,9 +127,9 @@ class Config(BaseSettings):
     """Main configuration class for Contro Discord Bot."""
     
     # Bot Configuration
-    discord_token: str = Field(default="", env="DISCORD_TOKEN")
-    discord_dev_token: str = Field(default="", env="DISCORD_DEV_TOKEN")
-    discord_premium_token: str = Field(default="", env="DISCORD_PREMIUM_TOKEN")
+    discord_token: str = Field(default="", env="CONTRO_TOKEN")
+    discord_dev_token: str = Field(default="", env="CONTRO_DEV_TOKEN")
+    discord_premium_token: str = Field(default="", env="CONTRO_PREMIUM_TOKEN")
     discord_prefix: str = Field(default=">", env="DISCORD_PREFIX")
     discord_dev_prefix: str = Field(default=">>", env="DISCORD_DEV_PREFIX")
     environment: str = Field(default="development", env="ENVIRONMENT")
@@ -138,22 +138,22 @@ class Config(BaseSettings):
     bot_version: str = Field(default="2.0.0", env="BOT_VERSION")
     
     # Sub-configurations
-    database: DatabaseConfig = DatabaseConfig()
-    cache: CacheConfig = CacheConfig()
-    api: APIConfig = APIConfig()
-    logging: LoggingConfig = LoggingConfig(
+    database: DatabaseConfig = Field(default_factory=DatabaseConfig)
+    cache: CacheConfig = Field(default_factory=CacheConfig)
+    api: APIConfig = Field(default_factory=APIConfig)
+    logging: LoggingConfig = Field(default_factory=lambda: LoggingConfig(
         level="INFO",
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         file="logs/bot.log",
         max_size=10 * 1024 * 1024,
         backup_count=5
-    )
-    security: SecurityConfig = SecurityConfig()
-    features: FeatureConfig = FeatureConfig()
-    performance: PerformanceConfig = PerformanceConfig()
-    external_services: ExternalServicesConfig = ExternalServicesConfig()
-    admin: AdminConfig = AdminConfig()
-    server: ServerConfig = ServerConfig()
+    ))
+    security: SecurityConfig = Field(default_factory=SecurityConfig)
+    features: FeatureConfig = Field(default_factory=FeatureConfig)
+    performance: PerformanceConfig = Field(default_factory=PerformanceConfig)
+    external_services: ExternalServicesConfig = Field(default_factory=ExternalServicesConfig)
+    admin: AdminConfig = Field(default_factory=AdminConfig)
+    server: ServerConfig = Field(default_factory=ServerConfig)
     
     class Config:
         env_file = ".env"
@@ -163,10 +163,13 @@ class Config(BaseSettings):
     
     def __init__(self, **values):
         super().__init__(**values)
+        # Map environment variables to the correct field names
         if not self.discord_token:
-            self.discord_token = os.environ.get("DISCORD_TOKEN", "")
+            self.discord_token = os.environ.get("CONTRO_TOKEN", os.environ.get("DISCORD_TOKEN", ""))
         if not self.discord_dev_token:
-            self.discord_dev_token = os.environ.get("DISCORD_DEV_TOKEN", "")
+            self.discord_dev_token = os.environ.get("CONTRO_DEV_TOKEN", os.environ.get("DISCORD_DEV_TOKEN", ""))
+        if not self.discord_premium_token:
+            self.discord_premium_token = os.environ.get("CONTRO_PREMIUM_TOKEN", os.environ.get("DISCORD_PREMIUM_TOKEN", ""))
         if not self.database.url or self.database.url == "mongodb://localhost:27017":
             self.database.url = os.environ.get("DB_URL", "mongodb://localhost:27017")
 
@@ -180,14 +183,36 @@ class Config(BaseSettings):
 
     def get_discord_token(self) -> str:
         """Get the appropriate Discord token based on environment."""
+        print(f"🔍 Environment: {self.environment}")
+        print(f"🔍 Debug mode: {self.debug}")
+        
         if self.environment == "development":
+            # Use CONTRO_DEV_TOKEN for development
+            dev_token = os.environ.get("CONTRO_DEV_TOKEN", "")
+            if dev_token:
+                print(f"✅ Using CONTRO_DEV_TOKEN for development mode")
+                return dev_token
+            # Fallback to discord_dev_token if CONTRO_DEV_TOKEN not found
             token = self.discord_dev_token or self.discord_token
+            print(f"⚠️  CONTRO_DEV_TOKEN not found, using fallback: {token[:20]}...")
             return token
         elif self.environment == "production":
+            # Use CONTRO_PREMIUM_TOKEN for production
+            premium_token = os.environ.get("CONTRO_PREMIUM_TOKEN", "")
+            if premium_token:
+                print(f"✅ Using CONTRO_PREMIUM_TOKEN for production mode")
+                return premium_token
+            # Fallback to discord_premium_token if CONTRO_PREMIUM_TOKEN not found
             token = self.discord_premium_token or self.discord_token
+            print(f"⚠️  CONTRO_PREMIUM_TOKEN not found, using fallback: {token[:20]}...")
             return token
         else:
-            # Default to main token
+            # Default to main token (CONTRO_TOKEN)
+            main_token = os.environ.get("CONTRO_TOKEN", "")
+            if main_token:
+                print(f"✅ Using CONTRO_TOKEN for default mode")
+                return main_token
+            print(f"⚠️  CONTRO_TOKEN not found, using discord_token: {self.discord_token[:20]}...")
             return self.discord_token
 
     def get_prefix(self) -> str:
@@ -211,10 +236,16 @@ def get_config() -> Config:
 def reload_config(mode: str = None) -> Config:
     """Reload configuration from environment variables."""
     global _config
+    
+    # Force reload environment variables from .env file
+    from dotenv import load_dotenv
+    load_dotenv(override=True)
+    
     _config = Config()
     if mode:
         _config.environment = mode
         _config.debug = mode == 'development'
+    
     return _config
 
 
