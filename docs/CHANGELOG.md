@@ -1,3 +1,7 @@
+## [1.1.5] - 2025-07-11
+
+Cleanup before rebase
+
 ## [1.1.4] - 2025-07-09
 
 Merge refactor/modular-architecture into main
