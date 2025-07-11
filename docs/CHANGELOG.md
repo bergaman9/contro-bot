@@ -1,3 +1,7 @@
+## [1.1.6] - 2025-07-11
+
+Add python-dotenv to requirements.txt
+
 ## [1.1.5] - 2025-07-11
 
 Cleanup before rebase
