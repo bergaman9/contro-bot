@@ -1,3 +1,7 @@
+## [1.1.8] - 2025-07-11
+
+fix: add Dockerfile and compose for proper dependency install on Railway
+
 ## [1.1.7] - 2025-07-11
 
 Fix requirements.txt: separate gunicorn and python-dotenv, remove corrupt line
