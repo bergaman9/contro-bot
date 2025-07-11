@@ -11,7 +11,7 @@ services:
       - ./data:/app/data
       - ./logs:/app/logs
     ports:
-      - "5000:5000"  # API port
+      - "8080:8080"  # API port
     environment:
       - PYTHONPATH=/app
       - PYTHONUNBUFFERED=1 

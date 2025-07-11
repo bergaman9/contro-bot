@@ -121,29 +121,24 @@ class ApplicationManager(LoggerMixin):
     
     def _start_api_thread(self) -> None:
         """Start API server in a separate thread."""
-        # Force reload API port from environment BEFORE starting the thread
-        api_port = int(os.environ.get('API_PORT', self.config.api.port))
-        
-        # Update the port for this run
+        # Railway PORT desteği
+        api_port = int(os.environ.get('PORT', os.environ.get('API_PORT', self.config.api.port)))
         self.config.api.port = api_port
-        
+
         def run_api():
             try:
-                # Note: debug=False to avoid signal handling issues in threads
-                # Flask's debug mode tries to set signal handlers which only work in main thread
                 self.api_app.run(
                     host=self.config.api.host,
-                    port=api_port,  # Use the corrected port directly
-                    debug=False,  # Always False to avoid signal issues in threads
+                    port=api_port,
+                    debug=False,
                     threaded=True
                 )
             except Exception as e:
                 self.logger.error(f"API server error: {e}")
                 self._shutdown_event.set()
-        
+
         api_thread = threading.Thread(target=run_api, daemon=True)
         api_thread.start()
-        
         self.logger.info(f"API server started on {self.config.api.host}:{api_port}")
     
     async def _start_bot(self) -> None:
