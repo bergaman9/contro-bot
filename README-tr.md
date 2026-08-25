@@ -4,6 +4,11 @@
   
   [![İngilizce](https://img.shields.io/badge/Language-English-blue)](README.md)
   [![Türkçe](https://img.shields.io/badge/Language-T%C3%BCrk%C3%A7e-red)](#)
+  <br>
+  <img src="https://img.shields.io/badge/Python-3.11-blue?logo=python&logoColor=white" alt="Python">
+  <img src="https://img.shields.io/badge/discord.py-2.7.1-blue?logo=discord&logoColor=white" alt="discord.py">
+  <img src="https://img.shields.io/badge/Next.js-15-black?logo=next.js&logoColor=white" alt="Next.js">
+  <img src="https://img.shields.io/badge/MongoDB-Atlas-47A248?logo=mongodb&logoColor=white" alt="MongoDB">
 </div>
 
 ---
@@ -72,3 +77,4 @@ Contro, 20'den fazla yerleşik modülle birlikte gelir. Aşağıda botun sunduğ
 
 ---
 *Not: Bu depo yalnızca tanıtım amaçlıdır. Contro'nun temel kaynak kodu, sistem güvenliğini korumak amacıyla gizli (private) bir depoda tutulmaktadır.*
+

@@ -4,6 +4,11 @@
   
   [![Turkish](https://img.shields.io/badge/Language-T%C3%BCrk%C3%A7e-red)](README-tr.md)
   [![English](https://img.shields.io/badge/Language-English-blue)](#)
+  <br>
+  <img src="https://img.shields.io/badge/Python-3.11-blue?logo=python&logoColor=white" alt="Python">
+  <img src="https://img.shields.io/badge/discord.py-2.7.1-blue?logo=discord&logoColor=white" alt="discord.py">
+  <img src="https://img.shields.io/badge/Next.js-15-black?logo=next.js&logoColor=white" alt="Next.js">
+  <img src="https://img.shields.io/badge/MongoDB-Atlas-47A248?logo=mongodb&logoColor=white" alt="MongoDB">
 </div>
 
 ---
@@ -72,3 +77,4 @@ Contro comes packed with over 20+ built-in modules. Below is the comprehensive l
 
 ---
 *Note: This repository serves as a showcase. The core source code for Contro is maintained in a private repository to protect proprietary systems.*
+
